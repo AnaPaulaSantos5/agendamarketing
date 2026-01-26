@@ -1,40 +1,35 @@
-import { NextResponse } from "next/server";
-import { GoogleSpreadsheet } from "google-spreadsheet";
+// app/api/agenda/route.ts
+import { NextResponse } from 'next/server';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-// Função para limpar a private key
-function cleanPrivateKey(key: string): string {
-  return key
-    .trim()                  // remove espaços no início e fim
-    .replace(/\r/g, "")      // remove carriage returns invisíveis
-    .replace(/\t/g, "")      // remove tabs
-    .replace(/\\n/g, "\n");  // transforma "\n" literal em quebra real
-}
-
-// Lê variáveis do .env e limpa se necessário
-const SHEET_ID = process.env.GOOGLE_SHEET_ID?.trim()!;
-const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim()!;
-const PRIVATE_KEY = cleanPrivateKey(process.env.GOOGLE_PRIVATE_KEY!);
+// Pega as variáveis do ambiente
+const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
+const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
+const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')!;
 
 export async function GET() {
   try {
-    // Cria documento passando apenas o ID
+    // Cria o documento com o ID
     const doc = new GoogleSpreadsheet(SHEET_ID);
 
-    // Autenticação com credenciais limpas
+    // Autentica usando a conta de serviço
     await doc.useServiceAccountAuth({
       client_email: CLIENT_EMAIL,
       private_key: PRIVATE_KEY,
     });
 
-    await doc.loadInfo(); // Carrega info do spreadsheet
-    const sheet = doc.sheetsByIndex[0]; // pega a primeira aba
+    // Carrega informações do documento
+    await doc.loadInfo();
+
+    // Por exemplo, pega a primeira aba
+    const sheet = doc.sheetsByIndex[0];
     const rows = await sheet.getRows();
 
     // Retorna os dados como JSON
-    const data = rows.map((row) => row._rawData);
-    return NextResponse.json(data);
+    const data = rows.map((row) => ({ ...row }));
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("Erro ao acessar Google Spreadsheet:", error);
-    return NextResponse.json({ error: "Falha ao acessar a planilha" }, { status: 500 });
+    console.error('Erro ao acessar a planilha:', error);
+    return NextResponse.json({ success: false, error: String(error) });
   }
 }
