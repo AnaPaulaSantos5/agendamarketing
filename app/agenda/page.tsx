@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AgendaEvent, ChecklistItem } from '../../lib/types' // caminho relativo seguro
 
 export default function AgendaPage() {
-  const [data, setData] = useState<{ agenda: AgendaEvent[]; checklist: ChecklistItem[] } | null>(null)
+  const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -25,14 +24,14 @@ export default function AgendaPage() {
       <h1>Agenda</h1>
 
       <h2>Agenda do Dia</h2>
-      {data.agenda.map((item, index) => (
+      {data.agenda.map((item: any, index: number) => (
         <p key={index}>
           {item.time} — {item.title}
         </p>
       ))}
 
       <h2>Checklist</h2>
-      {data.checklist.map(item => (
+      {data.checklist.map((item: any) => (
         <label key={item.id} style={{ display: 'block' }}>
           <input type="checkbox" /> {item.text}
         </label>
