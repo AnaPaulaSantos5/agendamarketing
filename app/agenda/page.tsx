@@ -4,13 +4,25 @@ import { useEffect, useState } from 'react'
 
 export default function AgendaPage() {
   const [data, setData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/agenda')
-      .then(res => res.json())
-      .then(setData)
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/api/agenda', { cache: 'no-store' })
+        if (!res.ok) throw new Error(`Erro ao carregar: ${res.status}`)
+        const json = await res.json()
+        setData(json)
+      } catch (err: any) {
+        console.error(err)
+        setError(err.message)
+      }
+    }
+
+    fetchData()
   }, [])
 
+  if (error) return <p>Erro: {error}</p>
   if (!data) return <p>Carregando...</p>
 
   return (
@@ -33,4 +45,3 @@ export default function AgendaPage() {
     </div>
   )
 }
-
