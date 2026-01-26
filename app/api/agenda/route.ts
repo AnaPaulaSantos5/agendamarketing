@@ -8,10 +8,9 @@ const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n')
 
 export async function GET() {
   try {
-    // Cria documento passando só o ID
-    const doc = new GoogleSpreadsheet(SHEET_ID)
+    // Passa o segundo argumento como undefined para satisfazer o TypeScript
+    const doc = new GoogleSpreadsheet(SHEET_ID, undefined)
 
-    // autentica
     await doc.useServiceAccountAuth({
       client_email: CLIENT_EMAIL,
       private_key: PRIVATE_KEY,
