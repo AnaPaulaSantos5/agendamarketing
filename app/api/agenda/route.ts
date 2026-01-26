@@ -1,44 +1,34 @@
 import { NextResponse } from 'next/server'
 import { GoogleSpreadsheet } from 'google-spreadsheet'
-import { AgendaEvent, ChecklistItem } from '@/lib/types'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!
 const SERVICE_ACCOUNT = {
   client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-  private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+  private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'), // atenção para o \n
 }
 
 export async function GET() {
   try {
+    // 1️⃣ construtor só recebe o ID
     const doc = new GoogleSpreadsheet(SHEET_ID)
 
-    // autentica passando o objeto completo
+    // 2️⃣ autenticação com objeto de credenciais completo
     await doc.useServiceAccountAuth(SERVICE_ACCOUNT)
 
-    await doc.loadInfo()
+    await doc.loadInfo() // carrega informações da planilha
     const sheet = doc.sheetsByIndex[0]
     const rows = await sheet.getRows()
 
-    const agenda: AgendaEvent[] = rows.map((row) => ({
+    const agenda = rows.map(row => ({
       date: row.Data,
-      time: row.Hora || '09:00',
+      time: row.Hora,
       title: row.Conteudo_Principal,
-      type: (row.Tipo || 'story').toLowerCase() as 'story' | 'reel' | 'post' | 'evento',
+      type: row.Tipo?.toLowerCase() || 'story'
     }))
 
-    const checklist: ChecklistItem[] = rows.map((row, index) => ({
-      id: `${index}`,
-      text: row.Conteudo_Secundario || 'Ação não definida',
-      done: row.Status_Postagem === 'Concluído',
-      time: row.Hora || undefined,
-    }))
-
-    return NextResponse.json({ agenda, checklist })
+    return NextResponse.json({ agenda })
   } catch (err: any) {
     console.error('Erro ao carregar agenda:', err)
-    return NextResponse.json(
-      { error: 'Erro ao carregar agenda' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 })
   }
 }
