@@ -1,16 +1,47 @@
 import { NextResponse } from 'next/server'
+import { GoogleSpreadsheet } from 'google-spreadsheet'
+import { AgendaEvent, ChecklistItem } from '@/lib/types'
+
+// Pega credenciais do .env
+const SHEET_ID = process.env.GOOGLE_SHEET_ID!
+const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!
+const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n') // corrige quebra de linha
 
 export async function GET() {
-  const agenda = [
-    { date: '2026-01-26', time: '09:00', title: 'Story bom dia motivacional', client: 'Confi' },
-    { date: '2026-01-26', time: '18:00', title: 'Reel consórcio', client: 'Confi' }
-  ]
+  try {
+    const doc = new GoogleSpreadsheet(SHEET_ID)
 
-  const checklist = [
-    { id: '1', text: 'Publicar story', done: false, time: '09:00' },
-    { id: '2', text: 'Publicar reel', done: false, time: '18:00' },
-    { id: '3', text: 'Responder directs', done: false }
-  ]
+    // autenticação
+    await doc.useServiceAccountAuth({
+      client_email: CLIENT_EMAIL,
+      private_key: PRIVATE_KEY,
+    })
 
-  return NextResponse.json({ agenda, checklist })
+    await doc.loadInfo()
+    const sheet = doc.sheetsByIndex[0] // pega primeira aba
+    const rows = await sheet.getRows()
+
+    // transforma linhas em agenda e checklist
+    const agenda: AgendaEvent[] = rows.map(row => ({
+      date: row.Data, // coluna Data
+      time: row.Hora || '09:00', // se tiver hora
+      title: row.Conteudo_Principal,
+      type: row.Tipo.toLowerCase() as 'story' | 'reel' | 'post' | 'evento',
+    }))
+
+    const checklist: ChecklistItem[] = rows.map((row, index) => ({
+      id: `${index}`,
+      text: row.Conteudo_Secundario || 'Ação não definida',
+      done: row.Status_Postagem === 'Concluído',
+      time: row.Hora || undefined,
+    }))
+
+    return NextResponse.json({ agenda, checklist })
+  } catch (err: any) {
+    console.error('Erro ao carregar agenda:', err.message)
+    return NextResponse.json(
+      { error: 'Erro ao carregar agenda' },
+      { status: 500 }
+    )
+  }
 }
