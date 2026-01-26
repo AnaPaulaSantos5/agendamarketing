@@ -3,16 +3,17 @@ import { GoogleSpreadsheet } from 'google-spreadsheet'
 import { AgendaEvent, ChecklistItem } from '@/lib/types'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!
-const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!
-const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n')
+const SERVICE_ACCOUNT = {
+  client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+  private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+}
 
 export async function GET() {
   try {
-    // Cria o documento e passa as credenciais direto no construtor
-    const doc = new GoogleSpreadsheet(SHEET_ID, {
-      clientEmail: CLIENT_EMAIL,
-      privateKey: PRIVATE_KEY,
-    })
+    const doc = new GoogleSpreadsheet(SHEET_ID)
+
+    // autentica passando o objeto completo
+    await doc.useServiceAccountAuth(SERVICE_ACCOUNT)
 
     await doc.loadInfo()
     const sheet = doc.sheetsByIndex[0]
