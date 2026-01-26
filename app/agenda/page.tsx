@@ -2,38 +2,90 @@
 
 import { useEffect, useState } from 'react'
 
-export default function AgendaPage() {
-  const [data, setData] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+type AgendaEvent = {
+  date: string
+  time: string
+  title: string
+  client: string
+}
 
+type ChecklistItem = {
+  id: string
+  text: string
+  done: boolean
+  time?: string
+}
+
+type AgendaData = {
+  agenda: AgendaEvent[]
+  checklist: ChecklistItem[]
+}
+
+export default function AgendaPage() {
+  const [data, setData] = useState<AgendaData | null>(null)
+  const [selectedClient, setSelectedClient] = useState('Confi')
+
+  // Busca os dados da API
   useEffect(() => {
     fetch('/api/agenda')
-      .then(res => {
-        if (!res.ok) throw new Error('Erro ao carregar agenda')
-        return res.json()
-      })
+      .then(res => res.json())
       .then(setData)
-      .catch(err => setError(err.message))
+      .catch(err => console.error('Erro ao carregar agenda', err))
   }, [])
 
-  if (error) return <p>Erro ao carregar: {error}</p>
   if (!data) return <p>Carregando...</p>
+
+  // Filtra agenda e checklist pelo cliente selecionado
+  const filteredAgenda = data.agenda.filter(ev => ev.client === selectedClient)
+  const filteredChecklist = data.checklist.filter(item =>
+    filteredAgenda.some(ev => ev.time === item.time)
+  )
+
+  const toggleChecklist = (id: string) => {
+    setData(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        checklist: prev.checklist.map(item =>
+          item.id === id ? { ...item, done: !item.done } : item
+        )
+      }
+    })
+  }
 
   return (
     <div style={{ padding: 24 }}>
       <h1>Agenda</h1>
 
+      <div style={{ marginBottom: 24 }}>
+        <label>
+          Filtro por cliente:{' '}
+          <select
+            value={selectedClient}
+            onChange={e => setSelectedClient(e.target.value)}
+          >
+            {/* Futuramente pode adicionar mais clientes */}
+            <option value="Confi">Confi</option>
+          </select>
+        </label>
+      </div>
+
       <h2>Agenda do Dia</h2>
-      {data.agenda.map((item: any, index: number) => (
+      {filteredAgenda.map((item, index) => (
         <p key={index}>
           {item.time} — {item.title}
         </p>
       ))}
 
       <h2>Checklist</h2>
-      {data.checklist.map((item: any) => (
-        <label key={item.id} style={{ display: 'block' }}>
-          <input type="checkbox" /> {item.text}
+      {filteredChecklist.map(item => (
+        <label key={item.id} style={{ display: 'block', marginBottom: 8 }}>
+          <input
+            type="checkbox"
+            checked={item.done}
+            onChange={() => toggleChecklist(item.id)}
+          />{' '}
+          {item.text}
         </label>
       ))}
     </div>
