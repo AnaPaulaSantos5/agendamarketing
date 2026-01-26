@@ -9,5 +9,5 @@ export type AgendaEvent = {
   date: string
   title: string
   time: string
-  type: 'story' | 'reel' | 'post' | 'evento'
+  client: string
 }
