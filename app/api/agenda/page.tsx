@@ -14,23 +14,23 @@ export default function AgendaPage() {
   if (!data) return <p>Carregando...</p>
 
   return (
-    <div>
+    <div style={{ padding: 24 }}>
       <h1>Agenda</h1>
 
       <h2>Agenda do Dia</h2>
-      {data.agenda.map((item: any) => (
-        <p key={item.title}>
+      {data.agenda.map((item: any, index: number) => (
+        <p key={index}>
           {item.time} — {item.title}
         </p>
       ))}
 
       <h2>Checklist</h2>
       {data.checklist.map((item: any) => (
-        <label key={item.id}>
-          <input type="checkbox" />
-          {item.text}
+        <label key={item.id} style={{ display: 'block' }}>
+          <input type="checkbox" /> {item.text}
         </label>
       ))}
     </div>
   )
 }
+
