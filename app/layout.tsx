@@ -1,4 +1,4 @@
-import './globals.css' // opcional, se tiver CSS global
+import './globals.css'
 
 export const metadata = {
   title: 'Marketing Agenda',
@@ -16,3 +16,4 @@ export default function RootLayout({
     </html>
   )
 }
+
