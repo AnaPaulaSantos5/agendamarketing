@@ -1,47 +1,25 @@
-import { NextResponse } from 'next/server';
-import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { getRows, addRow } from "../../../lib/spreadsheet";
 
 export async function GET() {
   try {
-    // 1️⃣ Instancia a planilha
-    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
-
-    // 2️⃣ Autentica via Service Account
-    await doc.useServiceAccountAuth({
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    const rows = await getRows();
+    return new Response(JSON.stringify(rows), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
     });
-
-    // 3️⃣ Carrega as informações da planilha
-    await doc.loadInfo();
-
-    // 4️⃣ Acessa a aba "Agenda"
-    const sheet = doc.sheetsByTitle['Agenda'];
-    if (!sheet) {
-      return NextResponse.json(
-        { error: 'Aba "Agenda" não encontrada' },
-        { status: 404 }
-      );
-    }
-
-    // 5️⃣ Lê todas as linhas
-    const rows = await sheet.getRows();
-
-    // 6️⃣ Mapeia os dados da planilha
-    const agenda = rows.map(row => ({
-      date: row['Data'],
-      principal: row['Conteudo_Principal'],
-      secundario: row['Conteudo_Secundario'],
-      tipo: row['Tipo'],
-    }));
-
-    // 7️⃣ Retorna o JSON
-    return NextResponse.json({ agenda });
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error(err);
+    return new Response("Erro ao carregar dados da agenda", { status: 500 });
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const data = await request.json();
+    await addRow(0, data); // adiciona na primeira aba da planilha
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (err) {
+    console.error(err);
+    return new Response("Erro ao adicionar dados na agenda", { status: 500 });
+  }
+}
