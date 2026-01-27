@@ -1,57 +1,63 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
+import { useState } from "react";
 
-type AgendaItem = {
-  data: string
-  conteudoPrincipal: string
-  conteudoSecundario: string
-  tipo: string
-  link: string
-  alternativa: string
-  cta: string
-  status: string
-}
+type Perfil = "Confi" | "Cecília" | "Luiza" | "Júlio";
 
-export default function AgendaPage() {
-  const [agenda, setAgenda] = useState<AgendaItem[]>([])
-  const [loading, setLoading] = useState(true)
+type Evento = {
+  id: number;
+  perfil: Perfil;
+  produto: string;
+  tipo: "Story" | "Reel" | "Post" | "Tarefa";
+  descricao: string;
+  linkDrive?: string;
+  dataInicio: string; // YYYY-MM-DD
+  dataFim: string;    // YYYY-MM-DD
+};
 
-  useEffect(() => {
-    fetch('/api/agenda')
-      .then(res => res.json())
-      .then(data => {
-        setAgenda(data.agenda || [])
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+export default function Agenda() {
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [filtroPerfil, setFiltroPerfil] = useState<Perfil | "Todos">("Todos");
 
-  if (loading) return <p>Carregando agenda...</p>
+  const eventosFiltrados = eventos.filter(
+    (e) => filtroPerfil === "Todos" || e.perfil === filtroPerfil
+  );
+
+  const adicionarEvento = (evento: Evento) => {
+    setEventos([...eventos, { ...evento, id: eventos.length + 1 }]);
+  };
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Agenda de Conteúdo</h1>
+    <div style={{ padding: 20 }}>
+      <h1>Agenda</h1>
 
-      {agenda.map((item, index) => (
-        <div
-          key={index}
-          style={{
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            padding: 16,
-            marginBottom: 16,
-          }}
+      <div>
+        <label>Filtrar por perfil: </label>
+        <select
+          value={filtroPerfil}
+          onChange={(e) => setFiltroPerfil(e.target.value as Perfil | "Todos")}
         >
-          <strong>{item.data}</strong> — {item.tipo}
+          <option value="Todos">Todos</option>
+          <option value="Confi">Confi</option>
+          <option value="Cecília">Cecília</option>
+          <option value="Luiza">Luiza</option>
+          <option value="Júlio">Júlio</option>
+        </select>
+      </div>
 
-          <p><b>Principal:</b> {item.conteudoPrincipal}</p>
-          <p><b>Secundário:</b> {item.conteudoSecundario}</p>
-
-          <p><b>CTA:</b> {item.cta}</p>
-          <p><b>Status:</b> {item.status}</p>
-        </div>
-      ))}
+      <div style={{ marginTop: 20 }}>
+        {eventosFiltrados.map((e) => (
+          <div key={e.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
+            <strong>{e.tipo} - {e.produto}</strong><br/>
+            Perfil: {e.perfil}<br/>
+            De: {e.dataInicio} Até: {e.dataFim}<br/>
+            {e.descricao}<br/>
+            {e.linkDrive && (
+              <a href={e.linkDrive} target="_blank" rel="noreferrer">Link do Drive</a>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
-  )
+  );
 }
