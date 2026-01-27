@@ -1,30 +1,25 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet'
-import { JWT } from 'google-auth-library'
+import { google } from 'googleapis'
 
 export async function GET() {
   try {
-    const auth = new JWT({
+    const auth = new google.auth.JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     })
 
-    const doc = new GoogleSpreadsheet(
-      process.env.GOOGLE_SHEET_ID!,
-      auth
-    )
+    const sheets = google.sheets({ version: 'v4', auth })
 
-    await doc.loadInfo()
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID!,
+      range: 'A1:D10',
+    })
 
     return Response.json({
-      title: doc.title,
-      sheets: doc.sheetCount,
+      values: res.data.values ?? [],
     })
   } catch (err: any) {
     console.error(err)
-    return Response.json(
-      { error: err.message },
-      { status: 500 }
-    )
+    return Response.json({ error: err.message }, { status: 500 })
   }
 }
