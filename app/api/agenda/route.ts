@@ -1,25 +1,26 @@
-import { getRows, addRow } from "../../../spreadsheet";
+import { NextRequest, NextResponse } from "next/server";
+import { getSpreadsheet } from "./spreadsheet";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const rows = await getRows();
-    return new Response(JSON.stringify(rows), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error(err);
-    return new Response("Erro ao carregar dados da agenda", { status: 500 });
-  }
-}
+    const doc = await getSpreadsheet();
 
-export async function POST(request: Request) {
-  try {
-    const data = await request.json();
-    await addRow(0, data); // adiciona na primeira aba da planilha
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
-  } catch (err) {
-    console.error(err);
-    return new Response("Erro ao adicionar dados na agenda", { status: 500 });
+    // Aqui você escolhe a aba que quer
+    const sheet = doc.sheetsByIndex[0]; // primeira aba
+    const rows = await sheet.getRows();
+
+    // Transformar os dados em JSON simples
+    const data = rows.map(row => ({
+      id: row._rowNumber,
+      ...row._rawData, // ou mapeie as colunas específicas
+    }));
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Erro ao acessar planilha:", error);
+    return NextResponse.json(
+      { error: "Não foi possível carregar a agenda" },
+      { status: 500 }
+    );
   }
 }
