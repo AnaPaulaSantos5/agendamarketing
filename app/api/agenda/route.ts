@@ -1,25 +1,30 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet'
-import { NextResponse } from 'next/server'
+
+const creds = JSON.parse(
+  Buffer.from(
+    process.env.GOOGLE_SERVICE_ACCOUNT_BASE64!,
+    'base64'
+  ).toString('utf-8')
+)
 
 export async function GET() {
   try {
     const doc = new GoogleSpreadsheet(
       process.env.GOOGLE_SHEET_ID!,
       {
-        clientEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-        privateKey: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-      } as any // 👈 ISSO É A CHAVE
+        clientEmail: creds.client_email,
+        privateKey: creds.private_key,
+      } as any
     )
 
     await doc.loadInfo()
 
-    return NextResponse.json({
+    return Response.json({
       title: doc.title,
-      sheets: doc.sheetsByIndex.map(s => s.title),
     })
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
+  } catch (err: any) {
+    return Response.json(
+      { error: err.message },
       { status: 500 }
     )
   }
