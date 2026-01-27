@@ -5,8 +5,8 @@ const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
 async function authenticate() {
   await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    clientEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+    privateKey: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
 }
@@ -26,7 +26,7 @@ export async function GET() {
       type: r.Tipo,
       main: r.Conteudo_Principal,
       secondary: r.Conteudo_Secundario,
-      cta: r.CTA,
+      cta: r.CTA_WhatsApp,
       status: r.Status_Postagem,
       profile: r.Perfil,
     }));
