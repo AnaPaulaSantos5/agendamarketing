@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const doc = new GoogleSpreadsheet(
-      process.env.GOOGLE_SHEET_ID!
+      process.env.GOOGLE_SHEET_ID!,
+      undefined
     );
 
     await doc.useServiceAccountAuth({
