@@ -7,7 +7,10 @@ export async function GET() {
     const auth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file',
+      ],
     })
 
     const doc = new GoogleSpreadsheet(
@@ -16,11 +19,13 @@ export async function GET() {
     )
 
     await doc.loadInfo()
-    const sheet = doc.sheetsByIndex[0]
-    const rows = await sheet.getRows()
 
-    return NextResponse.json(rows)
+    return NextResponse.json({
+      title: doc.title,
+      sheetCount: doc.sheetCount,
+    })
   } catch (error: any) {
+    console.error(error)
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
