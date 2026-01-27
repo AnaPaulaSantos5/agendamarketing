@@ -8,23 +8,18 @@ export async function GET() {
       {
         clientEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
         privateKey: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-      }
+      } as any // 👈 ISSO É A CHAVE
     )
 
-    // ESSENCIAL NA V5
     await doc.loadInfo()
 
     return NextResponse.json({
       title: doc.title,
-      sheetCount: doc.sheetCount,
       sheets: doc.sheetsByIndex.map(s => s.title),
     })
   } catch (error: any) {
     return NextResponse.json(
-      {
-        error: error.message,
-        stack: error.stack,
-      },
+      { error: error.message },
       { status: 500 }
     )
   }
