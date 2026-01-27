@@ -1,8 +1,9 @@
-// app/api/agenda/route.ts
 import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+const doc = new GoogleSpreadsheet({
+  spreadsheetId: process.env.GOOGLE_SHEET_ID!,
+});
 
 async function authenticate() {
   await doc.useServiceAccountAuth({
@@ -12,45 +13,27 @@ async function authenticate() {
   await doc.loadInfo(); // carrega informações da planilha
 }
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     await authenticate();
 
-    // Abas da planilha
-    const agendaSheet = doc.sheetsByTitle['Agenda'];
-    const checklistSheet = doc.sheetsByTitle['Checklist'];
+    const sheet = doc.sheetsByIndex[0]; // primeira aba
+    const rows = await sheet.getRows();
 
-    if (!agendaSheet || !checklistSheet) {
-      return NextResponse.json({ error: 'Aba Agenda ou Checklist não encontrada' });
-    }
-
-    // Pega todas as linhas
-    const agendaRows = await agendaSheet.getRows();
-    const checklistRows = await checklistSheet.getRows();
-
-    // Transforma em objetos JS simples
-    const agenda = agendaRows.map(row => ({
+    // transforma em JSON simples
+    const data = rows.map((row) => ({
       date: row.Data,
-      time: row.Horario || '',
-      title: row.Conteudo_Principal,
-      client: row.Cliente || 'Confi',
-      secondary: row.Conteudo_Secundario,
-      type: row.Tipo,
+      principal: row.Conteudo_Principal,
+      secundario: row.Conteudo_Secundario,
+      tipo: row.Tipo,
       link: row.Link_Arquivo,
+      alternativa: row.Alternativa_Pronta,
       cta: row.CTA_WhatsApp,
-      status: row.Status_Postagem
+      status: row.Status_Postagem,
     }));
 
-    const checklist = checklistRows.map(row => ({
-      id: row.ID,
-      text: row.Texto,
-      done: row.Concluido === 'TRUE',
-      time: row.Horario || ''
-    }));
-
-    return NextResponse.json({ agenda, checklist });
+    return NextResponse.json({ agenda: data });
   } catch (err: any) {
-    console.error('Erro agenda API:', err);
     return NextResponse.json({ error: `Google API error - ${err.message}` });
   }
 }
