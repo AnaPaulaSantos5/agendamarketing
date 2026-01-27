@@ -1,38 +1,30 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { NextResponse } from "next/server";
+import { GoogleSpreadsheet } from "google-spreadsheet";
+
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
 export async function GET() {
   try {
-    // 1️⃣ Instancia a planilha
-    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
-
-    // 2️⃣ Autentica via Service Account usando variáveis de ambiente
+    // Autentica usando a service account
     await doc.useServiceAccountAuth({
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
     });
 
-    // 3️⃣ Carrega info da planilha
-    await doc.loadInfo();
-    const sheet = doc.sheetsByIndex[0];
-
-    // 4️⃣ Pega as linhas
+    await doc.loadInfo(); // carrega informações da planilha
+    const sheet = doc.sheetsByIndex[0]; // primeira aba
     const rows = await sheet.getRows();
 
-    // 5️⃣ Transforma os dados em JSON simples
-    const data = rows.map(row => ({
-      nome: row.Nome,
+    // Transformar em JSON simples com os nomes corretos das colunas
+    const data = rows.map((row) => ({
+      nome: row.Nome,        // use exatamente o título da coluna na planilha
       email: row.Email,
       telefone: row.Telefone,
     }));
 
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (err: any) {
-    console.error('Erro ao carregar agenda:', err);
-    return new Response(
-      JSON.stringify({ error: 'Erro ao carregar agenda', details: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Erro ao carregar agenda:", error);
+    return NextResponse.json({ error: "Erro ao carregar agenda" }, { status: 500 });
   }
 }
