@@ -25,7 +25,6 @@ export default function AgendaPage() {
   const [data, setData] = useState<AgendaData | null>(null)
   const [selectedClient, setSelectedClient] = useState('Confi')
 
-  // Busca os dados da API
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -35,8 +34,10 @@ export default function AgendaPage() {
 
   if (!data) return <p>Carregando...</p>
 
-  // Filtra agenda e checklist pelo cliente selecionado
-  const filteredAgenda = data.agenda.filter(ev => ev.client === selectedClient)
+  const filteredAgenda = data.agenda.filter(
+    ev => ev.client === selectedClient
+  )
+
   const filteredChecklist = data.checklist.filter(item =>
     filteredAgenda.some(ev => ev.time === item.time)
   )
@@ -64,7 +65,6 @@ export default function AgendaPage() {
             value={selectedClient}
             onChange={e => setSelectedClient(e.target.value)}
           >
-            {/* Futuramente pode adicionar mais clientes */}
             <option value="Confi">Confi</option>
           </select>
         </label>
