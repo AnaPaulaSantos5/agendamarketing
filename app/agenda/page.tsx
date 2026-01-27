@@ -7,31 +7,50 @@ type Perfil = "Confi" | "Cecília" | "Luiza" | "Júlio";
 type Evento = {
   id: number;
   perfil: Perfil;
-  produto: string;
   tipo: "Story" | "Reel" | "Post" | "Tarefa";
-  descricao: string;
+  conteudoPrincipal: string;
+  conteudoSecundario?: string;
+  CTA?: string;
+  status: "Pendente" | "Concluído";
+  data: string; // YYYY-MM-DD
   linkDrive?: string;
-  dataInicio: string; // YYYY-MM-DD
-  dataFim: string;    // YYYY-MM-DD
 };
 
-export default function Agenda() {
-  const [eventos, setEventos] = useState<Evento[]>([]);
+export default function AgendaBlocos() {
+  const [eventos, setEventos] = useState<Evento[]>([
+    {
+      id: 1,
+      perfil: "Confi",
+      tipo: "Story",
+      conteudoPrincipal: "Story motivacional: abertura semana",
+      conteudoSecundario: "Enquete sobre objetivos",
+      CTA: "Deseja falar com o marketing? ✅",
+      status: "Pendente",
+      data: "2026-01-26",
+    },
+    {
+      id: 2,
+      perfil: "Confi",
+      tipo: "Reel",
+      conteudoPrincipal: "Reel educativo: dica de consórcio",
+      conteudoSecundario: "Story teaser do reel",
+      CTA: "Deseja falar com o marketing? ✅",
+      status: "Pendente",
+      data: "2026-01-27",
+    },
+  ]);
+
   const [filtroPerfil, setFiltroPerfil] = useState<Perfil | "Todos">("Todos");
 
   const eventosFiltrados = eventos.filter(
     (e) => filtroPerfil === "Todos" || e.perfil === filtroPerfil
   );
 
-  const adicionarEvento = (evento: Evento) => {
-    setEventos([...eventos, { ...evento, id: eventos.length + 1 }]);
-  };
-
   return (
     <div style={{ padding: 20 }}>
-      <h1>Agenda</h1>
+      <h1>Agenda em Blocos</h1>
 
-      <div>
+      <div style={{ marginBottom: 20 }}>
         <label>Filtrar por perfil: </label>
         <select
           value={filtroPerfil}
@@ -45,15 +64,39 @@ export default function Agenda() {
         </select>
       </div>
 
-      <div style={{ marginTop: 20 }}>
+      <div style={{ display: "grid", gap: 15 }}>
         {eventosFiltrados.map((e) => (
-          <div key={e.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
-            <strong>{e.tipo} - {e.produto}</strong><br/>
-            Perfil: {e.perfil}<br/>
-            De: {e.dataInicio} Até: {e.dataFim}<br/>
-            {e.descricao}<br/>
+          <div
+            key={e.id}
+            style={{
+              border: "2px solid #1260c7",
+              borderRadius: 8,
+              padding: 15,
+              background: "#f0f4ff",
+              maxWidth: 400,
+            }}
+          >
+            <strong>Data:</strong> {e.data} <br />
+            <strong>Tipo:</strong> {e.tipo} <br />
+            <strong>Conteúdo Principal:</strong> {e.conteudoPrincipal} <br />
+            {e.conteudoSecundario && (
+              <>
+                <strong>Conteúdo Secundário:</strong> {e.conteudoSecundario} <br />
+              </>
+            )}
+            {e.CTA && (
+              <>
+                <strong>CTA:</strong> {e.CTA} <br />
+              </>
+            )}
+            <strong>Status:</strong> {e.status} <br />
+            <strong>Perfil:</strong> {e.perfil} <br />
             {e.linkDrive && (
-              <a href={e.linkDrive} target="_blank" rel="noreferrer">Link do Drive</a>
+              <>
+                <a href={e.linkDrive} target="_blank" rel="noreferrer">
+                  Link do Drive
+                </a>
+              </>
             )}
           </div>
         ))}
