@@ -1,4 +1,4 @@
-import { getRows, addRow } from "../../lib/spreadsheet";
+import { getRows, addRow } from "./spreadsheet";
 
 export async function GET() {
   try {
