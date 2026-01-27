@@ -15,11 +15,9 @@ export async function GET() {
   try {
     await authenticate();
 
-    // Aba Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const agendaRows = await agendaSheet.getRows();
 
-    // Aba Checklist
     const checklistSheet = doc.sheetsByTitle['Checklist'];
     const checklistRows = await checklistSheet.getRows();
 
@@ -46,6 +44,4 @@ export async function GET() {
     console.error(err);
     return NextResponse.json({ error: `Google API error - ${err.message}` });
   }
-}
-}
 }
