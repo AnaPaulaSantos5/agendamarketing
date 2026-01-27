@@ -12,7 +12,9 @@
     "next": "13.4.12",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "google-spreadsheet": "^5.0.0"
+    "google-spreadsheet": "^5.0.0",
+    "supports-color": "^8.1.1",
+    "encoding": "^0.1.13"
   },
   "devDependencies": {
     "typescript": "^5.1.0",
