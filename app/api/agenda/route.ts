@@ -1,50 +1,56 @@
+// app/api/agenda/route.ts
 import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(
-  process.env.GOOGLE_SHEET_ID!,
-  // segunda argumento opcional: pode ser a autenticação ou vazio
-);
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
 async function authenticate() {
   await doc.useServiceAccountAuth({
-    clientEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    privateKey: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
-  await doc.loadInfo();
+  await doc.loadInfo(); // carrega informações da planilha
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await authenticate();
 
+    // Abas da planilha
     const agendaSheet = doc.sheetsByTitle['Agenda'];
-    const agendaRows = await agendaSheet.getRows();
-
     const checklistSheet = doc.sheetsByTitle['Checklist'];
+
+    if (!agendaSheet || !checklistSheet) {
+      return NextResponse.json({ error: 'Aba Agenda ou Checklist não encontrada' });
+    }
+
+    // Pega todas as linhas
+    const agendaRows = await agendaSheet.getRows();
     const checklistRows = await checklistSheet.getRows();
 
-    const agenda = agendaRows.map(r => ({
-      date: r.Data,
-      type: r.Tipo,
-      main: r.Conteudo_Principal,
-      secondary: r.Conteudo_Secundario,
-      cta: r.CTA_WhatsApp,
-      status: r.Status_Postagem,
-      profile: r.Perfil,
+    // Transforma em objetos JS simples
+    const agenda = agendaRows.map(row => ({
+      date: row.Data,
+      time: row.Horario || '',
+      title: row.Conteudo_Principal,
+      client: row.Cliente || 'Confi',
+      secondary: row.Conteudo_Secundario,
+      type: row.Tipo,
+      link: row.Link_Arquivo,
+      cta: row.CTA_WhatsApp,
+      status: row.Status_Postagem
     }));
 
-    const checklist = checklistRows.map(r => ({
-      id: r.ID,
-      date: r.Data,
-      client: r.Cliente,
-      task: r.Tarefa,
-      done: r.Done === 'true',
+    const checklist = checklistRows.map(row => ({
+      id: row.ID,
+      text: row.Texto,
+      done: row.Concluido === 'TRUE',
+      time: row.Horario || ''
     }));
 
     return NextResponse.json({ agenda, checklist });
   } catch (err: any) {
-    console.error(err);
+    console.error('Erro agenda API:', err);
     return NextResponse.json({ error: `Google API error - ${err.message}` });
   }
 }
