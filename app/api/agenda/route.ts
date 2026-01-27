@@ -1,30 +1,29 @@
+import { NextResponse } from 'next/server'
 import { GoogleSpreadsheet } from 'google-spreadsheet'
+import { JWT } from 'google-auth-library'
 
 export async function GET() {
   try {
-    const creds = JSON.parse(
-      Buffer.from(
-        process.env.GOOGLE_SERVICE_ACCOUNT_BASE64!,
-        'base64'
-      ).toString('utf-8')
-    )
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+      key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    })
 
     const doc = new GoogleSpreadsheet(
       process.env.GOOGLE_SHEET_ID!,
-      {
-        clientEmail: creds.client_email,
-        privateKey: creds.private_key,
-      } as any
+      auth
     )
 
     await doc.loadInfo()
 
-    return Response.json({
-      ok: true,
-      title: doc.title,
-    })
+    const sheet = doc.sheetsByIndex[0]
+    const rows = await sheet.getRows()
+
+    return NextResponse.json(rows)
   } catch (err: any) {
-    return Response.json(
+    console.error(err)
+    return NextResponse.json(
       { error: err.message },
       { status: 500 }
     )
