@@ -1,35 +1,29 @@
-// app/api/agenda/route.ts
-import { NextResponse } from 'next/server';
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-
-// Pega as variáveis do ambiente
-const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
-const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')!;
+import { GoogleSpreadsheet } from 'google-spreadsheet'
+import { JWT } from 'google-auth-library'
+import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    // Cria o documento com o ID
-    const doc = new GoogleSpreadsheet(SHEET_ID);
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    })
 
-    // Autentica usando a conta de serviço
-    await doc.useServiceAccountAuth({
-      client_email: CLIENT_EMAIL,
-      private_key: PRIVATE_KEY,
-    });
+    const doc = new GoogleSpreadsheet(
+      process.env.GOOGLE_SHEET_ID!,
+      auth
+    )
 
-    // Carrega informações do documento
-    await doc.loadInfo();
+    await doc.loadInfo()
+    const sheet = doc.sheetsByIndex[0]
+    const rows = await sheet.getRows()
 
-    // Por exemplo, pega a primeira aba
-    const sheet = doc.sheetsByIndex[0];
-    const rows = await sheet.getRows();
-
-    // Retorna os dados como JSON
-    const data = rows.map((row) => ({ ...row }));
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error('Erro ao acessar a planilha:', error);
-    return NextResponse.json({ success: false, error: String(error) });
+    return NextResponse.json(rows)
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    )
   }
 }
