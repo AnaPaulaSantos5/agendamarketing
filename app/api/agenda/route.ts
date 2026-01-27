@@ -1,19 +1,20 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet'
+import { JWT } from 'google-auth-library'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const SHEET_ID = process.env.GOOGLE_SHEET_ID!
+    const auth = new JWT({
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+      key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    })
 
     const doc = new GoogleSpreadsheet(
-      SHEET_ID,
-      {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-        private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-      }
+      process.env.GOOGLE_SHEET_ID!,
+      auth
     )
 
-    // carrega metadados da planilha
     await doc.loadInfo()
 
     return NextResponse.json({
