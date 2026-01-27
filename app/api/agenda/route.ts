@@ -1,12 +1,13 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet'
-import { JWT } from 'google-auth-library'
-import { NextResponse } from 'next/server'
+import { GoogleAuth } from 'google-auth-library'
 
 export async function GET() {
   try {
-    const auth = new JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-      key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     })
 
@@ -17,13 +18,15 @@ export async function GET() {
 
     await doc.loadInfo()
 
-    return NextResponse.json({
+    return Response.json({
       title: doc.title,
-      sheets: doc.sheetCount,
+      sheetCount: doc.sheetCount,
+      sheets: doc.sheetsByIndex.map(s => s.title),
     })
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message },
+  } catch (error: any) {
+    console.error(error)
+    return Response.json(
+      { error: error.message },
       { status: 500 }
     )
   }
