@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+const doc = new GoogleSpreadsheet(
+  process.env.GOOGLE_SHEET_ID!,
+  // segunda argumento opcional: pode ser a autenticação ou vazio
+);
 
 async function authenticate() {
   await doc.useServiceAccountAuth({
