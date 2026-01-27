@@ -1,33 +1,28 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet'
-import { JWT } from 'google-auth-library'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const auth = new JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file',
-      ],
-    })
+    const SHEET_ID = process.env.GOOGLE_SHEET_ID!
 
     const doc = new GoogleSpreadsheet(
-      process.env.GOOGLE_SHEET_ID!,
-      auth
+      SHEET_ID,
+      {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+        private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      }
     )
 
+    // carrega metadados da planilha
     await doc.loadInfo()
 
     return NextResponse.json({
       title: doc.title,
-      sheetCount: doc.sheetCount,
+      sheets: doc.sheetCount,
     })
-  } catch (error: any) {
-    console.error(error)
+  } catch (err: any) {
     return NextResponse.json(
-      { error: error.message },
+      { error: err.message },
       { status: 500 }
     )
   }
