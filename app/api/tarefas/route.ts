@@ -11,7 +11,6 @@ async function auth() {
   return doc;
 }
 
-// GET tarefas por bloco
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const blocoId = searchParams.get('blocoId');
@@ -20,12 +19,9 @@ export async function GET(req: Request) {
   const sheet = doc.sheetsByTitle['Tarefas'];
   const rows = await sheet.getRows();
 
-  return NextResponse.json(
-    rows.filter(r => r.Bloco_ID === blocoId)
-  );
+  return NextResponse.json(rows.filter(r => r.Bloco_ID === blocoId));
 }
 
-// POST nova tarefa
 export async function POST(req: Request) {
   const body = await req.json();
   const doc = await auth();
