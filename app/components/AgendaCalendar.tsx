@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import FullCalendar, { EventClickArg, DateSelectArg } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { EventClickArg, DateSelectArg } from '@fullcalendar/core';
 import EventModal, { AgendaEvent } from './EventModal';
 
 type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
@@ -69,11 +70,12 @@ export default function AgendaCalendar() {
 
   // Marcar tarefa como concluída
   const handleChecklistToggle = async (event: AgendaEvent) => {
+    if (!event.tarefa) return;
     const updatedEvent = {
       ...event,
       tarefa: {
-        ...event.tarefa!,
-        status: event.tarefa!.status === 'Concluída' ? 'Pendente' : 'Concluída',
+        ...event.tarefa,
+        status: event.tarefa.status === 'Concluída' ? 'Pendente' : 'Concluída',
       },
     };
     await handleSave(updatedEvent, true);
