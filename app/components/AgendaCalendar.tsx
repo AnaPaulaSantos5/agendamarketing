@@ -1,89 +1,86 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
 import { EventInput } from '@fullcalendar/core';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [perfil, setPerfil] = useState<Perfil | 'Todos'>('Todos');
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
 
   async function carregarAgenda() {
     const res = await fetch('/api/agenda');
     const data = await res.json();
 
-    const parsed = data.Agenda
-      .filter((item: any) => item.Data_Inicio)
-      .map((item: any, index: number) => {
-        const start = new Date(item.Data_Inicio);
-        if (isNaN(start.getTime())) return null;
+    if (!data?.Agenda) return;
 
-        const end = item.Data_Fim
-          ? new Date(item.Data_Fim)
-          : start;
+    const eventos: EventInput[] = data.Agenda.map((item: any, index: number) => ({
+      id: String(index),
+      title: `${item.Tipo}: ${item.Conteudo_Principal}`,
+      start: item.Data_Inicio,
+      end: item.Data_Fim || item.Data_Inicio,
+      extendedProps: {
+        perfil: item.Perfil,
+        status: item.Status_Postagem,
+        cta: item.CTA,
+      },
+    }));
 
-        return {
-          id: index.toString(),
-          title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          extendedProps: {
-            perfil: item.Perfil,
-            status: item.Status_Postagem,
-            cta: item.CTA,
-          },
-        };
-      })
-      .filter(Boolean);
-
-    setEvents(parsed);
+    setEvents(eventos);
   }
 
   useEffect(() => {
     carregarAgenda();
   }, []);
 
-  const eventosFiltrados =
-    perfil === 'Todos'
-      ? events
-      : events.filter(
-          (e) => e.extendedProps?.perfil === perfil
-        );
-
-  async function handleSelect(info: any) {
-    const titulo = prompt('Conteúdo principal:');
-    if (!titulo) return;
+  async function handleDateClick(info: DateClickArg) {
+    const conteudo = prompt('Conteúdo principal:');
+    if (!conteudo) return;
 
     const payload = {
-      Data_Inicio: info.startStr.split('T')[0],
-      Data_Fim: info.endStr.split('T')[0],
+      Data_Inicio: info.dateStr, // YYYY-MM-DD
+      Data_Fim: info.dateStr,
       Tipo_Evento: 'Produção',
       Tipo: 'Story',
-      Conteudo_Principal: titulo,
+      Conteudo_Principal: conteudo,
       Conteudo_Secundario: '',
       CTA: 'Deseja falar com o marketing? ✅',
       Status_Postagem: 'Pendente',
-      Perfil: 'Confi',
+      Perfil: perfil,
     };
 
-    await fetch('/api/agenda', {
+    const res = await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
+    if (!res.ok) {
+      alert('Erro ao salvar evento');
+      return;
+    }
+
     carregarAgenda();
   }
 
+  const eventosFiltrados = events.filter(
+    (e: any) => e.extendedProps?.perfil === perfil
+  );
+
   return (
-    <div>
-      <select value={perfil} onChange={(e) => setPerfil(e.target.value as any)}>
-        <option value="Todos">Todos</option>
+    <div style={{ padding: 20 }}>
+      <h2>Agenda de Conteúdo</h2>
+
+      <select
+        value={perfil}
+        onChange={(e) => setPerfil(e.target.value as Perfil)}
+        style={{ marginBottom: 16 }}
+      >
         <option value="Confi">Confi</option>
         <option value="Cecília">Cecília</option>
         <option value="Luiza">Luiza</option>
@@ -93,9 +90,8 @@ export default function AgendaCalendar() {
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        selectable
         events={eventosFiltrados}
-        select={handleSelect}
+        dateClick={handleDateClick}
         height="auto"
       />
     </div>
