@@ -4,15 +4,41 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import EventModal, { AgendaEvent, Profile } from './EventModal';
+import EventModal from './EventModal';
+
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
+export type AgendaEvent = {
+  id: string;
+  start: string;
+  end: string;
+  tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal: string; // obrigatório
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
+  perfil?: Perfil;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
+};
+
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Profile>('Confi');
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
 
-  const profiles: Profile[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+  // Checklist lateral
+  const [tasksToday, setTasksToday] = useState<AgendaEvent[]>([]);
 
   useEffect(() => {
     fetchEvents();
@@ -23,96 +49,111 @@ export default function AgendaCalendar() {
       const res = await fetch('/api/agenda');
       const data = await res.json();
       setEvents(data || []);
+      updateTasks(data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao buscar eventos', err);
     }
   };
 
+  const updateTasks = (allEvents: AgendaEvent[]) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayTasks = allEvents.filter(e => e.start.slice(0, 10) === today);
+    setTasksToday(todayTasks);
+  };
+
   const handleDateClick = (info: any) => {
-    const newEvent: AgendaEvent = {
+    setSelectedEvent({
       id: '',
       start: info.dateStr,
       end: info.dateStr,
       conteudoPrincipal: '',
       perfil: filterProfile,
-    };
-    setSelectedEvent(newEvent);
+      tarefa: null,
+    });
     setIsModalOpen(true);
   };
 
   const handleEventClick = (info: any) => {
     const ev = events.find(e => e.id === info.event.id);
-    if (ev) {
-      setSelectedEvent(ev);
-      setIsModalOpen(true);
-    }
+    if (!ev) return;
+    setSelectedEvent(ev);
+    setIsModalOpen(true);
   };
 
   const handleSave = async (event: AgendaEvent, isEdit: boolean) => {
     try {
-      if (isEdit && event.id) {
-        await fetch('/api/agenda', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(event),
-        });
-      } else {
-        await fetch('/api/agenda', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(event),
-        });
-      }
-      await fetchEvents();
+      const method = isEdit ? 'PATCH' : 'POST';
+      await fetch('/api/agenda', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      });
+
+      // Atualiza state local
+      setEvents(prev => {
+        if (isEdit) {
+          return prev.map(ev => (ev.id === event.id ? event : ev));
+        } else {
+          return [...prev, { ...event, id: String(prev.length + 1) }];
+        }
+      });
+      updateTasks([...events, event]);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao salvar evento', err);
       alert('Erro ao salvar evento');
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (eventId: string) => {
+    if (!confirm('Deseja realmente excluir este evento?')) return;
     try {
       await fetch('/api/agenda', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: eventId }),
       });
-      await fetchEvents();
+      const updated = events.filter(e => e.id !== eventId);
+      setEvents(updated);
+      updateTasks(updated);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao excluir evento', err);
       alert('Erro ao excluir evento');
     }
   };
 
-  const handleChecklistAction = async (event: AgendaEvent, action: 'Concluída' | 'Reagendar' | 'Cancelar') => {
-    let updatedEvent = { ...event };
-    if (action === 'Concluída') updatedEvent.tarefa = { ...updatedEvent.tarefa, status: 'Concluída' };
-    if (action === 'Cancelar') updatedEvent.tarefa = { ...updatedEvent.tarefa, status: 'Cancelada' };
-    if (action === 'Reagendar') {
-      const newDate = prompt('Escolha nova data e hora (YYYY-MM-DDTHH:MM)', updatedEvent.start);
-      if (newDate) {
-        updatedEvent.start = newDate;
-        updatedEvent.end = newDate;
-      }
+  const handleTaskAction = async (task: AgendaEvent, action: 'concluida' | 'reagendar' | 'cancelar') => {
+    if (!task.tarefa) return;
+
+    const updatedTask = { ...task, tarefa: { ...task.tarefa } };
+
+    if (action === 'concluida') {
+      updatedTask.tarefa.status = 'Concluída';
+    } else if (action === 'reagendar') {
+      const newDate = prompt('Informe nova data (YYYY-MM-DD HH:mm):', task.start);
+      if (!newDate) return;
+      updatedTask.start = newDate;
+      updatedTask.end = newDate;
+      if (updatedTask.tarefa) updatedTask.tarefa.data = newDate;
+    } else if (action === 'cancelar') {
+      await handleDelete(task.id);
+      return;
     }
-    await handleSave(updatedEvent, true);
+
+    await handleSave(updatedTask, true);
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayEvents = filteredEvents.filter(e => e.start.slice(0, 10) === today);
-
   return (
-    <div style={{ display: 'flex', gap: 20 }}>
+    <div style={{ display: 'flex', gap: 10 }}>
+      {/* Calendário */}
       <div style={{ flex: 1 }}>
         <div>
           Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Profile)}>
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -131,31 +172,36 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ width: 300, padding: 10, borderLeft: '1px solid #ccc' }}>
         <h4>Checklist Hoje</h4>
+        {tasksToday.length === 0 && <p>Nenhuma tarefa hoje</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {todayEvents.map(e => (
-            <li key={e.id} style={{ marginBottom: 10, padding: 8, border: '1px solid #ccc', borderRadius: 4 }}>
-              <div><b>{e.conteudoPrincipal}</b> ({e.tarefa?.status || 'Pendente'})</div>
-              <div style={{ display: 'flex', gap: 5, marginTop: 5 }}>
-                <button onClick={() => handleChecklistAction(e, 'Concluída')} style={buttonBlue}>Concluída</button>
-                <button onClick={() => handleChecklistAction(e, 'Reagendar')} style={buttonGrey}>Reagendar</button>
-                <button onClick={() => handleChecklistAction(e, 'Cancelar')} style={buttonRed}>Cancelar</button>
-              </div>
+          {tasksToday.map(task => (
+            <li key={task.id} style={{ marginBottom: 8, border: '1px solid #ddd', padding: 5, borderRadius: 4 }}>
+              <strong>{task.conteudoPrincipal}</strong>
+              {task.tarefa && (
+                <>
+                  <div>Status: {task.tarefa.status}</div>
+                  <div>
+                    <button onClick={() => handleTaskAction(task, 'concluida')}>Concluída</button>{' '}
+                    <button onClick={() => handleTaskAction(task, 'reagendar')}>Reagendar</button>{' '}
+                    <button onClick={() => handleTaskAction(task, 'cancelar')}>Cancelar</button>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
       </div>
 
-      <EventModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        event={selectedEvent}
-        onSave={handleSave}
-        onDelete={handleDelete}
-      />
+      {/* Modal */}
+      {selectedEvent && (
+        <EventModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          event={selectedEvent}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }
-
-const buttonBlue: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#1260c7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 };
-const buttonGrey: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#ccc', color: '#000', border: 'none', cursor: 'pointer', fontSize: 12 };
-const buttonRed: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 };
