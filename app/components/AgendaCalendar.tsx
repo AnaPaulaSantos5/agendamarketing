@@ -1,99 +1,64 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
+import interactionPlugin from '@fullcalendar/interaction';
 import { EventInput } from '@fullcalendar/core';
-
-type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+import { useEffect, useState } from 'react';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
 
-  async function carregarAgenda() {
+  async function carregar() {
     const res = await fetch('/api/agenda');
-    const data = await res.json();
+    const json = await res.json();
 
-    if (!data?.Agenda) return;
-
-    const eventos: EventInput[] = data.Agenda.map((item: any, index: number) => ({
-      id: String(index),
-      title: `${item.Tipo}: ${item.Conteudo_Principal}`,
-      start: item.Data_Inicio,
+    const evts: EventInput[] = json.Agenda.map((item: any, i: number) => ({
+      id: String(i),
+      title: item.Conteudo_Principal || 'Sem título',
+      start: item.Data_Inicio, // ISO STRING
       end: item.Data_Fim || item.Data_Inicio,
-      extendedProps: {
-        perfil: item.Perfil,
-        status: item.Status_Postagem,
-        cta: item.CTA,
-      },
     }));
 
-    setEvents(eventos);
+    setEvents(evts);
   }
 
   useEffect(() => {
-    carregarAgenda();
+    carregar();
   }, []);
 
-  async function handleDateClick(info: DateClickArg) {
-    const conteudo = prompt('Conteúdo principal:');
-    if (!conteudo) return;
+  async function criarEvento(info: any) {
+    const titulo = prompt('Conteúdo principal');
+    if (!titulo) return;
 
-    const payload = {
-      Data_Inicio: info.dateStr, // YYYY-MM-DD
-      Data_Fim: info.dateStr,
-      Tipo_Evento: 'Produção',
-      Tipo: 'Story',
-      Conteudo_Principal: conteudo,
-      Conteudo_Secundario: '',
-      CTA: 'Deseja falar com o marketing? ✅',
-      Status_Postagem: 'Pendente',
-      Perfil: perfil,
-    };
+    const iso = info.dateStr; // 👈 já vem YYYY-MM-DD
 
-    const res = await fetch('/api/agenda', {
+    await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        Data_Inicio: iso,
+        Data_Fim: iso,
+        Tipo_Evento: 'Conteúdo',
+        Tipo: 'Story',
+        Conteudo_Principal: titulo,
+        Conteudo_Secundario: '',
+        CTA: 'Deseja falar com o marketing? ✅',
+        Status_Postagem: 'Pendente',
+        Perfil: 'Confi',
+      }),
     });
 
-    if (!res.ok) {
-      alert('Erro ao salvar evento');
-      return;
-    }
-
-    carregarAgenda();
+    carregar(); // 🔥 recarrega da planilha
   }
 
-  const eventosFiltrados = events.filter(
-    (e: any) => e.extendedProps?.perfil === perfil
-  );
-
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Agenda de Conteúdo</h2>
-
-      <select
-        value={perfil}
-        onChange={(e) => setPerfil(e.target.value as Perfil)}
-        style={{ marginBottom: 16 }}
-      >
-        <option value="Confi">Confi</option>
-        <option value="Cecília">Cecília</option>
-        <option value="Luiza">Luiza</option>
-        <option value="Júlio">Júlio</option>
-      </select>
-
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={eventosFiltrados}
-        dateClick={handleDateClick}
-        height="auto"
-      />
-    </div>
+    <FullCalendar
+      plugins={[dayGridPlugin, interactionPlugin]}
+      initialView="dayGridMonth"
+      events={events}
+      dateClick={criarEvento}
+      height="auto"
+    />
   );
 }
