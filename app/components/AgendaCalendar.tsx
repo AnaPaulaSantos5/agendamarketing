@@ -8,12 +8,11 @@ import EventModal from './EventModal';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type AgendaEvent = {
+export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
   tipoEvento?: string;
-  tipo?: string;
   conteudoPrincipal?: string;
   perfil?: Perfil;
   tarefa?: any;
@@ -29,6 +28,9 @@ export default function AgendaCalendar() {
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Buscar eventos
   useEffect(() => {
     async function fetchAgenda() {
       try {
@@ -36,30 +38,23 @@ export default function AgendaCalendar() {
         const data = await res.json();
         setEvents(data || []);
       } catch (err) {
-        console.error('Erro da API:', err);
+        console.error(err);
       }
     }
     fetchAgenda();
   }, []);
 
-  const handleSave = async (newEvent: AgendaEvent) => {
-    try {
-      const res = await fetch('/api/agenda', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEvent),
-      });
-      if (!res.ok) throw new Error('Erro ao salvar');
+  const handleSave = (newEvent: AgendaEvent, isEdit = false) => {
+    if (isEdit) {
+      // Atualizar evento existente localmente
+      setEvents(prev => prev.map(e => (e.id === newEvent.id ? newEvent : e)));
+    } else {
+      // Criar novo evento
       setEvents(prev => [...prev, { ...newEvent, id: String(prev.length + 1) }]);
-    } catch (err) {
-      console.error('Erro ao salvar evento', err);
-      alert('Erro ao salvar evento');
     }
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
@@ -102,17 +97,13 @@ export default function AgendaCalendar() {
           }}
           eventDrop={info => {
             const updatedEvents = events.map(e =>
-              e.id === info.event.id
-                ? { ...e, start: info.event.startStr, end: info.event.endStr }
-                : e
+              e.id === info.event.id ? { ...e, start: info.event.startStr, end: info.event.endStr } : e
             );
             setEvents(updatedEvents);
           }}
           eventResize={info => {
             const updatedEvents = events.map(e =>
-              e.id === info.event.id
-                ? { ...e, start: info.event.startStr, end: info.event.endStr }
-                : e
+              e.id === info.event.id ? { ...e, start: info.event.startStr, end: info.event.endStr } : e
             );
             setEvents(updatedEvents);
           }}
@@ -124,10 +115,34 @@ export default function AgendaCalendar() {
         <h4>Checklist Hoje</h4>
         <ul>
           {events
-            .filter(e => e.start.slice(0, 10) === today)
+            .filter(e => e.start.slice(0, 10) === today && e.tarefa)
             .map(e => (
-              <li key={e.id}>
-                {e.conteudoPrincipal} ({e.tipoEvento})
+              <li key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  {e.tarefa.titulo} ({e.tipoEvento})
+                </span>
+                <div>
+                  <button
+                    onClick={() => {
+                      const updated = events.map(ev =>
+                        ev.id === e.id ? { ...ev, tarefa: { ...ev.tarefa, status: 'Concluída' } } : ev
+                      );
+                      setEvents(updated);
+                    }}
+                    style={{ marginRight: 4 }}
+                  >
+                    ✅
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedEvent(e);
+                      setSelectedDate({ start: e.start, end: e.end });
+                      setModalOpen(true);
+                    }}
+                  >
+                    ✏️
+                  </button>
+                </div>
               </li>
             ))}
         </ul>
@@ -147,3 +162,4 @@ export default function AgendaCalendar() {
     </div>
   );
 }
+
