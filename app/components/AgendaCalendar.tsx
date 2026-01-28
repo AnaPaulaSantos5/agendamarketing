@@ -3,160 +3,120 @@ import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
-import { EventClickArg } from '@fullcalendar/core';
-import EventModal, { AgendaEvent as ModalAgendaEvent } from './EventModal';
-
-type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
-export type AgendaEvent = {
-  id: string;
-  start: string;
-  end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal: string; // obrigatório para compatibilidade com EventModal
-  conteudoSecundario?: string;
-  perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-  } | null;
-};
-
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+import interactionPlugin from '@fullcalendar/interaction';
+import EventModal, { AgendaEvent, Profile } from './EventModal';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filterProfile, setFilterProfile] = useState<Profile>('Confi');
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch inicial da agenda
+  const profiles: Profile[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+
   useEffect(() => {
-    fetchAgenda();
+    fetchEvents();
   }, []);
 
-  async function fetchAgenda() {
+  const fetchEvents = async () => {
     try {
       const res = await fetch('/api/agenda');
       const data = await res.json();
       setEvents(data || []);
     } catch (err) {
-      console.error('Erro da API:', err);
+      console.error(err);
     }
-  }
+  };
 
-  // Clique em data para criar novo evento
-  const handleDateClick = (info: DateClickArg) => {
-    setSelectedEvent({
+  const handleDateClick = (info: any) => {
+    const newEvent: AgendaEvent = {
       id: '',
       start: info.dateStr,
       end: info.dateStr,
       conteudoPrincipal: '',
       perfil: filterProfile,
-    });
+    };
+    setSelectedEvent(newEvent);
     setIsModalOpen(true);
   };
 
-  // Clique em evento para ver informações
-  const handleEventClick = (info: EventClickArg) => {
+  const handleEventClick = (info: any) => {
     const ev = events.find(e => e.id === info.event.id);
-    if (!ev) return;
-    setSelectedEvent(ev);
-    setIsModalOpen(true);
+    if (ev) {
+      setSelectedEvent(ev);
+      setIsModalOpen(true);
+    }
   };
 
-  // Salvar evento (novo ou edição)
-  const handleSave = async (ev: AgendaEvent, isEdit: boolean) => {
+  const handleSave = async (event: AgendaEvent, isEdit: boolean) => {
     try {
-      const method = isEdit ? 'PATCH' : 'POST';
-      const res = await fetch('/api/agenda', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ev),
-      });
-      if (!res.ok) throw new Error('Erro ao salvar');
-
-      if (isEdit) {
-        setEvents(prev =>
-          prev.map(e => (e.id === ev.id ? { ...e, ...ev } : e))
-        );
+      if (isEdit && event.id) {
+        await fetch('/api/agenda', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+        });
       } else {
-        const newId = String(events.length + 1);
-        setEvents(prev => [...prev, { ...ev, id: newId }]);
+        await fetch('/api/agenda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+        });
       }
-      setIsModalOpen(false);
+      await fetchEvents();
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
     }
   };
 
-  // Excluir evento
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este evento?')) return;
     try {
-      const res = await fetch('/api/agenda', {
+      await fetch('/api/agenda', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error('Erro ao deletar');
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setIsModalOpen(false);
+      await fetchEvents();
     } catch (err) {
       console.error(err);
-      alert('Erro ao deletar evento');
+      alert('Erro ao excluir evento');
     }
   };
 
-  // Checklist lateral
-  const handleChecklistChange = async (
-    ev: AgendaEvent,
-    action: 'Concluída' | 'Reagendar' | 'Cancelar'
-  ) => {
-    let updatedEvent = { ...ev };
-    if (action === 'Concluída') updatedEvent.tarefa!.status = 'Concluída';
-    if (action === 'Cancelar') updatedEvent.tarefa!.status = 'Cancelada';
+  const handleChecklistAction = async (event: AgendaEvent, action: 'Concluída' | 'Reagendar' | 'Cancelar') => {
+    let updatedEvent = { ...event };
+    if (action === 'Concluída') updatedEvent.tarefa = { ...updatedEvent.tarefa, status: 'Concluída' };
+    if (action === 'Cancelar') updatedEvent.tarefa = { ...updatedEvent.tarefa, status: 'Cancelada' };
     if (action === 'Reagendar') {
-      const newDate = prompt('Informe nova data (YYYY-MM-DD HH:mm)', ev.start);
-      if (!newDate) return;
-      updatedEvent.start = newDate;
-      updatedEvent.end = newDate;
+      const newDate = prompt('Escolha nova data e hora (YYYY-MM-DDTHH:MM)', updatedEvent.start);
+      if (newDate) {
+        updatedEvent.start = newDate;
+        updatedEvent.end = newDate;
+      }
     }
     await handleSave(updatedEvent, true);
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const todayEvents = filteredEvents.filter(e => e.start.slice(0, 10) === today);
+
   return (
-    <div style={{ display: 'flex' }}>
-      {/* Calendário */}
+    <div style={{ display: 'flex', gap: 20 }}>
       <div style={{ flex: 1 }}>
         <div>
           Filtrar por perfil:{' '}
-          <select
-            value={filterProfile}
-            onChange={e => setFilterProfile(e.target.value as Perfil)}
-          >
-            {profiles.map(p => (
-              <option key={p}>{p}</option>
-            ))}
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Profile)}>
+            {profiles.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
+
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
-          }}
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -171,40 +131,31 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ width: 300, padding: 10, borderLeft: '1px solid #ccc' }}>
         <h4>Checklist Hoje</h4>
-        <ul>
-          {events
-            .filter(e => e.tarefa && e.start.slice(0, 10) === new Date().toISOString().slice(0, 10))
-            .map(e => (
-              <li key={e.id} style={{ marginBottom: 8 }}>
-                <strong>{e.conteudoPrincipal}</strong> ({e.tarefa!.status})
-                <div style={{ marginTop: 4 }}>
-                  <button onClick={() => handleChecklistChange(e, 'Concluída')}>
-                    Concluída
-                  </button>{' '}
-                  <button onClick={() => handleChecklistChange(e, 'Reagendar')}>
-                    Reagendar
-                  </button>{' '}
-                  <button onClick={() => handleChecklistChange(e, 'Cancelar')}>
-                    Cancelar
-                  </button>
-                </div>
-              </li>
-            ))}
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {todayEvents.map(e => (
+            <li key={e.id} style={{ marginBottom: 10, padding: 8, border: '1px solid #ccc', borderRadius: 4 }}>
+              <div><b>{e.conteudoPrincipal}</b> ({e.tarefa?.status || 'Pendente'})</div>
+              <div style={{ display: 'flex', gap: 5, marginTop: 5 }}>
+                <button onClick={() => handleChecklistAction(e, 'Concluída')} style={buttonBlue}>Concluída</button>
+                <button onClick={() => handleChecklistAction(e, 'Reagendar')} style={buttonGrey}>Reagendar</button>
+                <button onClick={() => handleChecklistAction(e, 'Cancelar')} style={buttonRed}>Cancelar</button>
+              </div>
+            </li>
+          ))}
         </ul>
       </div>
 
-      {/* Modal */}
-      {selectedEvent && (
-        <EventModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          event={selectedEvent as ModalAgendaEvent}
-          onSave={(ev: ModalAgendaEvent) =>
-            handleSave(ev as AgendaEvent, Boolean(selectedEvent.id))
-          }
-          onDelete={() => handleDelete(selectedEvent.id)}
-        />
-      )}
+      <EventModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        event={selectedEvent}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }
+
+const buttonBlue: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#1260c7', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 };
+const buttonGrey: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#ccc', color: '#000', border: 'none', cursor: 'pointer', fontSize: 12 };
+const buttonRed: React.CSSProperties = { padding: '4px 8px', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 };
