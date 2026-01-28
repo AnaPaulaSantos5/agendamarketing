@@ -1,95 +1,54 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-
-export type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
-export type AgendaEvent = {
-  id: string;
-  start: string;
-  end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
-  perfil?: Profile;
-  tarefa?: {
-    titulo?: string;
-    responsavel?: Profile;
-    data?: string;
-    status?: string;
-    linkDrive?: string;
-    notificar?: string;
-  } | null;
-};
+import { AgendaEvent, Perfil } from './AgendaCalendar';
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  event: AgendaEvent;
   onSave: (event: AgendaEvent, isEdit: boolean) => Promise<void>;
   onDelete: (eventId: string) => Promise<void>;
-  event: AgendaEvent | null;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, onDelete, event }: Props) {
+export default function EventModal({ isOpen, onClose, event, onSave, onDelete }: Props) {
   const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState('');
-  const [profile, setProfile] = useState<Profile>('Confi');
-  const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [linkDrive, setLinkDrive] = useState('');
-  const [tarefaTitle, setTarefaTitle] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  const [title, setTitle] = useState(event.conteudoPrincipal);
+  const [start, setStart] = useState(event.start);
+  const [end, setEnd] = useState(event.end);
+  const [profile, setProfile] = useState<Perfil>(event.perfil || 'Confi');
+  const [tarefaTitle, setTarefaTitle] = useState(event.tarefa?.titulo || '');
+  const [linkDrive, setLinkDrive] = useState(event.tarefa?.linkDrive || '');
 
   useEffect(() => {
-    if (event) {
-      setTitle(event.conteudoPrincipal);
-      setProfile(event.perfil || 'Confi');
-      setType(event.tipo as 'Interno' | 'Perfil' || 'Perfil');
-      setLinkDrive(event.tarefa?.linkDrive || '');
-      setTarefaTitle(event.tarefa?.titulo || '');
-      setStart(event.start);
-      setEnd(event.end);
-      setIsEditing(false);
-    }
+    setTitle(event.conteudoPrincipal);
+    setStart(event.start);
+    setEnd(event.end);
+    setProfile(event.perfil || 'Confi');
+    setTarefaTitle(event.tarefa?.titulo || '');
+    setLinkDrive(event.tarefa?.linkDrive || '');
+    setIsEditing(false);
   }, [event]);
 
-  if (!isOpen || !event) return null;
+  if (!isOpen) return null;
 
   const handleSave = () => {
     if (!title) return alert('Informe o título do evento');
 
-    onSave(
-      {
-        id: event.id,
-        start,
-        end,
-        tipoEvento: type,
-        conteudoPrincipal: title,
-        perfil: profile,
-        conteudoSecundario: event.conteudoSecundario,
-        cta: event.cta,
-        statusPostagem: event.statusPostagem,
-        tarefa: tarefaTitle
-          ? {
-              titulo: tarefaTitle,
-              responsavel: profile,
-              data: start,
-              status: event.tarefa?.status || 'Pendente',
-              linkDrive,
-              notificar: 'Sim',
-            }
-          : null,
-      },
-      true
-    );
-    setIsEditing(false);
+    const newEvent: AgendaEvent = {
+      ...event,
+      conteudoPrincipal: title,
+      start,
+      end,
+      perfil: profile,
+      tarefa: tarefaTitle ? { titulo: tarefaTitle, responsavel: profile, data: start, status: event.tarefa?.status || 'Pendente', linkDrive, notificar: 'Sim' } : null,
+    };
+
+    onSave(newEvent, Boolean(event.id));
     onClose();
   };
 
   const handleDelete = () => {
-    if (!confirm('Deseja realmente excluir este evento?')) return;
+    if (!event.id) return;
     onDelete(event.id);
     onClose();
   };
@@ -97,47 +56,29 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, event }:
   return (
     <div style={overlay}>
       <div style={modal}>
+        <h3>Evento</h3>
+
         {!isEditing ? (
           <>
-            <h3>{event.conteudoPrincipal}</h3>
-            <p><b>Perfil:</b> {event.perfil}</p>
-            <p><b>Tipo:</b> {event.tipo}</p>
-            <p><b>Data/Hora:</b> {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleString()}</p>
-            {event.conteudoSecundario && <p><b>Info:</b> {event.conteudoSecundario}</p>}
-            {event.cta && <p><b>CTA:</b> {event.cta}</p>}
-            {event.tarefa && (
-              <p>
-                <b>Tarefa:</b> {event.tarefa.titulo} ({event.tarefa.status})
-              </p>
-            )}
-            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button style={buttonBlue} onClick={() => setIsEditing(true)}>Editar</button>
-              <button style={buttonRed} onClick={handleDelete}>Excluir</button>
-              <button style={buttonGrey} onClick={onClose}>Fechar</button>
-            </div>
+            <div><strong>Título:</strong> {title}</div>
+            <div><strong>Data/Hora:</strong> {start} - {end}</div>
+            <div><strong>Perfil:</strong> {profile}</div>
+            {tarefaTitle && <div><strong>Tarefa:</strong> {tarefaTitle}</div>}
+            <button onClick={() => setIsEditing(true)}>Editar</button>
+            <button onClick={handleDelete} style={{ marginLeft: 5, backgroundColor: 'red', color: '#fff' }}>Excluir</button>
           </>
         ) : (
           <>
-            <h3>Editar Evento/Tarefa</h3>
-            <input style={input} placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} />
-            <select style={input} value={profile} onChange={e => setProfile(e.target.value as Profile)}>
-              <option>Confi</option>
-              <option>Cecília</option>
-              <option>Luiza</option>
-              <option>Júlio</option>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título do evento" style={input} />
+            <input value={start} onChange={e => setStart(e.target.value)} placeholder="Data/Hora início" style={input} />
+            <input value={end} onChange={e => setEnd(e.target.value)} placeholder="Data/Hora fim" style={input} />
+            <select value={profile} onChange={e => setProfile(e.target.value as Perfil)} style={input}>
+              {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => <option key={p}>{p}</option>)}
             </select>
-            <select style={input} value={type} onChange={e => setType(e.target.value as 'Interno' | 'Perfil')}>
-              <option value="Perfil">Perfil</option>
-              <option value="Interno">Interno</option>
-            </select>
-            <input style={input} type="datetime-local" value={start} onChange={e => setStart(e.target.value)} />
-            <input style={input} type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} />
-            <input style={input} placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} />
-            <input style={input} placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button style={buttonBlue} onClick={handleSave}>Salvar</button>
-              <button style={buttonGrey} onClick={() => setIsEditing(false)}>Cancelar</button>
-            </div>
+            <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Título da tarefa (opcional)" style={input} />
+            <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive (opcional)" style={input} />
+            <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
+            <button onClick={() => setIsEditing(false)} style={{ ...input, marginTop: 5 }}>Cancelar</button>
           </>
         )}
       </div>
@@ -146,8 +87,5 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, event }:
 }
 
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 380, borderRadius: 8 };
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
 const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
-const buttonBlue: React.CSSProperties = { padding: '8px 12px', backgroundColor: '#1260c7', color: '#fff', border: 'none', cursor: 'pointer' };
-const buttonRed: React.CSSProperties = { padding: '8px 12px', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' };
-const buttonGrey: React.CSSProperties = { padding: '8px 12px', backgroundColor: '#ccc', color: '#000', border: 'none', cursor: 'pointer' };
