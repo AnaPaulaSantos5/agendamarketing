@@ -4,6 +4,7 @@ import { GoogleSpreadsheet } from 'google-spreadsheet';
 
 const doc = new GoogleSpreadsheet(process.env.SHEET_ID!);
 
+// Acesso à planilha
 async function accessSpreadsheet() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_CLIENT_EMAIL!,
@@ -15,8 +16,8 @@ async function accessSpreadsheet() {
   return { agendaSheet, tarefasSheet };
 }
 
+// Formata data para YYYY-MM-DD
 function formatDateForSheet(dateStr: string) {
-  // Converte "2026-01-29T02:30:00-03:00" para "YYYY-MM-DD"
   const d = new Date(dateStr);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -24,13 +25,14 @@ function formatDateForSheet(dateStr: string) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// GET: retorna todos os eventos
 export async function GET() {
   try {
     const { agendaSheet } = await accessSpreadsheet();
     const rows = await agendaSheet.getRows();
 
     const events = rows.map(row => ({
-      id: row._rowNumber,
+      id: String(row._rowNumber),
       start: row.Data_Inicio,
       end: row.Data_Fim,
       tipoEvento: row.Tipo_Evento,
@@ -40,19 +42,20 @@ export async function GET() {
       cta: row.CTA,
       statusPostagem: row.Status_Postagem,
       perfil: row.Perfil,
+      linkDrive: row.LinkDrive || '',
     }));
 
-    return NextResponse.json(events);
+    return NextResponse.json(events); // sempre retorna array
   } catch (error) {
     console.error('Erro ao carregar agenda', error);
-    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
+    return NextResponse.json([], { status: 500 }); // fallback array
   }
 }
 
+// POST: salva evento na Agenda e Tarefas
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
     // ====== Salva na Agenda ======
@@ -66,9 +69,10 @@ export async function POST(req: NextRequest) {
       CTA: data.cta || '',
       Status_Postagem: data.statusPostagem || '',
       Perfil: data.perfil || '',
+      LinkDrive: data.linkDrive || '',
     });
 
-    // ====== Salva na Tarefas ======
+    // ====== Salva na Tarefas (se existir) ======
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: data.tarefa.blocoId || '',
