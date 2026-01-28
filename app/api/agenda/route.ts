@@ -2,43 +2,60 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-// IDs das planilhas
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
-const AGENDA_SHEET_INDEX = 0; // Aba Agenda
-const TAREFAS_SHEET_INDEX = 1; // Aba Tarefas
+const doc = new GoogleSpreadsheet(process.env.SHEET_ID!);
 
-// Função para formatar datas para YYYY-MM-DD
-function formatDateForSheet(dateString: string) {
-  const d = new Date(dateString);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-async function getSheets() {
-  const doc = new GoogleSpreadsheet(SPREADSHEET_ID!);
+async function accessSpreadsheet() {
   await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_EMAIL!,
+    client_email: process.env.GOOGLE_CLIENT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
-  const agendaSheet = doc.sheetsByIndex[AGENDA_SHEET_INDEX];
-  const tarefasSheet = doc.sheetsByIndex[TAREFAS_SHEET_INDEX];
+  const agendaSheet = doc.sheetsByTitle['Agenda'];
+  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
   return { agendaSheet, tarefasSheet };
+}
+
+function formatDateForSheet(dateStr: string) {
+  // Converte "2026-01-29T02:30:00-03:00" para "YYYY-MM-DD"
+  const d = new Date(dateStr);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export async function GET() {
+  try {
+    const { agendaSheet } = await accessSpreadsheet();
+    const rows = await agendaSheet.getRows();
+
+    const events = rows.map(row => ({
+      id: row._rowNumber,
+      start: row.Data_Inicio,
+      end: row.Data_Fim,
+      tipoEvento: row.Tipo_Evento,
+      tipo: row.Tipo,
+      conteudoPrincipal: row.Conteudo_Principal,
+      conteudoSecundario: row.Conteudo_Secundario,
+      cta: row.CTA,
+      statusPostagem: row.Status_Postagem,
+      perfil: row.Perfil,
+    }));
+
+    return NextResponse.json(events);
+  } catch (error) {
+    console.error('Erro ao carregar agenda', error);
+    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
 
-    if (!data.start || !data.end) {
-      return NextResponse.json({ error: 'Datas obrigatórias' }, { status: 400 });
-    }
+    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    const { agendaSheet, tarefasSheet } = await getSheets();
-
-    // Adiciona na Agenda
+    // ====== Salva na Agenda ======
     await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
@@ -51,18 +68,20 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil || '',
     });
 
-    // Adiciona na Tarefas
-    await tarefasSheet.addRow({
-      Bloco_ID: data.id || '',
-      Titulo: data.conteudoPrincipal || '',
-      Responsavel: data.perfil || '',
-      Data: formatDateForSheet(data.start),
-      Status: data.statusPostagem || '',
-      LinkDrive: data.linkDrive || '',
-      Notificar: data.notificar || 'Sim',
-    });
+    // ====== Salva na Tarefas ======
+    if (data.tarefa) {
+      await tarefasSheet.addRow({
+        Bloco_ID: data.tarefa.blocoId || '',
+        Titulo: data.tarefa.titulo || '',
+        Responsavel: data.tarefa.responsavel || '',
+        Data: formatDateForSheet(data.tarefa.data || new Date().toISOString()),
+        Status: data.tarefa.status || '',
+        LinkDrive: data.tarefa.linkDrive || '',
+        Notificar: data.tarefa.notificar || '',
+      });
+    }
 
-    return NextResponse.json({ message: 'Evento salvo com sucesso' });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Erro ao salvar evento', error);
     return NextResponse.json({ error: 'Erro ao salvar' }, { status: 500 });
