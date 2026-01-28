@@ -31,7 +31,6 @@ export async function GET() {
       CTA: row.CTA,
       Status_Postagem: row.Status_Postagem,
       Perfil: row.Perfil,
-      LinkDrive: row.LinkDrive || '',
     }));
 
     return NextResponse.json({ Agenda: events });
@@ -41,16 +40,16 @@ export async function GET() {
   }
 }
 
-// POST: adiciona novo evento na Agenda e Tarefas
+// POST: adiciona novo evento na Agenda e cria tarefa correspondente
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSheet();
 
-    // Adiciona na Agenda
+    // 1️⃣ Adiciona na Agenda
     const newRow = await agendaSheet.addRow({
-      Data_Inicio: data.start,
-      Data_Fim: data.end,
+      Data_Inicio: data.Data_Inicio,
+      Data_Fim: data.Data_Fim,
       Tipo_Evento: data.Tipo_Evento,
       Tipo: data.Tipo,
       Conteudo_Principal: data.Conteudo_Principal,
@@ -58,15 +57,14 @@ export async function POST(req: NextRequest) {
       CTA: data.CTA,
       Status_Postagem: 'Pendente',
       Perfil: data.Perfil,
-      LinkDrive: data.LinkDrive || '',
     });
 
-    // Cria tarefa correspondente (um bloco por evento)
+    // 2️⃣ Cria tarefa correspondente
     await tarefasSheet.addRow({
       Bloco_ID: newRow._rowNumber,
       Titulo: data.Conteudo_Principal,
       Responsavel: data.Perfil,
-      Data: data.start,
+      Data: data.Data_Inicio,
       Status: 'Pendente',
       LinkDrive: data.LinkDrive || '',
       Notificar: 'Sim',
