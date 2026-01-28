@@ -1,38 +1,36 @@
-// app/api/agenda/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
 const doc = new GoogleSpreadsheet(process.env.SHEET_ID!);
 
-// Acesso à planilha
 async function accessSpreadsheet() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_CLIENT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
+
   await doc.loadInfo();
   const agendaSheet = doc.sheetsByTitle['Agenda'];
   const tarefasSheet = doc.sheetsByTitle['Tarefas'];
   return { agendaSheet, tarefasSheet };
 }
 
-// Formata data para YYYY-MM-DD
 function formatDateForSheet(dateStr: string) {
+  if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// GET: retorna todos os eventos
 export async function GET() {
   try {
     const { agendaSheet } = await accessSpreadsheet();
     const rows = await agendaSheet.getRows();
-
-    const events = rows.map(row => ({
-      id: String(row._rowNumber),
+    const events = rows.map((row) => ({
+      id: row._rowNumber,
       start: row.Data_Inicio,
       end: row.Data_Fim,
       tipoEvento: row.Tipo_Evento,
@@ -42,17 +40,14 @@ export async function GET() {
       cta: row.CTA,
       statusPostagem: row.Status_Postagem,
       perfil: row.Perfil,
-      linkDrive: row.LinkDrive || '',
     }));
-
-    return NextResponse.json(events); // sempre retorna array
+    return NextResponse.json(events);
   } catch (error) {
     console.error('Erro ao carregar agenda', error);
-    return NextResponse.json([], { status: 500 }); // fallback array
+    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
   }
 }
 
-// POST: salva evento na Agenda e Tarefas
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
@@ -69,10 +64,9 @@ export async function POST(req: NextRequest) {
       CTA: data.cta || '',
       Status_Postagem: data.statusPostagem || '',
       Perfil: data.perfil || '',
-      LinkDrive: data.linkDrive || '',
     });
 
-    // ====== Salva na Tarefas (se existir) ======
+    // ====== Salva na Tarefas ======
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: data.tarefa.blocoId || '',
