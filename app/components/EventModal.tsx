@@ -1,115 +1,121 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { AgendaEvent } from './AgendaCalendar';
+import React, { useState } from 'react';
+
+type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
+type AgendaEvent = {
+  id: string;
+  start: string;
+  end: string;
+  tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
+  perfil?: Profile;
+  tarefa?: {
+    titulo: string;
+    responsavel: Profile;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
+};
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  start: string;
-  end: string;
-  event?: AgendaEvent | null;
+  event: AgendaEvent;
+  onSave: (event: AgendaEvent, isEdit: boolean) => void;
+  onDelete: (eventId: string) => void;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, start, end, event }: Props) {
-  const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<'Confi' | 'Cecília' | 'Luiza' | 'Júlio'>('Confi');
-  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [tarefaTitle, setTarefaTitle] = useState('');
-  const [linkDrive, setLinkDrive] = useState('');
-  const [startDate, setStartDate] = useState(start);
-  const [endDate, setEndDate] = useState(end);
-  const [editing, setEditing] = useState(false);
-
-  useEffect(() => {
-    if (event) {
-      setTitle(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || 'Confi');
-      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
-      setTarefaTitle(event.tarefa?.titulo || '');
-      setLinkDrive(event.tarefa?.linkDrive || '');
-      setStartDate(event.start);
-      setEndDate(event.end);
-      setEditing(false);
-    } else {
-      setEditing(true);
-      setStartDate(start);
-      setEndDate(end);
-    }
-  }, [event, start, end]);
+export default function EventModal({ isOpen, onClose, event, onSave, onDelete }: Props) {
+  const [editMode, setEditMode] = useState(false);
+  const [title, setTitle] = useState(event.conteudoPrincipal || '');
+  const [profile, setProfile] = useState<Profile>(event.perfil || 'Confi');
+  const [type, setType] = useState<'Interno' | 'Perfil'>(event.tipoEvento as any || 'Perfil');
+  const [linkDrive, setLinkDrive] = useState(event.tarefa?.linkDrive || '');
+  const [tarefaTitle, setTarefaTitle] = useState(event.tarefa?.titulo || '');
+  const [start, setStart] = useState(event.start);
+  const [end, setEnd] = useState(event.end);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSaveClick = () => {
     if (!title) return alert('Informe o título do evento');
-    const ev: AgendaEvent = {
-      id: event?.id || String(new Date().getTime()),
-      start: startDate,
-      end: endDate,
+
+    onSave({
+      ...event,
+      start,
+      end,
       conteudoPrincipal: title,
-      perfil,
-      tipoEvento: tipo,
-      tarefa: tarefaTitle
-        ? {
-            titulo: tarefaTitle,
-            responsavel: perfil,
-            data: startDate,
-            status: event?.tarefa?.status || 'Pendente',
-            linkDrive,
-            notificar: 'Sim',
-          }
-        : null,
-    };
-    onSave(ev, !!event);
-    onClose();
+      perfil: profile,
+      tipoEvento: type,
+      tarefa: tarefaTitle ? {
+        ...event.tarefa,
+        titulo: tarefaTitle,
+        responsavel: profile,
+        data: start,
+        status: event.tarefa?.status || 'Pendente',
+        linkDrive,
+        notificar: 'Sim',
+      } : null,
+    }, editMode || !!event.id);
+  };
+
+  const handleDeleteClick = () => {
+    onDelete(event.id);
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
+        <h3>Evento</h3>
 
-        {event && !editing && (
-          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
-            ✏️ Editar
-          </button>
-        )}
-
-        {(editing || !event) && (
+        {!editMode ? (
           <>
-            <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
-            <select value={perfil} onChange={e => setPerfil(e.target.value as any)} style={input}>
+            <p><strong>Título:</strong> {title}</p>
+            <p><strong>Perfil:</strong> {profile}</p>
+            <p><strong>Tipo:</strong> {type}</p>
+            <p><strong>Data/Hora:</strong> {start} → {end}</p>
+            {tarefaTitle && <p><strong>Tarefa:</strong> {tarefaTitle} ({event.tarefa?.status})</p>}
+            <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
+              <button onClick={() => setEditMode(true)}>✏️ Editar</button>
+              <button onClick={handleDeleteClick}>❌ Excluir</button>
+              <button onClick={onClose}>Fechar</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título do evento" style={input} />
+            <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
               <option>Confi</option>
               <option>Cecília</option>
               <option>Luiza</option>
               <option>Júlio</option>
             </select>
-            <select value={tipo} onChange={e => setTipo(e.target.value as any)} style={input}>
+            <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
               <option value="Perfil">Perfil</option>
               <option value="Interno">Interno</option>
             </select>
-            <input placeholder="Título da tarefa" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
-            <input placeholder="Link do Drive" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
-
-            <label>Início:</label>
-            <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} style={input} />
-            <label>Fim:</label>
-            <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} style={input} />
-
-            <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>
-              Salvar
-            </button>
+            <input value={start} onChange={e => setStart(e.target.value)} style={input} />
+            <input value={end} onChange={e => setEnd(e.target.value)} style={input} />
+            <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Título da tarefa" style={input} />
+            <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" style={input} />
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button onClick={handleSaveClick} style={{ backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
+              <button onClick={() => setEditMode(false)}>Cancelar</button>
+            </div>
           </>
         )}
-
-        <button onClick={onClose} style={{ ...input, marginTop: 8 }}>
-          Fechar
-        </button>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 };
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
 const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
 const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
