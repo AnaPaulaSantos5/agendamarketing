@@ -7,15 +7,15 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
 type AgendaEvent = {
   id: string;
-  title: string;
   start: string;
   end: string;
   tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal?: string;
   perfil?: Perfil;
-  linkDrive?: string;
+  tarefa?: any;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -24,9 +24,8 @@ export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
-  const [formData, setFormData] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [selectedDate, setSelectedDate] = useState<{start: string, end: string}>({ start: '', end: '' });
 
-  // Carregar agenda da planilha
   useEffect(() => {
     async function fetchAgenda() {
       try {
@@ -40,16 +39,11 @@ export default function AgendaCalendar() {
     fetchAgenda();
   }, []);
 
-  // Filtra por perfil
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
-  // Clique no calendário
   const handleDateClick = (info: any) => {
-    setFormData({ start: info.dateStr, end: info.dateStr });
+    setSelectedDate({ start: info.dateStr, end: info.dateStr });
     setModalOpen(true);
   };
 
-  // Salvar evento
   const handleSave = async (newEvent: AgendaEvent) => {
     try {
       const res = await fetch('/api/agenda', {
@@ -58,56 +52,57 @@ export default function AgendaCalendar() {
         body: JSON.stringify(newEvent),
       });
       if (!res.ok) throw new Error('Erro ao salvar');
-      setEvents(prev => [...prev, newEvent]);
+      setEvents(prev => [...prev, { ...newEvent, id: String(prev.length + 1) }]);
     } catch (err) {
       console.error('Erro ao salvar evento', err);
       alert('Erro ao salvar evento');
-    } finally {
-      setModalOpen(false);
     }
   };
 
+  const filteredEvents = events.filter(e => e.perfil === filterProfile);
+
   return (
-    <div style={{ position: 'relative', display: 'flex' }}>
+    <div style={{ display: 'flex' }}>
+      {/* Calendário */}
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: 10 }}>
-          Filtrar por perfil:
+        <div>
+          Filtrar por perfil: 
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => (
-              <option key={p}>{p}</option>
-            ))}
+            {profiles.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
-          }}
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
           events={filteredEvents.map(ev => ({
             id: ev.id,
-            title: ev.title,
+            title: ev.conteudoPrincipal,
             start: ev.start,
             end: ev.end,
           }))}
           dateClick={handleDateClick}
-          height="auto"
         />
       </div>
 
-      {/* Modal de evento */}
-      {modalOpen && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          onSave={handleSave}
-          start={formData.start}
-          end={formData.end}
-        />
-      )}
+      {/* Checklist lateral */}
+      <div style={{ width: 250, padding: 10, borderLeft: '1px solid #ccc' }}>
+        <h4>Checklist Hoje</h4>
+        <ul>
+          {events.filter(e => e.start === new Date().toISOString().slice(0, 10)).map(e => (
+            <li key={e.id}>{e.conteudoPrincipal} ({e.tipoEvento})</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Modal */}
+      <EventModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        start={selectedDate.start}
+        end={selectedDate.end}
+        onSave={handleSave}
+      />
     </div>
   );
 }
