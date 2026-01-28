@@ -8,9 +8,6 @@ import interactionPlugin from '@fullcalendar/interaction';
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<any[]>([]);
 
-  /* =========================
-     CARREGAR EVENTOS
-  ========================= */
   async function carregarAgenda() {
     const res = await fetch('/api/agenda');
     const data = await res.json();
@@ -21,20 +18,23 @@ export default function AgendaCalendar() {
     carregarAgenda();
   }, []);
 
-  /* =========================
-     CRIAR EVENTO
-  ========================= */
   async function handleSelect(info: any) {
+    const conteudo = prompt('Conteúdo principal:');
+    if (!conteudo) return;
+
+    const tipo = prompt('Tipo (Story, Reels, Post):', 'Story') || 'Story';
+    const perfil = prompt('Perfil:', 'Confi Seguros') || 'Confi Seguros';
+
     const payload = {
       Data_Inicio: info.startStr,
       Data_Fim: info.endStr || info.startStr,
       Tipo_Evento: 'Conteúdo',
-      Tipo: 'Story',
-      Conteudo_Principal: 'Novo conteúdo',
+      Tipo: tipo,
+      Conteudo_Principal: conteudo,
       Conteudo_Secundario: '',
       CTA: '',
       Status_Postagem: 'Planejado',
-      Perfil: 'Confi Seguros',
+      Perfil: perfil,
     };
 
     await fetch('/api/agenda', {
@@ -43,7 +43,7 @@ export default function AgendaCalendar() {
       body: JSON.stringify(payload),
     });
 
-    carregarAgenda(); // 🔥 ESSENCIAL
+    carregarAgenda();
   }
 
   return (
