@@ -29,7 +29,7 @@ export async function GET() {
     const rows = await agendaSheet.getRows();
 
     const events = rows.map(row => ({
-      id: row._rowNumber,
+      id: row._rowNumber.toString(),
       start: row.Data_Inicio,
       end: row.Data_Fim,
       tipoEvento: row.Tipo_Evento,
