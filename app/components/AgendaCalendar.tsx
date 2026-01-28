@@ -5,61 +5,52 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { DateSelectArg, EventInput } from '@fullcalendar/core';
+import { EventInput } from '@fullcalendar/core';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
-
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [perfilFiltro, setPerfilFiltro] = useState<Perfil>('Confi');
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
 
-  /* =============================
-     CARREGAR EVENTOS
-     ============================= */
+  // 🔹 Carregar eventos da planilha
   useEffect(() => {
-    async function loadAgenda() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data = await res.json();
-        setEvents(data);
-      } catch (err) {
-        console.error('Erro ao carregar agenda', err);
-      }
-    }
-    loadAgenda();
+    fetch('/api/agenda')
+      .then(res => res.json())
+      .then(data => {
+        const mapped: EventInput[] = data.Agenda.map((item: any, index: number) => ({
+          id: String(index),
+          title: item.Conteudo_Principal,
+          start: item.Data.split('/').reverse().join('-'),
+          allDay: true,
+          extendedProps: {
+            profile: item.Perfil,
+            type: item.Tipo,
+            status: item.Status_Postagem,
+          },
+        }));
+        setEvents(mapped);
+      });
   }, []);
 
-  /* =============================
-     CRIAR EVENTO (BLOCO)
-     ============================= */
-  async function handleSelect(selectInfo: DateSelectArg) {
-    const title = prompt('Título do evento');
+  // 🔹 Criar evento clicando no calendário
+  async function handleDateSelect(selectInfo: any) {
+    const title = prompt('Descrição do conteúdo (ex: Story checklist seguro residencial)');
     if (!title) return;
 
-    const tipo =
-      prompt('Tipo (Story, Reel, Post, Organização)', 'Story') || 'Story';
-
-    const linkDrive = prompt('Link do Drive (opcional)') || '';
-
-    const newEvent: EventInput = {
-      id: String(Date.now()),
+    const newEvent = {
       title,
       start: selectInfo.startStr,
-      end: selectInfo.endStr,
       extendedProps: {
-        profile: perfilFiltro,
-        type: tipo,
-        linkDrive,
-        status: 'Pendente',
+        profile: perfil,
+        type: 'Story',
       },
     };
 
     // Atualiza UI
     setEvents(prev => [...prev, newEvent]);
 
-    // Persiste no backend
+    // Salva na planilha
     await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -67,54 +58,33 @@ export default function AgendaCalendar() {
     });
   }
 
-  /* =============================
-     FILTRO POR PERFIL
-     ============================= */
-  const filteredEvents = events.filter(
-    e => e.extendedProps?.profile === perfilFiltro
-  );
-
   return (
     <div style={{ padding: 20 }}>
-      {/* FILTRO */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ marginRight: 8 }}>Perfil:</label>
-        <select
-          value={perfilFiltro}
-          onChange={e => setPerfilFiltro(e.target.value as Perfil)}
-        >
-          {perfis.map(p => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </div>
+      <h2>Agenda de Conteúdos</h2>
 
-      {/* CALENDÁRIO */}
+      <select
+        value={perfil}
+        onChange={e => setPerfil(e.target.value as Perfil)}
+        style={{ marginBottom: 10 }}
+      >
+        <option value="Confi">Confi</option>
+        <option value="Cecília">Cecília</option>
+        <option value="Luiza">Luiza</option>
+        <option value="Júlio">Júlio</option>
+      </select>
+
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         selectable
         editable
-        select={handleSelect}
-        events={filteredEvents}
+        select={handleDateSelect}
+        events={events.filter(e => e.extendedProps?.profile === perfil)}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
-        eventClick={(info) => {
-          const p = info.event.extendedProps;
-          alert(
-            `📌 ${info.event.title}\n\n` +
-            `Perfil: ${p.profile}\n` +
-            `Tipo: ${p.type}\n` +
-            `Status: ${p.status}\n\n` +
-            `Roteiro:\n${p.linkDrive || '—'}`
-          );
-        }}
-        height="auto"
       />
     </div>
   );
