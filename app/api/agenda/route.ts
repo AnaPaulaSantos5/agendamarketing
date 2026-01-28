@@ -1,87 +1,76 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { NextResponse } from 'next/server';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 
-/* =========================
-   AUTENTICAÇÃO GOOGLE
-========================= */
-async function getDoc() {
-  const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+const auth = new JWT({
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
 
-  await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  });
-
-  await doc.loadInfo();
-  return doc;
-}
+const doc = new GoogleSpreadsheet(
+  process.env.GOOGLE_SHEET_ID!,
+  auth
+);
 
 /* =========================
    GET — CARREGAR AGENDA
 ========================= */
 export async function GET() {
-  try {
-    const doc = await getDoc();
-    const sheet = doc.sheetsByTitle['Agenda'];
-    const rows = await sheet.getRows();
+  await doc.loadInfo();
+  const sheet = doc.sheetsByTitle['Agenda'];
+  const rows = await sheet.getRows();
 
-    const eventos = rows.map((row) => ({
-      Bloco_ID: row.Bloco_ID,
-      title: row.Conteudo_Principal || 'Sem título',
-      start: row.Data_Inicio, // YYYY-MM-DD
-      end: row.Data_Fim,      // YYYY-MM-DD
-      extendedProps: {
-        Tipo_Evento: row.Tipo_Evento,
-        Tipo: row.Tipo,
-        Conteudo_Secundario: row.Conteudo_Secundario,
-        CTA: row.CTA,
-        Status_Postagem: row.Status_Postagem,
-        Perfil: row.Perfil,
-      },
-    }));
+  const events = rows.map((row: any) => ({
+    title: `${row.Tipo}: ${row.Conteudo_Principal}`,
+    start: row.Data_Inicio,
+    end: row.Data_Fim || row.Data_Inicio,
+  }));
 
-    return NextResponse.json(eventos);
-  } catch (error) {
-    console.error('GET /api/agenda erro:', error);
-    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
-  }
+  return NextResponse.json(events);
 }
 
 /* =========================
-   POST — CRIAR BLOCO
+   POST — CRIAR EVENTO + TAREFAS
 ========================= */
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
+  const body = await req.json();
 
-    if (!body.Data_Inicio || !body.Data_Fim) {
-      return NextResponse.json(
-        { error: 'Datas obrigatórias' },
-        { status: 400 }
-      );
-    }
+  await doc.loadInfo();
 
-    const blocoId = Date.now().toString(); // ID único e persistente
+  const agendaSheet = doc.sheetsByTitle['Agenda'];
+  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
 
-    const doc = await getDoc();
-    const sheet = doc.sheetsByTitle['Agenda'];
+  // ID único para ligar Agenda ↔ Tarefas
+  const blocoId = `BL-${Date.now()}`;
 
-    await sheet.addRow({
+  // 🔹 Salva na Agenda
+  await agendaSheet.addRow({
+    Bloco_ID: blocoId,
+    ...body,
+  });
+
+  // 🔹 Cria tarefas automaticamente
+  await tarefasSheet.addRows([
+    {
       Bloco_ID: blocoId,
-      Data_Inicio: body.Data_Inicio, // YYYY-MM-DD
-      Data_Fim: body.Data_Fim,       // YYYY-MM-DD
-      Tipo_Evento: body.Tipo_Evento || 'Campanha',
-      Tipo: body.Tipo || '',
-      Conteudo_Principal: body.Conteudo_Principal || '',
-      Conteudo_Secundario: body.Conteudo_Secundario || '',
-      CTA: body.CTA || '',
-      Status_Postagem: body.Status_Postagem || 'Planejado',
-      Perfil: body.Perfil || '',
-    });
+      Tarefa: 'Criar arte',
+      Status: 'Pendente',
+      Perfil: body.Perfil,
+    },
+    {
+      Bloco_ID: blocoId,
+      Tarefa: 'Revisar conteúdo',
+      Status: 'Pendente',
+      Perfil: body.Perfil,
+    },
+    {
+      Bloco_ID: blocoId,
+      Tarefa: 'Publicar',
+      Status: 'Pendente',
+      Perfil: body.Perfil,
+    },
+  ]);
 
-    return NextResponse.json({ ok: true, Bloco_ID: blocoId });
-  } catch (error) {
-    console.error('POST /api/agenda erro:', error);
-    return NextResponse.json({ error: 'Erro ao salvar agenda' }, { status: 500 });
-  }
+  return NextResponse.json({ success: true });
 }
