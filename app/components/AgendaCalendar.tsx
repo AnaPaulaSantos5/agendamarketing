@@ -1,14 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import EventModal from './EventModal';
 
-type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type Tarefa = {
+export type Tarefa = {
   titulo: string;
   responsavel: Perfil;
   data: string;
@@ -17,13 +12,13 @@ type Tarefa = {
   notificar?: string;
 };
 
-type AgendaEvent = {
+export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
   tipoEvento?: string;
   tipo?: string;
-  conteudoPrincipal?: string;
+  conteudoPrincipal: string; // obrigatório
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
@@ -31,197 +26,134 @@ type AgendaEvent = {
   tarefa?: Tarefa | null;
 };
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (event: AgendaEvent) => void;
+  event: Partial<AgendaEvent>; // permite passar incompleto
+};
 
-export default function AgendaCalendar() {
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+export default function EventModal({ isOpen, onClose, onSave, event }: Props) {
+  const [title, setTitle] = useState(event.conteudoPrincipal || '');
+  const [profile, setProfile] = useState<Perfil>(event.perfil || 'Confi');
+  const [type, setType] = useState<'Interno' | 'Perfil'>(event.tipo || 'Perfil');
+  const [linkDrive, setLinkDrive] = useState(event.tarefa?.linkDrive || '');
+  const [tarefaTitle, setTarefaTitle] = useState(event.tarefa?.titulo || '');
+  const [start, setStart] = useState(event.start || '');
+  const [end, setEnd] = useState(event.end || '');
 
-  // Para visualização e edição
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Fetch inicial da agenda
   useEffect(() => {
-    async function fetchAgenda() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data = await res.json();
-        setEvents(data || []);
-      } catch (err) {
-        console.error('Erro da API:', err);
-      }
-    }
-    fetchAgenda();
-  }, []);
+    // atualizar estado quando abrir modal para edição
+    setTitle(event.conteudoPrincipal || '');
+    setProfile(event.perfil || 'Confi');
+    setType(event.tipo || 'Perfil');
+    setLinkDrive(event.tarefa?.linkDrive || '');
+    setTarefaTitle(event.tarefa?.titulo || '');
+    setStart(event.start || '');
+    setEnd(event.end || '');
+  }, [event, isOpen]);
 
-  // Salvar evento (novo ou edição)
-  const handleSave = async (event: AgendaEvent, isEdit = false) => {
-    try {
-      const method = isEdit ? 'PATCH' : 'POST';
-      const res = await fetch('/api/agenda', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      });
-      if (!res.ok) throw new Error('Erro ao salvar');
+  if (!isOpen) return null;
 
-      if (isEdit) {
-        setEvents(prev =>
-          prev.map(e => (e.id === event.id ? { ...e, ...event } : e))
-        );
-      } else {
-        setEvents(prev => [...prev, { ...event, id: String(prev.length + 1) }]);
-      }
+  const handleSave = () => {
+    if (!title) return alert('Informe o título do evento');
 
-      setIsModalOpen(false);
-      setSelectedEvent(null);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar evento');
-    }
+    const eventData: AgendaEvent = {
+      id: event.id || '', // vazio se for novo
+      start,
+      end,
+      tipoEvento: type,
+      tipo: type,
+      conteudoPrincipal: title,
+      conteudoSecundario: event.conteudoSecundario || '',
+      cta: event.cta || '',
+      statusPostagem: event.statusPostagem || '',
+      perfil: profile,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: profile,
+            data: start,
+            status: event.tarefa?.status || 'Pendente',
+            linkDrive,
+            notificar: event.tarefa?.notificar || 'Sim',
+          }
+        : null,
+    };
+
+    onSave(eventData);
+    onClose();
   };
-
-  // Excluir evento
-  const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este evento?')) return;
-    try {
-      const res = await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) throw new Error('Erro ao excluir');
-
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setSelectedEvent(null);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir evento');
-    }
-  };
-
-  // Marcar tarefa como concluída / pendente
-  const handleChecklistToggle = async (event: AgendaEvent) => {
-    if (!event.tarefa) return;
-    const newStatus = event.tarefa.status === 'Concluída' ? 'Pendente' : 'Concluída';
-    const updatedEvent = { ...event, tarefa: { ...event.tarefa, status: newStatus } };
-    await handleSave(updatedEvent, true);
-  };
-
-  // Reagendar tarefa/evento (abre modal pré-preenchido)
-  const handleReschedule = (event: AgendaEvent) => {
-    setSelectedEvent(event);
-    setIsModalOpen(true);
-  };
-
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
-  // Para checklist do dia
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      {/* Lado esquerdo: Calendário */}
-      <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: 8 }}>
-          Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => <option key={p}>{p}</option>)}
-          </select>
-        </div>
+    <div style={overlay}>
+      <div style={modal}>
+        <h3>{event.id ? 'Editar Evento/Tarefa' : 'Novo Evento/Tarefa'}</h3>
 
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-          events={filteredEvents.map(ev => ({
-            id: ev.id,
-            title: ev.conteudoPrincipal,
-            start: ev.start,
-            end: ev.end,
-          }))}
-          dateClick={info => {
-            setSelectedEvent({
-              id: '',
-              start: info.dateStr,
-              end: info.dateStr,
-              perfil: filterProfile,
-            });
-            setIsModalOpen(true);
-          }}
-          eventClick={info => {
-            const event = events.find(e => e.id === info.event.id);
-            if (event) setSelectedEvent(event);
-          }}
-          selectable
-          select={info => {
-            setSelectedEvent({
-              id: '',
-              start: info.startStr,
-              end: info.endStr,
-              perfil: filterProfile,
-            });
-            setIsModalOpen(true);
-          }}
+        <input
+          placeholder="Título do evento"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          style={input}
         />
 
-        {/* Visualização do evento selecionado */}
-        {selectedEvent && selectedEvent.id && (
-          <div style={{ marginTop: 10, padding: 10, border: '1px solid #ccc', borderRadius: 6 }}>
-            <h4>Detalhes do Evento</h4>
-            <p><strong>Título:</strong> {selectedEvent.conteudoPrincipal}</p>
-            <p><strong>Perfil:</strong> {selectedEvent.perfil}</p>
-            <p><strong>Tipo:</strong> {selectedEvent.tipo}</p>
-            <p><strong>Tipo de Evento:</strong> {selectedEvent.tipoEvento}</p>
-            <p><strong>Data/Hora Início:</strong> {selectedEvent.start}</p>
-            <p><strong>Data/Hora Fim:</strong> {selectedEvent.end}</p>
-            {selectedEvent.tarefa && (
-              <>
-                <p><strong>Tarefa:</strong> {selectedEvent.tarefa.titulo}</p>
-                <p><strong>Status:</strong> {selectedEvent.tarefa.status}</p>
-                <p><strong>Link Drive:</strong> {selectedEvent.tarefa.linkDrive && <a href={selectedEvent.tarefa.linkDrive} target="_blank">Abrir</a>}</p>
-              </>
-            )}
-            <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
-              <button onClick={() => setIsModalOpen(true)}>✏️ Editar</button>
-              <button onClick={() => handleDelete(selectedEvent.id)} style={{ color: 'red' }}>🗑️ Excluir</button>
-              <button onClick={() => setSelectedEvent(null)}>❌ Fechar</button>
-            </div>
-          </div>
-        )}
-      </div>
+        <select value={profile} onChange={e => setProfile(e.target.value as Perfil)} style={input}>
+          <option>Confi</option>
+          <option>Cecília</option>
+          <option>Luiza</option>
+          <option>Júlio</option>
+        </select>
 
-      {/* Lado direito: Checklist do dia */}
-      <div style={{ width: 280, padding: 10, borderLeft: '1px solid #ccc' }}>
-        <h4>Checklist Hoje</h4>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {events
-            .filter(e => e.tarefa && e.start.slice(0, 10) === todayStr)
-            .map(e => (
-              <li key={e.id} style={{ marginBottom: 6, borderBottom: '1px solid #eee', paddingBottom: 4 }}>
-                <strong>{e.conteudoPrincipal}</strong> - {e.tarefa!.titulo} ({e.tarefa!.status})
-                <div style={{ display: 'flex', gap: 5, marginTop: 2 }}>
-                  <button onClick={() => handleChecklistToggle(e)}>
-                    {e.tarefa!.status === 'Concluída' ? '✅ Desmarcar' : '☑️ Concluir'}
-                  </button>
-                  <button onClick={() => handleReschedule(e)}>⏰ Reagendar</button>
-                  <button onClick={() => handleDelete(e.id)} style={{ color: 'red' }}>🗑️ Excluir</button>
-                </div>
-              </li>
-            ))}
-        </ul>
-      </div>
+        <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
+          <option value="Perfil">Perfil</option>
+          <option value="Interno">Interno</option>
+        </select>
 
-      {/* Modal de edição */}
-      {selectedEvent && (
-        <EventModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          event={selectedEvent}
-          onSave={(ev: AgendaEvent) => handleSave(ev, Boolean(ev.id))}
+        <input
+          placeholder="Título da tarefa (opcional)"
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+          style={input}
         />
-      )}
+        <input
+          placeholder="Link do Drive (opcional)"
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          style={input}
+        />
+
+        <input
+          type="datetime-local"
+          value={start}
+          onChange={e => setStart(e.target.value)}
+          style={input}
+        />
+        <input
+          type="datetime-local"
+          value={end}
+          onChange={e => setEnd(e.target.value)}
+          style={input}
+        />
+
+        <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>
+          Salvar
+        </button>
+        <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }
+
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 999,
+};
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
+const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
