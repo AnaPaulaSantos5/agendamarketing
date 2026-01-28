@@ -1,43 +1,63 @@
-import { NextResponse } from "next/server";
-import { GoogleSpreadsheet } from "google-spreadsheet";
+import { NextResponse } from 'next/server';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
-const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n");
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
+
+async function auth() {
+  await doc.useServiceAccountAuth({
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+  });
+  await doc.loadInfo();
+}
 
 export async function GET() {
   try {
-    // 1️⃣ Instancia a planilha
-    const doc = new GoogleSpreadsheet(GOOGLE_SHEET_ID);
+    await auth();
+    const sheet = doc.sheetsByTitle['Agenda'];
+    const rows = await sheet.getRows();
 
-    // 2️⃣ Autentica via Service Account
-    await doc.useServiceAccountAuth({
-      client_email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: GOOGLE_PRIVATE_KEY,
+    const events = rows.map(row => ({
+      id: row.ID,
+      title: row.Titulo,
+      start: row.Inicio,
+      end: row.Fim,
+      extendedProps: {
+        profile: row.Perfil,
+        type: row.Tipo,
+        linkDrive: row.LinkDrive,
+        status: row.Status,
+      },
+    }));
+
+    return NextResponse.json(events);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Erro ao buscar agenda' }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+
+    await auth();
+    const sheet = doc.sheetsByTitle['Agenda'];
+
+    await sheet.addRow({
+      ID: body.id,
+      Titulo: body.title,
+      Inicio: body.start,
+      Fim: body.end,
+      Perfil: body.extendedProps.profile,
+      Tipo: body.extendedProps.type,
+      LinkDrive: body.extendedProps.linkDrive || '',
+      Status: body.extendedProps.status || 'Pendente',
     });
 
-    await doc.loadInfo(); // carrega infos da planilha
-
-    // 3️⃣ Pega todas as abas
-    const allSheetsData = {};
-
-    for (const sheet of doc.sheetsByIndex) {
-      await sheet.loadHeaderRow(); // garante que os títulos de coluna estejam carregados
-      const rows = await sheet.getRows();
-      
-      // Mapeia cada linha transformando em JSON simples
-      allSheetsData[sheet.title] = rows.map((row) => {
-        const obj: Record<string, any> = {};
-        sheet.headerValues.forEach((header) => {
-          obj[header] = row[header];
-        });
-        return obj;
-      });
-    }
-
-    return NextResponse.json(allSheetsData);
-  } catch (error) {
-    console.error("Erro ao carregar agenda:", error);
-    return NextResponse.json({ error: "Não foi possível carregar a agenda" }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Erro ao salvar evento' }, { status: 500 });
   }
 }
