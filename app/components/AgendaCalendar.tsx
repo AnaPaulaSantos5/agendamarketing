@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar, { EventApi } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -37,14 +37,12 @@ export default function AgendaCalendar() {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
-  // Carregar Agenda e Tarefas
   const carregarAgenda = async () => {
     try {
       const res = await fetch('/api/agenda');
       const data = await res.json();
 
-      // Transformar Agenda
-      const agendaEvents: AgendaEvent[] = data.Agenda.map((item: any, index: number) => ({
+      const agendaEvents: AgendaEvent[] = (data.Agenda || []).map((item: any, index: number) => ({
         id: index.toString(),
         title: `${item.Tipo}: ${item.Conteudo_Principal}`,
         start: item.Data_Inicio,
@@ -67,10 +65,8 @@ export default function AgendaCalendar() {
     carregarAgenda();
   }, []);
 
-  // Filtrar eventos por perfil
   const filteredEvents = events.filter(e => e.profile === filterProfile);
 
-  // Criar Agenda ou Tarefa
   const criarEvento = async (evento: any) => {
     try {
       const res = await fetch('/api/agenda', {
@@ -91,7 +87,6 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Função de teste para criar evento
   const adicionarTesteAgenda = () => {
     criarEvento({
       Tipo_Evento: 'Agenda',
