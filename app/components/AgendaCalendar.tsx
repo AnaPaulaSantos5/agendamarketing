@@ -1,132 +1,197 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar, { EventInput } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { DateSelectArg } from '@fullcalendar/interaction';
-import Modal from 'react-modal';
+import interactionPlugin from '@fullcalendar/interaction';
+import { EventInput } from '@fullcalendar/core';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type AgendaEvent = {
+interface AgendaEvent {
   id: string;
   title: string;
-  start: string;
-  end: string;
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
   tipo_evento: string;
   tipo: string;
   conteudo_principal: string;
   conteudo_secundario: string;
   cta: string;
   status_postagem: string;
-  profile: Perfil;
-};
+  perfil: Perfil;
+}
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
-
-Modal.setAppElement('#__next');
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
-  // Modal
-  const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [form, setForm] = useState({
-    tipo_evento: '',
-    tipo: '',
-    conteudo_principal: '',
-    conteudo_secundario: '',
-    cta: '',
-    status_postagem: '',
-    profile: 'Confi' as Perfil,
-  });
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState<Partial<AgendaEvent>>({});
 
-  // Buscar eventos da Agenda
+  // Carregar eventos da API
   useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/api/agenda');
+        const data = await res.json();
+        setEvents(data.Agenda || []);
+      } catch (err) {
+        console.error('Erro ao carregar agenda:', err);
+      }
+    }
     fetchEvents();
   }, []);
 
-  async function fetchEvents() {
-    try {
-      const res = await fetch('/api/agenda');
-      const data = await res.json();
-      setEvents(data.Agenda || []);
-    } catch (err) {
-      console.error('Erro ao carregar agenda:', err);
+  const filteredEvents = events.filter(e => e.perfil === filterProfile);
+
+  // Salvar novo evento
+  const handleSaveEvent = async () => {
+    if (
+      !formData.start ||
+      !formData.end ||
+      !formData.tipo_evento ||
+      !formData.tipo ||
+      !formData.conteudo_principal ||
+      !formData.status_postagem ||
+      !formData.perfil
+    ) {
+      alert('Preencha todos os campos obrigatórios!');
+      return;
     }
-  }
-
-  // Quando seleciona datas no calendário
-  const handleSelect = (selectInfo: DateSelectArg) => {
-    setSelectedDates({ start: selectInfo.startStr, end: selectInfo.endStr });
-    setForm({
-      tipo_evento: '',
-      tipo: '',
-      conteudo_principal: '',
-      conteudo_secundario: '',
-      cta: '',
-      status_postagem: '',
-      profile: 'Confi',
-    });
-    setModalIsOpen(true);
-  };
-
-  // Atualizar formulário
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Salvar evento
-  const handleSave = async () => {
-    // Validação simples
-    const requiredFields = ['tipo_evento', 'tipo', 'conteudo_principal', 'status_postagem', 'profile'];
-    for (const field of requiredFields) {
-      if (!form[field as keyof typeof form]) {
-        alert(`Preencha o campo ${field}`);
-        return;
-      }
-    }
-
-    const newEvent: AgendaEvent = {
-      id: String(events.length),
-      title: `${form.tipo_evento}: ${form.conteudo_principal}`,
-      start: selectedDates.start,
-      end: selectedDates.end,
-      ...form,
-    };
 
     try {
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEvent),
+        body: JSON.stringify({ event: formData }),
       });
-      if (!res.ok) throw new Error('Erro ao salvar');
-
-      setEvents(prev => [...prev, newEvent]);
-      setModalIsOpen(false);
+      if (!res.ok) throw new Error('Erro ao salvar evento');
+      const saved = await res.json();
+      setEvents(prev => [...prev, saved.event]);
+      setShowForm(false);
+      setFormData({});
     } catch (err) {
-      console.error('Erro ao salvar evento:', err);
+      console.error(err);
       alert('Erro ao salvar evento');
     }
   };
-
-  const filteredEvents = events.filter(e => e.profile === filterProfile);
 
   return (
     <div>
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+        <select
+          value={filterProfile}
+          onChange={e => setFilterProfile(e.target.value as Perfil)}
+        >
           {profiles.map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
+
+        <button
+          style={{ marginLeft: '1rem' }}
+          onClick={() => setShowForm(true)}
+        >
+          Adicionar Evento
+        </button>
       </div>
+
+      {showForm && (
+        <div style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
+          <h3>Adicionar Evento</h3>
+          <label>
+            Data Início:
+            <input
+              type="date"
+              value={formData.start || ''}
+              onChange={e => setFormData({ ...formData, start: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Data Fim:
+            <input
+              type="date"
+              value={formData.end || ''}
+              onChange={e => setFormData({ ...formData, end: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Tipo Evento:
+            <input
+              type="text"
+              value={formData.tipo_evento || ''}
+              onChange={e => setFormData({ ...formData, tipo_evento: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Tipo:
+            <input
+              type="text"
+              value={formData.tipo || ''}
+              onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Conteúdo Principal:
+            <input
+              type="text"
+              value={formData.conteudo_principal || ''}
+              onChange={e => setFormData({ ...formData, conteudo_principal: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Conteúdo Secundário:
+            <input
+              type="text"
+              value={formData.conteudo_secundario || ''}
+              onChange={e => setFormData({ ...formData, conteudo_secundario: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            CTA:
+            <input
+              type="text"
+              value={formData.cta || ''}
+              onChange={e => setFormData({ ...formData, cta: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Status Postagem:
+            <input
+              type="text"
+              value={formData.status_postagem || ''}
+              onChange={e => setFormData({ ...formData, status_postagem: e.target.value })}
+            />
+          </label>
+          <br />
+          <label>
+            Perfil:
+            <select
+              value={formData.perfil || 'Confi'}
+              onChange={e => setFormData({ ...formData, perfil: e.target.value as Perfil })}
+            >
+              {profiles.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </label>
+          <br />
+          <button onClick={handleSaveEvent}>Salvar</button>
+          <button onClick={() => setShowForm(false)}>Cancelar</button>
+        </div>
+      )}
 
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -136,69 +201,15 @@ export default function AgendaCalendar() {
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
-        selectable={true}
-        select={handleSelect}
         events={filteredEvents.map(e => ({
           id: e.id,
-          title: e.title,
+          title: e.conteudo_principal,
           start: e.start,
           end: e.end,
         }))}
         editable={true}
+        selectable={true}
       />
-
-      <Modal
-        isOpen={modalIsOpen}
-        onRequestClose={() => setModalIsOpen(false)}
-        contentLabel="Adicionar Evento"
-        style={{
-          content: { top: '20%', left: '20%', right: '20%', bottom: 'auto' }
-        }}
-      >
-        <h2>Adicionar Evento</h2>
-        <div>
-          <label>Data Início:</label>
-          <input type="date" value={selectedDates.start} readOnly />
-        </div>
-        <div>
-          <label>Data Fim:</label>
-          <input type="date" value={selectedDates.end} readOnly />
-        </div>
-        <div>
-          <label>Tipo Evento:</label>
-          <input name="tipo_evento" value={form.tipo_evento} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Tipo:</label>
-          <input name="tipo" value={form.tipo} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Conteúdo Principal:</label>
-          <input name="conteudo_principal" value={form.conteudo_principal} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Conteúdo Secundário:</label>
-          <input name="conteudo_secundario" value={form.conteudo_secundario} onChange={handleChange} />
-        </div>
-        <div>
-          <label>CTA:</label>
-          <input name="cta" value={form.cta} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Status Postagem:</label>
-          <input name="status_postagem" value={form.status_postagem} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Perfil:</label>
-          <select name="profile" value={form.profile} onChange={handleChange}>
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={() => setModalIsOpen(false)}>Cancelar</button>
-      </Modal>
     </div>
   );
 }
