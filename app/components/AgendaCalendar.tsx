@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
 type AgendaEvent = {
   id: string;
   start: string;
@@ -16,6 +17,7 @@ type AgendaEvent = {
   conteudoPrincipal?: string;
   perfil?: Perfil;
   tarefa?: any;
+  allDay?: boolean;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -24,7 +26,8 @@ export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
     async function fetchAgenda() {
@@ -38,11 +41,6 @@ export default function AgendaCalendar() {
     }
     fetchAgenda();
   }, []);
-
-  const handleDateClick = (info: any) => {
-    setSelectedDate({ start: info.dateStr, end: info.dateStr });
-    setModalOpen(true);
-  };
 
   const handleSave = async (newEvent: AgendaEvent) => {
     try {
@@ -61,27 +59,63 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
-    <div style={{ display: 'flex' }}>
+    <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
       <div style={{ flex: 1 }}>
         <div>
-          Filtrar por perfil: 
+          Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => <option key={p}>{p}</option>)}
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
           </select>
         </div>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          editable={true}
+          selectable={true}
+          selectMirror={true}
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
             start: ev.start,
             end: ev.end,
+            allDay: ev.allDay || false,
           }))}
-          dateClick={handleDateClick}
+          select={info => {
+            setSelectedEvent(null);
+            setSelectedDate({ start: info.startStr, end: info.endStr });
+            setModalOpen(true);
+          }}
+          eventClick={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) {
+              setSelectedEvent(ev);
+              setSelectedDate({ start: ev.start, end: ev.end });
+              setModalOpen(true);
+            }
+          }}
+          eventDrop={info => {
+            const updatedEvents = events.map(e =>
+              e.id === info.event.id
+                ? { ...e, start: info.event.startStr, end: info.event.endStr }
+                : e
+            );
+            setEvents(updatedEvents);
+          }}
+          eventResize={info => {
+            const updatedEvents = events.map(e =>
+              e.id === info.event.id
+                ? { ...e, start: info.event.startStr, end: info.event.endStr }
+                : e
+            );
+            setEvents(updatedEvents);
+          }}
         />
       </div>
 
@@ -89,20 +123,27 @@ export default function AgendaCalendar() {
       <div style={{ width: 250, padding: 10, borderLeft: '1px solid #ccc' }}>
         <h4>Checklist Hoje</h4>
         <ul>
-          {events.filter(e => e.start === new Date().toISOString().slice(0, 10)).map(e => (
-            <li key={e.id}>{e.conteudoPrincipal} ({e.tipoEvento})</li>
-          ))}
+          {events
+            .filter(e => e.start.slice(0, 10) === today)
+            .map(e => (
+              <li key={e.id}>
+                {e.conteudoPrincipal} ({e.tipoEvento})
+              </li>
+            ))}
         </ul>
       </div>
 
       {/* Modal */}
-      <EventModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        start={selectedDate.start}
-        end={selectedDate.end}
-        onSave={handleSave}
-      />
+      {modalOpen && (
+        <EventModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          start={selectedDate.start}
+          end={selectedDate.end}
+          onSave={handleSave}
+          event={selectedEvent}
+        />
+      )}
     </div>
   );
 }
