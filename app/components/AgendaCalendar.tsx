@@ -5,86 +5,104 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventInput } from '@fullcalendar/core';
 
-type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+type Evento = {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  perfil: string;
+  extendedProps: {
+    tipoEvento: string;
+    status: string;
+    cta?: string;
+  };
+};
 
-const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const PERFIS = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
-  const [events, setEvents] = useState<EventInput[]>([]);
-  const [perfilFiltro, setPerfilFiltro] = useState<Perfil | 'Todos'>('Todos');
+  const [events, setEvents] = useState<Evento[]>([]);
+  const [perfilFiltro, setPerfilFiltro] = useState('Confi');
 
+  // 🔹 Carregar eventos da API
   useEffect(() => {
-    carregarAgenda();
+    async function load() {
+      const res = await fetch('/api/agenda');
+      const data = await res.json();
+
+      const parsed: Evento[] = data.Agenda.map((item: any, index: number) => ({
+        id: index.toString(),
+        title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
+        start: item.Data_Inicio,
+        end: item.Data_Fim,
+        perfil: item.Perfil,
+        extendedProps: {
+          tipoEvento: item.Tipo_Evento,
+          status: item.Status_Postagem,
+          cta: item.CTA,
+        },
+      }));
+
+      setEvents(parsed);
+    }
+
+    load();
   }, []);
 
-  async function carregarAgenda() {
-    const res = await fetch('/api/agenda');
-    const data = await res.json();
-
-    const transformed: EventInput[] = data.Agenda.map((item: any, index: number) => {
-      const isBloco = item.Tipo_Evento === 'BLOCO';
-
-      return {
-        id: index.toString(),
-        title: item.Conteudo_Principal || '(Sem título)',
-        start: item.Data_Inicio,
-        end: item.Data_Fim || item.Data_Inicio,
-        allDay: isBloco,
-        display: isBloco ? 'background' : 'auto',
-        extendedProps: {
-          perfil: item.Perfil,
-          tipo: item.Tipo,
-          status: item.Status_Postagem,
-          linkDrive: item.LinkDrive || '',
-          tipoEvento: item.Tipo_Evento,
-        },
-      };
-    });
-
-    setEvents(transformed);
-  }
-
-  function handleSelect(info: any) {
-    const titulo = prompt('Descrição da tarefa ou bloco:');
+  // 🔹 Criar evento no calendário
+  async function handleSelect(info: any) {
+    const titulo = prompt('Conteúdo principal (ex: Gravar vídeo Seguro Residencial)');
     if (!titulo) return;
 
-    const tipoEvento = confirm('OK = BLOCO | Cancelar = TAREFA') ? 'BLOCO' : 'TAREFA';
+    const tipoEvento = prompt('Tipo do evento (BLOCO ou TAREFA)', 'TAREFA') || 'TAREFA';
 
-    const novoEvento: EventInput = {
-      title: titulo,
-      start: info.startStr,
-      end: info.endStr,
-      allDay: tipoEvento === 'BLOCO',
-      display: tipoEvento === 'BLOCO' ? 'background' : 'auto',
-      extendedProps: {
-        perfil: 'Confi',
-        tipoEvento,
-        status: 'Planejado',
-      },
+    const novoEvento = {
+      Data_Inicio: info.startStr,
+      Data_Fim: info.endStr,
+      Tipo_Evento: tipoEvento,
+      Tipo: tipoEvento === 'BLOCO' ? 'Planejamento' : 'Execução',
+      Conteudo_Principal: titulo,
+      Conteudo_Secundario: '',
+      CTA: 'Deseja contactar o marketing? 1.Sim 2.Não',
+      Status_Postagem: 'Planejado',
+      Perfil: perfilFiltro,
     };
 
-    setEvents(prev => [...prev, novoEvento]);
-
-    fetch('/api/agenda', {
+    await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(novoEvento),
     });
+
+    // Recarrega agenda
+    const res = await fetch('/api/agenda');
+    const data = await res.json();
+
+    const parsed: Evento[] = data.Agenda.map((item: any, index: number) => ({
+      id: index.toString(),
+      title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
+      start: item.Data_Inicio,
+      end: item.Data_Fim,
+      perfil: item.Perfil,
+      extendedProps: {
+        tipoEvento: item.Tipo_Evento,
+        status: item.Status_Postagem,
+        cta: item.CTA,
+      },
+    }));
+
+    setEvents(parsed);
   }
 
-  const eventosFiltrados = perfilFiltro === 'Todos'
-    ? events
-    : events.filter(e => e.extendedProps?.perfil === perfilFiltro);
+  const eventosFiltrados = events.filter(e => e.perfil === perfilFiltro);
 
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <label>Perfil: </label>
-        <select value={perfilFiltro} onChange={e => setPerfilFiltro(e.target.value as any)}>
-          <option value="Todos">Todos</option>
-          {perfis.map(p => (
+        <select value={perfilFiltro} onChange={e => setPerfilFiltro(e.target.value)}>
+          {PERFIS.map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
@@ -95,19 +113,9 @@ export default function AgendaCalendar() {
         initialView="timeGridWeek"
         selectable
         editable
-        events={eventosFiltrados}
         select={handleSelect}
-        eventClick={(info) => {
-          const e = info.event.extendedProps;
-          alert(
-            `Evento: ${info.event.title}\nPerfil: ${e.perfil}\nStatus: ${e.status}`
-          );
-        }}
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        }}
+        events={eventosFiltrados}
+        height="auto"
       />
     </div>
   );
