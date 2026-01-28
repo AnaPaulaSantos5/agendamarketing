@@ -5,67 +5,79 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { DateSelectArg, EventClickArg } from '@fullcalendar/core';
 
-type AgendaEvent = {
+type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
+interface AgendaEvent {
   id: string;
-  Data_Inicio: string;
-  Data_Fim: string;
-  Tipo_Evento: string;
-  Tipo: string;
-  Conteudo_Principal: string;
-  Conteudo_Secundario: string;
-  CTA: string;
-  Status_Postagem: string;
-  Perfil: string;
-};
+  title: string;
+  start: string; // ISO date string
+  end: string;   // ISO date string
+  Perfil: Perfil;
+  Tipo_Evento?: string;
+  Tipo?: string;
+  Conteudo_Principal?: string;
+  Conteudo_Secundario?: string;
+  CTA?: string;
+  Status_Postagem?: string;
+  LinkDrive?: string;
+}
 
-const profiles = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<string>('Confi');
-  const [formVisible, setFormVisible] = useState(false);
-  const [formData, setFormData] = useState<Partial<AgendaEvent>>({});
+  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
-  // Carregar eventos da API
-  const fetchAgenda = async () => {
-    try {
-      const res = await fetch('/api/agenda');
-      const data = await res.json();
-      setEvents(data.Agenda);
-    } catch (err) {
-      console.error('Erro ao carregar agenda:', err);
-    }
-  };
+  const [newEvent, setNewEvent] = useState({
+    start: '',
+    end: '',
+    Tipo_Evento: '',
+    Tipo: '',
+    Conteudo_Principal: '',
+    Conteudo_Secundario: '',
+    CTA: '',
+    Perfil: 'Confi' as Perfil,
+  });
 
+  // Buscar agenda da API
   useEffect(() => {
+    async function fetchAgenda() {
+      try {
+        const res = await fetch('/api/agenda');
+        const data = await res.json();
+        console.log('Agenda recebida:', data);
+
+        const transformed = (data.Agenda || []).map((item: any, index: number) => ({
+          id: index.toString(),
+          title: item.Conteudo_Principal || '',
+          start: item.Data_Inicio,
+          end: item.Data_Fim,
+          Perfil: item.Perfil as Perfil,
+          Tipo_Evento: item.Tipo_Evento,
+          Tipo: item.Tipo,
+          Conteudo_Principal: item.Conteudo_Principal,
+          Conteudo_Secundario: item.Conteudo_Secundario,
+          CTA: item.CTA,
+          Status_Postagem: item.Status_Postagem,
+          LinkDrive: item.LinkDrive || '',
+        }));
+
+        setEvents(transformed);
+      } catch (err) {
+        console.error('Erro ao carregar agenda:', err);
+      }
+    }
     fetchAgenda();
   }, []);
 
-  // Filtrar eventos por perfil
-  const filteredEvents = events.filter(e => e.Perfil === filterProfile);
+  // Filtrar por perfil
+  const filteredEvents = (events || []).filter(e => e.Perfil === filterProfile);
 
-  // Função para abrir o formulário
-  const openForm = (selected?: DateSelectArg) => {
-    if (selected) {
-      setFormData({
-        Data_Inicio: selected.startStr,
-        Data_Fim: selected.endStr,
-        Status_Postagem: 'Pendente',
-        Perfil: 'Confi',
-      });
-    } else {
-      setFormData({});
-    }
-    setFormVisible(true);
-  };
-
-  // Função para salvar evento
-  const saveEvent = async () => {
-    // Checar campos obrigatórios
-    if (!formData.Data_Inicio || !formData.Data_Fim || !formData.Tipo || !formData.Conteudo_Principal || !formData.Perfil) {
-      alert('Preencha todos os campos obrigatórios!');
+  // Criar novo evento
+  const handleAddEvent = async () => {
+    if (!newEvent.start || !newEvent.end || !newEvent.Tipo_Evento) {
+      alert('Preencha pelo menos Data Início, Data Fim e Tipo de Evento');
       return;
     }
 
@@ -73,15 +85,40 @@ export default function AgendaCalendar() {
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(newEvent),
       });
-      if (res.ok) {
-        setFormVisible(false);
-        setFormData({});
-        fetchAgenda(); // Recarregar agenda
-      } else {
-        alert('Erro ao salvar evento');
-      }
+      const data = await res.json();
+      console.log('Evento salvo:', data);
+
+      // Atualiza a agenda local
+      setEvents(prev => [
+        ...prev,
+        {
+          id: (prev.length + 1).toString(),
+          title: newEvent.Conteudo_Principal || '',
+          start: newEvent.start,
+          end: newEvent.end,
+          Perfil: newEvent.Perfil,
+          Tipo_Evento: newEvent.Tipo_Evento,
+          Tipo: newEvent.Tipo,
+          Conteudo_Principal: newEvent.Conteudo_Principal,
+          Conteudo_Secundario: newEvent.Conteudo_Secundario,
+          CTA: newEvent.CTA,
+          Status_Postagem: 'Pendente',
+        },
+      ]);
+
+      // Resetar formulário
+      setNewEvent({
+        start: '',
+        end: '',
+        Tipo_Evento: '',
+        Tipo: '',
+        Conteudo_Principal: '',
+        Conteudo_Secundario: '',
+        CTA: '',
+        Perfil: 'Confi',
+      });
     } catch (err) {
       console.error('Erro ao salvar evento:', err);
     }
@@ -89,84 +126,100 @@ export default function AgendaCalendar() {
 
   return (
     <div>
-      {/* Filtro de perfil */}
+      <h2>Agenda Marketing</h2>
+
+      {/* Filtro por perfil */}
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value)}>
-          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+        <select
+          value={filterProfile}
+          onChange={e => setFilterProfile(e.target.value as Perfil)}
+        >
+          {profiles.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
-        <button onClick={() => openForm()} style={{ marginLeft: '1rem' }}>Adicionar Evento</button>
       </div>
 
-      {/* FullCalendar */}
+      {/* Formulário de criação de evento */}
+      <div style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
+        <h3>Adicionar Evento</h3>
+        <input
+          type="date"
+          value={newEvent.start}
+          onChange={e => setNewEvent({ ...newEvent, start: e.target.value })}
+        />
+        <input
+          type="date"
+          value={newEvent.end}
+          onChange={e => setNewEvent({ ...newEvent, end: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Tipo de Evento"
+          value={newEvent.Tipo_Evento}
+          onChange={e => setNewEvent({ ...newEvent, Tipo_Evento: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Tipo"
+          value={newEvent.Tipo}
+          onChange={e => setNewEvent({ ...newEvent, Tipo: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Conteúdo Principal"
+          value={newEvent.Conteudo_Principal}
+          onChange={e => setNewEvent({ ...newEvent, Conteudo_Principal: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Conteúdo Secundário"
+          value={newEvent.Conteudo_Secundario}
+          onChange={e => setNewEvent({ ...newEvent, Conteudo_Secundario: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="CTA"
+          value={newEvent.CTA}
+          onChange={e => setNewEvent({ ...newEvent, CTA: e.target.value })}
+        />
+        <select
+          value={newEvent.Perfil}
+          onChange={e => setNewEvent({ ...newEvent, Perfil: e.target.value as Perfil })}
+        >
+          {profiles.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <button onClick={handleAddEvent}>Adicionar Evento</button>
+      </div>
+
+      {/* Calendário */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
-        events={filteredEvents.map(e => ({
-          id: e.id,
-          title: `${e.Tipo_Evento}: ${e.Conteudo_Principal}`,
-          start: e.Data_Inicio,
-          end: e.Data_Fim,
-          extendedProps: {
-            Tipo: e.Tipo,
-            Conteudo_Secundario: e.Conteudo_Secundario,
-            CTA: e.CTA,
-            Status_Postagem: e.Status_Postagem,
-            Perfil: e.Perfil
-          }
-        }))}
+        events={filteredEvents}
         editable={true}
         selectable={true}
-        select={openForm}
-        eventClick={(info: EventClickArg) => {
-          const e = info.event.extendedProps;
-          alert(
-            `Tipo: ${e.Tipo}\nConteúdo Principal: ${info.event.title}\nConteúdo Secundário: ${e.Conteudo_Secundario}\nCTA: ${e.CTA}\nStatus: ${e.Status_Postagem}\nPerfil: ${e.Perfil}`
-          );
+        eventClick={(info) => {
+          alert(`
+Evento: ${info.event.title}
+Tipo Evento: ${info.event.extendedProps.Tipo_Evento}
+Conteúdo Principal: ${info.event.extendedProps.Conteudo_Principal}
+Conteúdo Secundário: ${info.event.extendedProps.Conteudo_Secundario}
+CTA: ${info.event.extendedProps.CTA}
+Link Drive: ${info.event.extendedProps.LinkDrive || 'Não informado'}
+Status: ${info.event.extendedProps.Status_Postagem || 'Pendente'}
+Perfil: ${info.event.extendedProps.Perfil}
+          `);
         }}
       />
-
-      {/* Modal/Formulário */}
-      {formVisible && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <div style={{ background: 'white', padding: '1rem', width: '400px', borderRadius: '8px' }}>
-            <h3>Adicionar Evento</h3>
-            <label>Data Início:</label>
-            <input type="date" value={formData.Data_Inicio || ''} onChange={e => setFormData({ ...formData, Data_Inicio: e.target.value })} />
-            <label>Data Fim:</label>
-            <input type="date" value={formData.Data_Fim || ''} onChange={e => setFormData({ ...formData, Data_Fim: e.target.value })} />
-            <label>Tipo Evento:</label>
-            <input value={formData.Tipo_Evento || ''} onChange={e => setFormData({ ...formData, Tipo_Evento: e.target.value })} />
-            <label>Tipo:</label>
-            <input value={formData.Tipo || ''} onChange={e => setFormData({ ...formData, Tipo: e.target.value })} />
-            <label>Conteúdo Principal:</label>
-            <input value={formData.Conteudo_Principal || ''} onChange={e => setFormData({ ...formData, Conteudo_Principal: e.target.value })} />
-            <label>Conteúdo Secundário:</label>
-            <input value={formData.Conteudo_Secundario || ''} onChange={e => setFormData({ ...formData, Conteudo_Secundario: e.target.value })} />
-            <label>CTA:</label>
-            <input value={formData.CTA || ''} onChange={e => setFormData({ ...formData, CTA: e.target.value })} />
-            <label>Status Postagem:</label>
-            <input value={formData.Status_Postagem || ''} onChange={e => setFormData({ ...formData, Status_Postagem: e.target.value })} />
-            <label>Perfil:</label>
-            <select value={formData.Perfil || 'Confi'} onChange={e => setFormData({ ...formData, Perfil: e.target.value })}>
-              {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-
-            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-              <button onClick={saveEvent}>Salvar</button>
-              <button onClick={() => setFormVisible(false)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
