@@ -1,100 +1,91 @@
-// app/api/agenda/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
-async function accessSpreadsheet() {
+async function accessSheet() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
+  const agendaSheet = doc.sheetsByTitle['Agenda'];
+  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+  return { agendaSheet, tarefasSheet };
 }
 
 export async function GET() {
-  await accessSpreadsheet();
+  try {
+    const { agendaSheet, tarefasSheet } = await accessSheet();
+    const agendaRows = await agendaSheet.getRows();
+    const tarefasRows = await tarefasSheet.getRows();
 
-  // Carrega ambas as abas
-  const sheetAgenda = doc.sheetsByTitle['Agenda'];
-  const sheetTarefas = doc.sheetsByTitle['Tarefas'];
+    const agenda = agendaRows.map(r => ({
+      Data_Inicio: r.Data_Inicio,
+      Data_Fim: r.Data_Fim,
+      Tipo_Evento: r.Tipo_Evento,
+      Tipo: r.Tipo,
+      Conteudo_Principal: r.Conteudo_Principal,
+      Conteudo_Secundario: r.Conteudo_Secundario,
+      CTA: r.CTA,
+      Status_Postagem: r.Status_Postagem,
+      Perfil: r.Perfil,
+    }));
 
-  if (!sheetAgenda || !sheetTarefas) {
-    return NextResponse.json({ error: 'Aba Agenda ou Tarefas não encontrada' }, { status: 500 });
+    const tarefas = tarefasRows.map(r => ({
+      Bloco_ID: r.Bloco_ID,
+      Titulo: r.Titulo,
+      Responsavel: r.Responsavel,
+      Data: r.Data,
+      Status: r.Status,
+      LinkDrive: r.LinkDrive,
+      Notificar: r.Notificar,
+    }));
+
+    return NextResponse.json({ agenda, tarefas });
+  } catch (err) {
+    console.error('Erro GET /api/agenda', err);
+    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
   }
-
-  const rowsAgenda = await sheetAgenda.getRows();
-  const rowsTarefas = await sheetTarefas.getRows();
-
-  const agenda = rowsAgenda.map((row, index) => ({
-    id: index.toString(),
-    Data_Inicio: row.Data_Inicio,
-    Data_Fim: row.Data_Fim,
-    Tipo_Evento: row.Tipo_Evento,
-    Tipo: row.Tipo,
-    Conteudo_Principal: row.Conteudo_Principal,
-    Conteudo_Secundario: row.Conteudo_Secundario,
-    CTA: row.CTA,
-    Status_Postagem: row.Status_Postagem,
-    Perfil: row.Perfil,
-  }));
-
-  const tarefas = rowsTarefas.map((row, index) => ({
-    id: index.toString(),
-    Bloco_ID: row.Bloco_ID,
-    Titulo: row.Titulo,
-    Responsavel: row.Responsavel,
-    Data: row.Data,
-    Status: row.Status,
-    LinkDrive: row.LinkDrive,
-    Notificar: row.Notificar,
-  }));
-
-  return NextResponse.json({ Agenda: agenda, Tarefas: tarefas });
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  await accessSpreadsheet();
+  try {
+    const { agendaSheet, tarefasSheet } = await accessSheet();
+    const body = await req.json();
 
-  // Detecta aba correta
-  const tipoEvento = body.Tipo_Evento?.toLowerCase();
-
-  if (tipoEvento === 'agenda') {
-    const sheet = doc.sheetsByTitle['Agenda'];
-    if (!sheet) throw new Error('Aba "Agenda" não encontrada');
-
-    await sheet.addRow({
+    // Criar linha na Agenda
+    const newRow = {
       Data_Inicio: body.Data_Inicio,
       Data_Fim: body.Data_Fim,
-      Tipo_Evento: 'Agenda',
+      Tipo_Evento: body.Tipo_Evento,
       Tipo: body.Tipo,
       Conteudo_Principal: body.Conteudo_Principal,
       Conteudo_Secundario: body.Conteudo_Secundario,
-      CTA: body.CTA || '',
+      CTA: body.CTA,
       Status_Postagem: body.Status_Postagem || 'Pendente',
-      Perfil: body.Perfil || 'Confi',
-    });
+      Perfil: body.Perfil,
+    };
+    await agendaSheet.addRow(newRow);
+
+    // Criar linha na Tarefas vinculada ao bloco
+    if (body.Tarefas && body.Tarefas.length > 0) {
+      for (const tarefa of body.Tarefas) {
+        await tarefasSheet.addRow({
+          Bloco_ID: new Date().getTime().toString(),
+          Titulo: tarefa.Titulo,
+          Responsavel: tarefa.Responsavel,
+          Data: tarefa.Data,
+          Status: tarefa.Status || 'Pendente',
+          LinkDrive: tarefa.LinkDrive || '',
+          Notificar: tarefa.Notificar || 'Sim',
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Erro POST /api/agenda', err);
+    return NextResponse.json({ error: 'Erro ao salvar evento' }, { status: 500 });
   }
-
-  else if (tipoEvento === 'tarefa') {
-    const sheet = doc.sheetsByTitle['Tarefas'];
-    if (!sheet) throw new Error('Aba "Tarefas" não encontrada');
-
-    await sheet.addRow({
-      Bloco_ID: body.Bloco_ID || '',
-      Titulo: body.Titulo || '',
-      Responsavel: body.Responsavel || '',
-      Data: body.Data || '',
-      Status: body.Status || 'Pendente',
-      LinkDrive: body.LinkDrive || '',
-      Notificar: body.Notificar || 'Não',
-    });
-  }
-
-  else {
-    return NextResponse.json({ error: 'Tipo_Evento inválido' }, { status: 400 });
-  }
-
-  return NextResponse.json({ ok: true });
 }
