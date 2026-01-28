@@ -16,7 +16,7 @@ export default function AgendaCalendar() {
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Carrega eventos do Google Sheets
+  // Carregar eventos do Google Sheets
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -30,7 +30,7 @@ export default function AgendaCalendar() {
     fetchEvents();
   }, []);
 
-  // Salvar novo evento ou editar existente
+  // Salvar evento (novo ou edição)
   const handleSave = async (event: AgendaEvent, isEdit: boolean) => {
     try {
       const method = isEdit ? 'PATCH' : 'POST';
@@ -52,7 +52,7 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Excluir evento/tarefa
+  // Excluir evento
   const handleDelete = async (eventId: string) => {
     try {
       await fetch('/api/agenda', {
@@ -68,27 +68,48 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Marcar tarefa como concluída
+  // Checklist: marcar concluído/desmarcar
   const handleChecklistToggle = async (event: AgendaEvent) => {
     if (!event.tarefa) return;
-    const updatedEvent = {
+    const updatedEvent: AgendaEvent = {
       ...event,
       tarefa: {
         ...event.tarefa,
         status: event.tarefa.status === 'Concluída' ? 'Pendente' : 'Concluída',
       },
     };
-    await handleSave(updatedEvent, true);
+    try {
+      await fetch('/api/agenda', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedEvent),
+      });
+      setEvents(prev => prev.map(ev => ev.id === event.id ? updatedEvent : ev));
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao atualizar checklist');
+    }
   };
 
-  // Reagendar tarefa
-  const handleReschedule = (event: AgendaEvent) => {
+  // Checklist: reagendar
+  const handleReschedule = async (event: AgendaEvent) => {
     const newDate = prompt('Informe nova data/hora (YYYY-MM-DD HH:MM):', event.start);
     if (!newDate) return;
-    const updatedEvent = { ...event, start: newDate, end: newDate };
-    handleSave(updatedEvent, true);
+    const updatedEvent: AgendaEvent = { ...event, start: newDate, end: newDate };
+    try {
+      await fetch('/api/agenda', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedEvent),
+      });
+      setEvents(prev => prev.map(ev => ev.id === event.id ? updatedEvent : ev));
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao reagendar tarefa');
+    }
   };
 
+  // Clicar no dia para criar evento
   const handleDateClick = (info: DateSelectArg) => {
     const newEvent: AgendaEvent = {
       id: '',
@@ -101,6 +122,7 @@ export default function AgendaCalendar() {
     setModalOpen(true);
   };
 
+  // Clicar no evento para ver informações
   const handleEventClick = (clickInfo: EventClickArg) => {
     const event = events.find(e => e.id === clickInfo.event.id);
     if (!event) return;
@@ -155,7 +177,7 @@ export default function AgendaCalendar() {
         </ul>
       </div>
 
-      {/* Modal de evento */}
+      {/* Modal */}
       {selectedEvent && (
         <EventModal
           isOpen={modalOpen}
