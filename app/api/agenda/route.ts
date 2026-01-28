@@ -8,6 +8,7 @@ async function accessSpreadsheet() {
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
+
   await doc.loadInfo();
   const agendaSheet = doc.sheetsByTitle['Agenda'];
   const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -26,6 +27,7 @@ export async function GET() {
   try {
     const { agendaSheet } = await accessSpreadsheet();
     const rows = await agendaSheet.getRows();
+
     const events = rows.map(row => ({
       id: row._rowNumber,
       start: row.Data_Inicio,
@@ -38,10 +40,11 @@ export async function GET() {
       statusPostagem: row.Status_Postagem,
       perfil: row.Perfil,
     }));
+
     return NextResponse.json(events);
   } catch (error) {
-    console.error('Erro da API:', error);
-    return NextResponse.json({ error: 'Erro ao carregar agenda', details: error.message }, { status: 500 });
+    console.error('Erro ao carregar agenda', error);
+    return NextResponse.json({ error: 'Erro ao carregar agenda', details: String(error) }, { status: 500 });
   }
 }
 
@@ -50,8 +53,8 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // ====== Salva na Agenda ======
-    const newRow = await agendaSheet.addRow({
+    // Salva evento na Agenda
+    await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
       Tipo_Evento: data.tipoEvento || '',
@@ -63,7 +66,7 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil || '',
     });
 
-    // ====== Salva na Tarefas (se houver) ======
+    // Salva tarefa, se existir
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: data.tarefa.blocoId || '',
@@ -76,27 +79,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Retorna novo evento para atualizar front-end
-    return NextResponse.json({
-      ok: true,
-      event: newRow,
-    });
-  } catch (error) {
-    console.error('Erro ao salvar evento', error);
-    return NextResponse.json({ error: 'Erro ao salvar evento', details: error.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    const { id } = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-    const rows = await agendaSheet.getRows();
-    const rowToDelete = rows.find(r => r._rowNumber === Number(id));
-    if (rowToDelete) await rowToDelete.delete();
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('Erro ao deletar evento', error);
-    return NextResponse.json({ error: 'Erro ao deletar', details: error.message }, { status: 500 });
+    console.error('Erro ao salvar evento', error);
+    return NextResponse.json({ error: 'Erro ao salvar', details: String(error) }, { status: 500 });
   }
 }
