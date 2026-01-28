@@ -12,40 +12,39 @@ async function auth() {
 }
 
 export async function GET() {
-  try {
-    await auth();
-    const sheet = doc.sheetsByTitle['Agenda'];
-    const rows = await sheet.getRows();
+  await auth();
+  const sheet = doc.sheetsByTitle['Agenda'];
+  const rows = await sheet.getRows();
 
-    const data = rows.map((row) => ({
-      Data_Inicio: row.Data_Inicio,
-      Data_Fim: row.Data_Fim,
-      Tipo_Evento: row.Tipo_Evento,
-      Tipo: row.Tipo,
-      Conteudo_Principal: row.Conteudo_Principal,
-      Conteudo_Secundario: row.Conteudo_Secundario,
-      CTA: row.CTA,
-      Status_Postagem: row.Status_Postagem,
-      Perfil: row.Perfil,
+  const data = rows
+    .filter(r => r.Data_Inicio) // 👈 evita linhas quebradas
+    .map(r => ({
+      Data_Inicio: r.Data_Inicio, // ISO STRING
+      Data_Fim: r.Data_Fim || r.Data_Inicio,
+      Tipo_Evento: r.Tipo_Evento,
+      Tipo: r.Tipo,
+      Conteudo_Principal: r.Conteudo_Principal,
+      Conteudo_Secundario: r.Conteudo_Secundario,
+      CTA: r.CTA,
+      Status_Postagem: r.Status_Postagem,
+      Perfil: r.Perfil,
     }));
 
-    return NextResponse.json({ Agenda: data });
-  } catch (e) {
-    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
-  }
+  return NextResponse.json({ Agenda: data });
 }
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
+  const body = await req.json();
 
-    await auth();
-    const sheet = doc.sheetsByTitle['Agenda'];
+  await auth();
+  const sheet = doc.sheetsByTitle['Agenda'];
 
-    await sheet.addRow(body);
+  // ⚠️ FORÇA ISO STRING
+  await sheet.addRow({
+    ...body,
+    Data_Inicio: String(body.Data_Inicio),
+    Data_Fim: String(body.Data_Fim),
+  });
 
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: 'Erro ao salvar evento' }, { status: 500 });
-  }
+  return NextResponse.json({ ok: true });
 }
