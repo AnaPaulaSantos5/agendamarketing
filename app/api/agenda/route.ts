@@ -9,9 +9,10 @@ async function accessSpreadsheet() {
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
-  const agendaSheet = doc.sheetsByTitle['Agenda'];
-  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-  return { agendaSheet, tarefasSheet };
+  return {
+    agendaSheet: doc.sheetsByTitle['Agenda'],
+    tarefasSheet: doc.sheetsByTitle['Tarefas'],
+  };
 }
 
 function formatDateForSheet(dateStr: string) {
@@ -24,38 +25,40 @@ function formatDateForSheet(dateStr: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-// GET eventos
+// GET eventos com tarefas
 export async function GET() {
   try {
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-    const rows = await agendaSheet.getRows();
-    const events = rows.map(row => ({
-      id: String(row._rowNumber),
-      start: row.Data_Inicio,
-      end: row.Data_Fim,
-      tipoEvento: row.Tipo_Evento,
-      tipo: row.Tipo,
-      conteudoPrincipal: row.Conteudo_Principal,
-      conteudoSecundario: row.Conteudo_Secundario,
-      cta: row.CTA,
-      statusPostagem: row.Status_Postagem,
-      perfil: row.Perfil,
-    }));
-
-    // Tarefas associadas
+    const agendaRows = await agendaSheet.getRows();
     const tarefaRows = await tarefasSheet.getRows();
-    const tarefasMap: Record<string, any[]> = {};
-    tarefaRows.forEach(tr => {
-      if (!tarefasMap[tr.Bloco_ID]) tarefasMap[tr.Bloco_ID] = [];
-      tarefasMap[tr.Bloco_ID].push(tr);
+
+    const events = agendaRows.map(row => {
+      const tarefa = tarefaRows.find(tr => String(tr.Bloco_ID) === String(row._rowNumber));
+      return {
+        id: String(row._rowNumber),
+        start: row.Data_Inicio,
+        end: row.Data_Fim,
+        tipoEvento: row.Tipo_Evento,
+        tipo: row.Tipo,
+        conteudoPrincipal: row.Conteudo_Principal,
+        conteudoSecundario: row.Conteudo_Secundario,
+        cta: row.CTA,
+        statusPostagem: row.Status_Postagem,
+        perfil: row.Perfil,
+        tarefa: tarefa
+          ? {
+              titulo: tarefa.Titulo,
+              responsavel: tarefa.Responsavel,
+              data: tarefa.Data,
+              status: tarefa.Status,
+              linkDrive: tarefa.LinkDrive,
+              notificar: tarefa.Notificar,
+            }
+          : null,
+      };
     });
 
-    const eventsWithTasks = events.map(ev => ({
-      ...ev,
-      tarefa: tarefasMap[ev.id]?.[0] || null,
-    }));
-
-    return NextResponse.json(eventsWithTasks);
+    return NextResponse.json(events);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -68,8 +71,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // Criar evento
-    const row = await agendaSheet.addRow({
+    const newRow = await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
       Tipo_Evento: data.tipoEvento || '',
@@ -81,10 +83,9 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil || '',
     });
 
-    // Criar tarefa
     if (data.tarefa) {
       await tarefasSheet.addRow({
-        Bloco_ID: row._rowNumber,
+        Bloco_ID: newRow._rowNumber,
         Titulo: data.tarefa.titulo,
         Responsavel: data.tarefa.responsavel,
         Data: formatDateForSheet(data.tarefa.data),
@@ -101,13 +102,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH para editar evento/tarefa
+// PATCH editar evento/tarefa
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // Atualizar evento
     const row = (await agendaSheet.getRows()).find(r => String(r._rowNumber) === data.id);
     if (!row) throw new Error('Evento não encontrado');
 
@@ -122,7 +122,6 @@ export async function PATCH(req: NextRequest) {
     row.Perfil = data.perfil || '';
     await row.save();
 
-    // Atualizar tarefa
     if (data.tarefa) {
       const tarefaRow = (await tarefasSheet.getRows()).find(tr => String(tr.Bloco_ID) === data.id);
       if (tarefaRow) {
