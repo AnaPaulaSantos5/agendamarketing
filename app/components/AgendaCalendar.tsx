@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import { DateSelectArg, EventInput, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import EventModal from './EventModal';
 
 type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -14,87 +15,55 @@ const profiles: Profile[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
   const [filterProfile, setFilterProfile] = useState<Profile>('Confi');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [range, setRange] = useState<{ start: string; end: string } | null>(null);
 
-  /**
-   * 🔹 CRIAR EVENTO AO SELECIONAR DATA/HORÁRIO
-   */
-  function handleDateSelect(selectInfo: DateSelectArg) {
-    const title = prompt('Digite a tarefa / conteúdo:');
-
-    if (!title) {
-      selectInfo.view.calendar.unselect();
-      return;
-    }
-
-    const newEvent: EventInput = {
-      id: String(Date.now()),
-      title,
-      start: selectInfo.startStr,
-      end: selectInfo.endStr,
-      extendedProps: {
-        profile: filterProfile,
-        status: 'Pendente',
-        linkDrive: '',
-      },
-    };
-
-    setEvents(prev => [...prev, newEvent]);
+  function handleSelect(info: DateSelectArg) {
+    setRange({ start: info.startStr, end: info.endStr });
+    setModalOpen(true);
   }
 
-  /**
-   * 🔹 CLICAR NO EVENTO
-   */
-  function handleEventClick(clickInfo: EventClickArg) {
-    const link = clickInfo.event.extendedProps.linkDrive;
+  function handleSave(event: EventInput) {
+    setEvents(prev => [...prev, event]);
+  }
 
+  function handleEventClick(info: EventClickArg) {
+    const p = info.event.extendedProps;
     alert(
-      `Tarefa: ${clickInfo.event.title}\n` +
-      `Perfil: ${clickInfo.event.extendedProps.profile}\n` +
-      `Status: ${clickInfo.event.extendedProps.status}\n` +
-      (link ? `Roteiro: ${link}` : 'Sem roteiro ainda')
+      `Título: ${info.event.title}\nPerfil: ${p.profile}\nTipo: ${p.type}\nRoteiro: ${p.linkDrive || '—'}`
     );
   }
 
-  /**
-   * 🔹 FILTRO POR PERFIL
-   */
   const filteredEvents = events.filter(
-    (event: any) => event.extendedProps?.profile === filterProfile
+    (e: any) => e.extendedProps.profile === filterProfile
   );
 
   return (
     <div style={{ padding: 20 }}>
-      {/* FILTRO */}
-      <div style={{ marginBottom: 16 }}>
-        <label>Perfil:&nbsp;</label>
-        <select
-          value={filterProfile}
-          onChange={(e) => setFilterProfile(e.target.value as Profile)}
-        >
-          {profiles.map(profile => (
-            <option key={profile} value={profile}>
-              {profile}
-            </option>
-          ))}
-        </select>
-      </div>
+      <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Profile)}>
+        {profiles.map(p => <option key={p}>{p}</option>)}
+      </select>
 
-      {/* CALENDÁRIO */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
-        selectable={true}
-        editable={true}
-        select={handleDateSelect}
+        selectable
+        editable
+        select={handleSelect}
         eventClick={handleEventClick}
         events={filteredEvents}
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay',
-        }}
         height="auto"
       />
+
+      {range && (
+        <EventModal
+          isOpen={modalOpen}
+          start={range.start}
+          end={range.end}
+          onClose={() => setModalOpen(false)}
+          onSave={handleSave}
+        />
+      )}
     </div>
   );
 }
