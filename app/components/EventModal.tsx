@@ -1,23 +1,13 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { AgendaEvent } from './AgendaCalendar';
 
 type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
-type AgendaEvent = {
-  id?: string;
-  start: string;
-  end: string;
-  tipoEvento?: string;
-  conteudoPrincipal?: string;
-  perfil?: Profile;
-  tarefa?: any;
-  allDay?: boolean;
-};
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (event: AgendaEvent) => void;
+  onSave: (event: AgendaEvent, isEdit?: boolean) => void;
   start: string;
   end: string;
   event?: AgendaEvent | null;
@@ -32,6 +22,7 @@ export default function EventModal({ isOpen, onClose, onSave, start, end, event 
   const [allDay, setAllDay] = useState(false);
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -43,10 +34,12 @@ export default function EventModal({ isOpen, onClose, onSave, start, end, event 
       setAllDay(event.allDay || false);
       setStartDate(event.start);
       setEndDate(event.end);
+      setIsEditing(false); // inicialmente apenas visualização
     } else {
       setStartDate(start);
       setEndDate(end);
       setAllDay(false);
+      setIsEditing(true); // novo evento já em modo edição
     }
   }, [event, start, end]);
 
@@ -56,6 +49,7 @@ export default function EventModal({ isOpen, onClose, onSave, start, end, event 
     if (!title) return alert('Informe o título do evento');
 
     const eventData: AgendaEvent = {
+      id: event?.id || String(new Date().getTime()),
       start: startDate,
       end: endDate,
       tipoEvento: type,
@@ -67,68 +61,77 @@ export default function EventModal({ isOpen, onClose, onSave, start, end, event 
             titulo: tarefaTitle,
             responsavel: profile,
             data: startDate,
-            status: 'Pendente',
+            status: event?.tarefa?.status || 'Pendente',
             linkDrive,
             notificar: 'Sim',
           }
         : undefined,
     };
 
-    onSave(eventData);
+    onSave(eventData, !!event);
     onClose();
-
-    setTitle('');
-    setTarefaTitle('');
-    setLinkDrive('');
-    setAllDay(false);
   }
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>Novo Evento/Tarefa</h3>
+        <h3>{event && !isEditing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
 
-        <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
+        {event && !isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{ marginBottom: 10, cursor: 'pointer' }}
+          >
+            ✏️ Editar
+          </button>
+        )}
 
-        <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
-          <option>Confi</option>
-          <option>Cecília</option>
-          <option>Luiza</option>
-          <option>Júlio</option>
-        </select>
-
-        <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
-          <option value="Perfil">Perfil</option>
-          <option value="Interno">Interno</option>
-        </select>
-
-        <div>
-          <label>
-            <input type="checkbox" checked={allDay} onChange={() => setAllDay(!allDay)} /> Dia todo
-          </label>
-        </div>
-
-        {!allDay && (
+        {(isEditing || !event) && (
           <>
+            <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
+
+            <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
+              <option>Confi</option>
+              <option>Cecília</option>
+              <option>Luiza</option>
+              <option>Júlio</option>
+            </select>
+
+            <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
+              <option value="Perfil">Perfil</option>
+              <option value="Interno">Interno</option>
+            </select>
+
             <div>
-              <label>Início:</label>
-              <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} style={input} />
+              <label>
+                <input type="checkbox" checked={allDay} onChange={() => setAllDay(!allDay)} /> Dia todo
+              </label>
             </div>
-            <div>
-              <label>Fim:</label>
-              <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} style={input} />
-            </div>
+
+            {!allDay && (
+              <>
+                <div>
+                  <label>Início:</label>
+                  <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} style={input} />
+                </div>
+                <div>
+                  <label>Fim:</label>
+                  <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} style={input} />
+                </div>
+              </>
+            )}
+
+            <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
+            <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
+
+            <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>
+              Salvar
+            </button>
           </>
         )}
 
-        <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
-        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
-
-        <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>
-          Salvar
-        </button>
         <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>
-          Cancelar
+          Fechar
         </button>
       </div>
     </div>
@@ -157,3 +160,4 @@ const input: React.CSSProperties = {
   marginBottom: 10,
   padding: 8,
 };
+
