@@ -1,53 +1,56 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar, { EventApi } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type Evento = {
-  id?: string;
+type AgendaEvent = {
+  id: string;
+  title: string;
   start: string; // YYYY-MM-DD
   end: string;   // YYYY-MM-DD
-  tipo_evento: string;
-  tipo: string;
-  conteudo_principal: string;
-  conteudo_secundario?: string;
-  cta?: string;
-  status_postagem?: string;
   profile: Perfil;
+  tipoEvento: string;
+  tipo: string;
+  conteudoPrincipal: string;
+  conteudoSecundario: string;
+  cta: string;
+  status: string;
   linkDrive?: string;
 };
 
-const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+type Tarefa = {
+  blocoId: string;
+  titulo: string;
+  responsavel: Perfil;
+  data: string;
+  status: string;
+  linkDrive?: string;
+  notificar: boolean;
+};
+
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
-  const [events, setEvents] = useState<Evento[]>([]);
+  const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<Evento>({
-    start: '',
-    end: '',
-    tipo_evento: '',
-    tipo: '',
-    conteudo_principal: '',
-    conteudo_secundario: '',
-    cta: '',
-    status_postagem: 'Pendente',
-    profile: 'Confi',
-    linkDrive: '',
-  });
 
-  // Carregar eventos da API
+  const [showForm, setShowForm] = useState(false);
+  const [newEvent, setNewEvent] = useState<Partial<AgendaEvent>>({ profile: 'Confi' });
+
+  // --- Carregar Agenda e Tarefas da API ---
   useEffect(() => {
     async function fetchAgenda() {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
-        setEvents(data.Agenda);
+        if (data.Agenda) setEvents(data.Agenda);
+        if (data.Tarefas) setTarefas(data.Tarefas);
       } catch (err) {
         console.error('Erro ao carregar agenda:', err);
       }
@@ -57,70 +60,73 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.profile === filterProfile);
 
-  const handleEventClick = (event: EventApi) => {
-    alert(`Evento: ${event.title}\nLink do roteiro: ${event.extendedProps.linkDrive || 'N/A'}`);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // validação básica
-    if (!formData.start || !formData.end || !formData.tipo_evento || !formData.tipo || !formData.conteudo_principal) {
+  // --- Função para adicionar evento ---
+  async function handleAddEvent() {
+    if (
+      !newEvent.start ||
+      !newEvent.end ||
+      !newEvent.tipoEvento ||
+      !newEvent.tipo ||
+      !newEvent.conteudoPrincipal ||
+      !newEvent.conteudoSecundario ||
+      !newEvent.cta ||
+      !newEvent.status ||
+      !newEvent.profile
+    ) {
       alert('Preencha todos os campos obrigatórios!');
       return;
     }
+
+    const evento: AgendaEvent = {
+      id: String(events.length),
+      start: newEvent.start!,
+      end: newEvent.end!,
+      tipoEvento: newEvent.tipoEvento!,
+      tipo: newEvent.tipo!,
+      conteudoPrincipal: newEvent.conteudoPrincipal!,
+      conteudoSecundario: newEvent.conteudoSecundario!,
+      cta: newEvent.cta!,
+      status: newEvent.status!,
+      profile: newEvent.profile as Perfil,
+      title: `${newEvent.tipo}: ${newEvent.conteudoPrincipal}`,
+      linkDrive: newEvent.linkDrive || '',
+    };
 
     try {
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ evento }),
       });
-      const data = await res.json();
-
       if (res.ok) {
-        setEvents(prev => [...prev, data]);
-        setShowModal(false);
-        // resetar formulário
-        setFormData({
-          start: '',
-          end: '',
-          tipo_evento: '',
-          tipo: '',
-          conteudo_principal: '',
-          conteudo_secundario: '',
-          cta: '',
-          status_postagem: 'Pendente',
-          profile: 'Confi',
-          linkDrive: '',
-        });
+        setEvents([...events, evento]);
+        alert('Evento adicionado com sucesso!');
+        setNewEvent({ profile: 'Confi' });
+        setShowForm(false);
       } else {
-        alert('Erro ao salvar evento: ' + data.error);
+        alert('Erro ao salvar evento');
       }
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
     }
-  };
+  }
 
   return (
     <div>
+      <h2>Agenda</h2>
+
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
         <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {perfis.map(p => (
+          {profiles.map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-
-        <button style={{ marginLeft: '1rem' }} onClick={() => setShowModal(true)}>Adicionar Evento</button>
+        <button style={{ marginLeft: '1rem' }} onClick={() => setShowForm(true)}>Adicionar Evento</button>
       </div>
 
+      {/* --- FullCalendar --- */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
@@ -130,57 +136,60 @@ export default function AgendaCalendar() {
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
         events={filteredEvents.map(e => ({
-          title: `${e.tipo}: ${e.conteudo_principal}`,
+          id: e.id,
+          title: e.title,
           start: e.start,
           end: e.end,
           extendedProps: { ...e },
         }))}
         editable={true}
         selectable={true}
-        eventClick={info => handleEventClick(info.event)}
+        eventClick={(info) => {
+          const e = info.event.extendedProps as AgendaEvent;
+          alert(`Evento: ${info.event.title}\nLink do roteiro: ${e.linkDrive || 'N/A'}`);
+        }}
       />
 
-      {showModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <form onSubmit={handleSubmit} style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', width: '400px' }}>
+      {/* --- Formulário Modal --- */}
+      {showForm && (
+        <div style={{ position: 'fixed', top: 0, left:0, width:'100%', height:'100%', backgroundColor:'rgba(0,0,0,0.5)', display:'flex', justifyContent:'center', alignItems:'center' }}>
+          <div style={{ backgroundColor:'#fff', padding:'2rem', borderRadius:'8px', width:'400px' }}>
             <h3>Adicionar Evento</h3>
-            <label>Data Início*:</label>
-            <input type="date" name="start" value={formData.start} onChange={handleInputChange} required />
-
-            <label>Data Fim*:</label>
-            <input type="date" name="end" value={formData.end} onChange={handleInputChange} required />
-
-            <label>Tipo Evento*:</label>
-            <input type="text" name="tipo_evento" value={formData.tipo_evento} onChange={handleInputChange} required />
-
-            <label>Tipo*:</label>
-            <input type="text" name="tipo" value={formData.tipo} onChange={handleInputChange} required />
-
-            <label>Conteúdo Principal*:</label>
-            <input type="text" name="conteudo_principal" value={formData.conteudo_principal} onChange={handleInputChange} required />
-
-            <label>Conteúdo Secundário:</label>
-            <input type="text" name="conteudo_secundario" value={formData.conteudo_secundario} onChange={handleInputChange} />
-
-            <label>CTA:</label>
-            <input type="text" name="cta" value={formData.cta} onChange={handleInputChange} />
-
-            <label>Perfil*:</label>
-            <select name="profile" value={formData.profile} onChange={handleInputChange} required>
-              {perfis.map(p => <option key={p} value={p}>{p}</option>)}
+            <label>Data Início: </label>
+            <input type="date" value={newEvent.start || ''} onChange={e => setNewEvent({ ...newEvent, start: e.target.value })} />
+            <br />
+            <label>Data Fim: </label>
+            <input type="date" value={newEvent.end || ''} onChange={e => setNewEvent({ ...newEvent, end: e.target.value })} />
+            <br />
+            <label>Tipo Evento: </label>
+            <input type="text" value={newEvent.tipoEvento || ''} onChange={e => setNewEvent({ ...newEvent, tipoEvento: e.target.value })} />
+            <br />
+            <label>Tipo: </label>
+            <input type="text" value={newEvent.tipo || ''} onChange={e => setNewEvent({ ...newEvent, tipo: e.target.value })} />
+            <br />
+            <label>Conteúdo Principal: </label>
+            <input type="text" value={newEvent.conteudoPrincipal || ''} onChange={e => setNewEvent({ ...newEvent, conteudoPrincipal: e.target.value })} />
+            <br />
+            <label>Conteúdo Secundário: </label>
+            <input type="text" value={newEvent.conteudoSecundario || ''} onChange={e => setNewEvent({ ...newEvent, conteudoSecundario: e.target.value })} />
+            <br />
+            <label>CTA: </label>
+            <input type="text" value={newEvent.cta || ''} onChange={e => setNewEvent({ ...newEvent, cta: e.target.value })} />
+            <br />
+            <label>Status: </label>
+            <input type="text" value={newEvent.status || ''} onChange={e => setNewEvent({ ...newEvent, status: e.target.value })} />
+            <br />
+            <label>Perfil: </label>
+            <select value={newEvent.profile || 'Confi'} onChange={e => setNewEvent({ ...newEvent, profile: e.target.value as Perfil })}>
+              {profiles.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-
-            <label>Link Drive:</label>
-            <input type="text" name="linkDrive" value={formData.linkDrive} onChange={handleInputChange} />
-
-            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-              <button type="button" onClick={() => setShowModal(false)}>Cancelar</button>
-              <button type="submit">Salvar</button>
-            </div>
-          </form>
+            <br />
+            <label>Link do Drive (opcional): </label>
+            <input type="text" value={newEvent.linkDrive || ''} onChange={e => setNewEvent({ ...newEvent, linkDrive: e.target.value })} />
+            <br />
+            <button onClick={handleAddEvent}>Salvar</button>
+            <button onClick={() => setShowForm(false)} style={{ marginLeft:'1rem' }}>Cancelar</button>
+          </div>
         </div>
       )}
     </div>
