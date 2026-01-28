@@ -1,50 +1,30 @@
-import { NextResponse } from 'next/server';
+// app/api/agenda/route.ts
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { NextResponse } from 'next/server';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+export async function GET() {
+  const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
-async function auth() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
-  await doc.loadInfo();
-}
 
-export async function GET() {
-  await auth();
+  await doc.loadInfo();
   const sheet = doc.sheetsByTitle['Agenda'];
   const rows = await sheet.getRows();
 
-  const data = rows
-    .filter(r => r.Data_Inicio) // 👈 evita linhas quebradas
-    .map(r => ({
-      Data_Inicio: r.Data_Inicio, // ISO STRING
-      Data_Fim: r.Data_Fim || r.Data_Inicio,
-      Tipo_Evento: r.Tipo_Evento,
-      Tipo: r.Tipo,
-      Conteudo_Principal: r.Conteudo_Principal,
-      Conteudo_Secundario: r.Conteudo_Secundario,
-      CTA: r.CTA,
-      Status_Postagem: r.Status_Postagem,
-      Perfil: r.Perfil,
-    }));
+  const data = rows.map(row => ({
+    Data_Inicio: row.Data_Inicio,
+    Data_Fim: row.Data_Fim,
+    Tipo_Evento: row.Tipo_Evento,
+    Tipo: row.Tipo,
+    Conteudo_Principal: row.Conteudo_Principal,
+    Conteudo_Secundario: row.Conteudo_Secundario,
+    CTA: row.CTA,
+    Status_Postagem: row.Status_Postagem,
+    Perfil: row.Perfil,
+  }));
 
   return NextResponse.json({ Agenda: data });
-}
-
-export async function POST(req: Request) {
-  const body = await req.json();
-
-  await auth();
-  const sheet = doc.sheetsByTitle['Agenda'];
-
-  // ⚠️ FORÇA ISO STRING
-  await sheet.addRow({
-    ...body,
-    Data_Inicio: String(body.Data_Inicio),
-    Data_Fim: String(body.Data_Fim),
-  });
-
-  return NextResponse.json({ ok: true });
 }
