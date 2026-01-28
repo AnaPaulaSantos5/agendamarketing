@@ -1,9 +1,9 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type AgendaEvent = {
+export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
@@ -29,7 +29,7 @@ type Props = {
   onClose: () => void;
   event: AgendaEvent;
   onSave: (event: AgendaEvent, isEdit: boolean) => void;
-  onDelete: (eventId: string) => void;
+  onDelete: (eventId: string) => void; // ⚡ Corrigido para build
 };
 
 export default function EventModal({ isOpen, onClose, event, onSave, onDelete }: Props) {
@@ -41,6 +41,18 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
   const [tarefaTitle, setTarefaTitle] = useState(event.tarefa?.titulo || '');
   const [start, setStart] = useState(event.start);
   const [end, setEnd] = useState(event.end);
+
+  // Atualiza os estados se o evento mudar
+  useEffect(() => {
+    setTitle(event.conteudoPrincipal || '');
+    setProfile(event.perfil || 'Confi');
+    setType(event.tipoEvento as any || 'Perfil');
+    setLinkDrive(event.tarefa?.linkDrive || '');
+    setTarefaTitle(event.tarefa?.titulo || '');
+    setStart(event.start);
+    setEnd(event.end);
+    setEditMode(false);
+  }, [event]);
 
   if (!isOpen) return null;
 
@@ -54,34 +66,38 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
       conteudoPrincipal: title,
       perfil: profile,
       tipoEvento: type,
-      tarefa: tarefaTitle ? {
-        ...event.tarefa,
-        titulo: tarefaTitle,
-        responsavel: profile,
-        data: start,
-        status: event.tarefa?.status || 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      } : null,
+      tarefa: tarefaTitle
+        ? {
+            ...event.tarefa,
+            titulo: tarefaTitle,
+            responsavel: profile,
+            data: start,
+            status: event.tarefa?.status || 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : null,
     }, editMode || !!event.id);
   };
 
   const handleDeleteClick = () => {
-    onDelete(event.id);
+    if (confirm('Deseja realmente excluir este evento?')) {
+      onDelete(event.id);
+    }
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>Evento</h3>
-
         {!editMode ? (
           <>
+            <h3>Evento</h3>
             <p><strong>Título:</strong> {title}</p>
             <p><strong>Perfil:</strong> {profile}</p>
             <p><strong>Tipo:</strong> {type}</p>
             <p><strong>Data/Hora:</strong> {start} → {end}</p>
             {tarefaTitle && <p><strong>Tarefa:</strong> {tarefaTitle} ({event.tarefa?.status})</p>}
+
             <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
               <button onClick={() => setEditMode(true)}>✏️ Editar</button>
               <button onClick={handleDeleteClick}>❌ Excluir</button>
@@ -90,6 +106,7 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
           </>
         ) : (
           <>
+            <h3>Editar Evento</h3>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título do evento" style={input} />
             <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
               <option>Confi</option>
@@ -105,6 +122,7 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
             <input value={end} onChange={e => setEnd(e.target.value)} style={input} />
             <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Título da tarefa" style={input} />
             <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" style={input} />
+
             <div style={{ display: 'flex', gap: 5 }}>
               <button onClick={handleSaveClick} style={{ backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
               <button onClick={() => setEditMode(false)}>Cancelar</button>
@@ -116,6 +134,11 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
+const overlay: React.CSSProperties = {
+  position: 'fixed', inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 999
+};
 const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
 const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
