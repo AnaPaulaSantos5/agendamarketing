@@ -1,6 +1,5 @@
 'use client';
-
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -8,25 +7,26 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
 type AgendaEvent = {
   id: string;
+  title: string;
   start: string;
   end: string;
   tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
+  linkDrive?: string;
 };
+
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [formVisible, setFormVisible] = useState(false);
-  const [formData, setFormData] = useState<Partial<AgendaEvent>>({});
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [formData, setFormData] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
+  // Carregar agenda da planilha
   useEffect(() => {
     async function fetchAgenda() {
       try {
@@ -40,88 +40,74 @@ export default function AgendaCalendar() {
     fetchAgenda();
   }, []);
 
+  // Filtra por perfil
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
+  // Clique no calendário
   const handleDateClick = (info: any) => {
     setFormData({ start: info.dateStr, end: info.dateStr });
-    setFormVisible(true);
+    setModalOpen(true);
   };
 
-  const handleSave = async (data: Partial<AgendaEvent>) => {
-    if (!data.start || !data.end || !data.tipoEvento || !data.tipo || !data.conteudoPrincipal || !data.perfil) {
-      alert('Preencha todos os campos obrigatórios!');
-      return;
-    }
+  // Salvar evento
+  const handleSave = async (newEvent: AgendaEvent) => {
     try {
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(newEvent),
       });
       if (!res.ok) throw new Error('Erro ao salvar');
-      const json = await res.json();
-      setEvents(prev => [...prev, { ...data, id: String(json.event._rowNumber) } as AgendaEvent]);
-      setFormVisible(false);
-      setFormData({});
+      setEvents(prev => [...prev, newEvent]);
     } catch (err) {
       console.error('Erro ao salvar evento', err);
       alert('Erro ao salvar evento');
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      const res = await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) throw new Error('Erro ao deletar');
-      setEvents(prev => prev.filter(e => e.id !== id));
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao deletar evento');
+    } finally {
+      setModalOpen(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div style={{ position: 'relative', display: 'flex' }}>
       <div style={{ flex: 1 }}>
+        <div style={{ marginBottom: 10 }}>
+          Filtrar por perfil:
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
           events={filteredEvents.map(ev => ({
             id: ev.id,
-            title: `${ev.tipo}: ${ev.conteudoPrincipal}`,
+            title: ev.title,
             start: ev.start,
             end: ev.end,
           }))}
           dateClick={handleDateClick}
+          height="auto"
         />
       </div>
 
-      {formVisible && (
+      {/* Modal de evento */}
+      {modalOpen && (
         <EventModal
-          isOpen={formVisible}
-          onClose={() => { setFormVisible(false); setFormData({}); }}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
           onSave={handleSave}
-          start={formData.start || ''}
-          end={formData.end || ''}
+          start={formData.start}
+          end={formData.end}
         />
       )}
-
-      <div style={{ width: 300, marginLeft: 10 }}>
-        <h3>Checklist do dia</h3>
-        {filteredEvents
-          .filter(e => new Date(e.start).toDateString() === new Date().toDateString())
-          .map(ev => (
-            <div key={ev.id}>
-              {ev.tipo}: {ev.conteudoPrincipal}
-              <button onClick={() => handleDelete(ev.id!)}>Excluir</button>
-            </div>
-          ))}
-      </div>
     </div>
   );
 }
