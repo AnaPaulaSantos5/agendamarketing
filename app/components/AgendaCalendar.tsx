@@ -1,120 +1,101 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { EventInput } from '@fullcalendar/core';
 
-type Evento = {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  perfil: string;
-  extendedProps: {
-    tipoEvento: string;
-    status: string;
-    cta?: string;
-  };
-};
-
-const PERFIS = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export default function AgendaCalendar() {
-  const [events, setEvents] = useState<Evento[]>([]);
-  const [perfilFiltro, setPerfilFiltro] = useState('Confi');
+  const [events, setEvents] = useState<EventInput[]>([]);
+  const [perfil, setPerfil] = useState<Perfil | 'Todos'>('Todos');
 
-  // 🔹 Carregar eventos da API
+  async function carregarAgenda() {
+    const res = await fetch('/api/agenda');
+    const data = await res.json();
+
+    const parsed = data.Agenda
+      .filter((item: any) => item.Data_Inicio)
+      .map((item: any, index: number) => {
+        const start = new Date(item.Data_Inicio);
+        if (isNaN(start.getTime())) return null;
+
+        const end = item.Data_Fim
+          ? new Date(item.Data_Fim)
+          : start;
+
+        return {
+          id: index.toString(),
+          title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          extendedProps: {
+            perfil: item.Perfil,
+            status: item.Status_Postagem,
+            cta: item.CTA,
+          },
+        };
+      })
+      .filter(Boolean);
+
+    setEvents(parsed);
+  }
+
   useEffect(() => {
-    async function load() {
-      const res = await fetch('/api/agenda');
-      const data = await res.json();
-
-      const parsed: Evento[] = data.Agenda.map((item: any, index: number) => ({
-        id: index.toString(),
-        title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
-        start: item.Data_Inicio,
-        end: item.Data_Fim,
-        perfil: item.Perfil,
-        extendedProps: {
-          tipoEvento: item.Tipo_Evento,
-          status: item.Status_Postagem,
-          cta: item.CTA,
-        },
-      }));
-
-      setEvents(parsed);
-    }
-
-    load();
+    carregarAgenda();
   }, []);
 
-  // 🔹 Criar evento no calendário
+  const eventosFiltrados =
+    perfil === 'Todos'
+      ? events
+      : events.filter(
+          (e) => e.extendedProps?.perfil === perfil
+        );
+
   async function handleSelect(info: any) {
-    const titulo = prompt('Conteúdo principal (ex: Gravar vídeo Seguro Residencial)');
+    const titulo = prompt('Conteúdo principal:');
     if (!titulo) return;
 
-    const tipoEvento = prompt('Tipo do evento (BLOCO ou TAREFA)', 'TAREFA') || 'TAREFA';
-
-    const novoEvento = {
-      Data_Inicio: info.startStr,
-      Data_Fim: info.endStr,
-      Tipo_Evento: tipoEvento,
-      Tipo: tipoEvento === 'BLOCO' ? 'Planejamento' : 'Execução',
+    const payload = {
+      Data_Inicio: info.startStr.split('T')[0],
+      Data_Fim: info.endStr.split('T')[0],
+      Tipo_Evento: 'Produção',
+      Tipo: 'Story',
       Conteudo_Principal: titulo,
       Conteudo_Secundario: '',
-      CTA: 'Deseja contactar o marketing? 1.Sim 2.Não',
-      Status_Postagem: 'Planejado',
-      Perfil: perfilFiltro,
+      CTA: 'Deseja falar com o marketing? ✅',
+      Status_Postagem: 'Pendente',
+      Perfil: 'Confi',
     };
 
     await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(novoEvento),
+      body: JSON.stringify(payload),
     });
 
-    // Recarrega agenda
-    const res = await fetch('/api/agenda');
-    const data = await res.json();
-
-    const parsed: Evento[] = data.Agenda.map((item: any, index: number) => ({
-      id: index.toString(),
-      title: `${item.Tipo_Evento}: ${item.Conteudo_Principal}`,
-      start: item.Data_Inicio,
-      end: item.Data_Fim,
-      perfil: item.Perfil,
-      extendedProps: {
-        tipoEvento: item.Tipo_Evento,
-        status: item.Status_Postagem,
-        cta: item.CTA,
-      },
-    }));
-
-    setEvents(parsed);
+    carregarAgenda();
   }
-
-  const eventosFiltrados = events.filter(e => e.perfil === perfilFiltro);
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <label>Perfil: </label>
-        <select value={perfilFiltro} onChange={e => setPerfilFiltro(e.target.value)}>
-          {PERFIS.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
+      <select value={perfil} onChange={(e) => setPerfil(e.target.value as any)}>
+        <option value="Todos">Todos</option>
+        <option value="Confi">Confi</option>
+        <option value="Cecília">Cecília</option>
+        <option value="Luiza">Luiza</option>
+        <option value="Júlio">Júlio</option>
+      </select>
 
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView="dayGridMonth"
         selectable
-        editable
-        select={handleSelect}
         events={eventosFiltrados}
+        select={handleSelect}
         height="auto"
       />
     </div>
