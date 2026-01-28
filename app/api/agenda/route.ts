@@ -13,44 +13,51 @@ const doc = new GoogleSpreadsheet(
   auth
 );
 
-/* =========================
+/* =====================
    GET — CARREGAR AGENDA
-========================= */
+===================== */
 export async function GET() {
   await doc.loadInfo();
   const sheet = doc.sheetsByTitle['Agenda'];
   const rows = await sheet.getRows();
 
-  const events = rows.map((row: any) => ({
-    title: `${row.Tipo}: ${row.Conteudo_Principal}`,
-    start: row.Data_Inicio,
-    end: row.Data_Fim || row.Data_Inicio,
-  }));
+  const events = rows
+    .filter((r: any) => r.Data_Inicio)
+    .map((row: any) => ({
+      id: row.Bloco_ID,
+      title: `${row.Tipo} - ${row.Conteudo_Principal}`,
+      start: new Date(row.Data_Inicio).toISOString(),
+      end: row.Data_Fim
+        ? new Date(row.Data_Fim).toISOString()
+        : new Date(row.Data_Inicio).toISOString(),
+      extendedProps: {
+        perfil: row.Perfil,
+        status: row.Status_Postagem,
+      },
+    }));
 
   return NextResponse.json(events);
 }
 
-/* =========================
-   POST — CRIAR EVENTO + TAREFAS
-========================= */
+/* =====================
+   POST — SALVAR AGENDA
+===================== */
 export async function POST(req: Request) {
   const body = await req.json();
-
   await doc.loadInfo();
 
   const agendaSheet = doc.sheetsByTitle['Agenda'];
   const tarefasSheet = doc.sheetsByTitle['Tarefas'];
 
-  // ID único para ligar Agenda ↔ Tarefas
   const blocoId = `BL-${Date.now()}`;
 
-  // 🔹 Salva na Agenda
+  // 🔹 AGENDA
   await agendaSheet.addRow({
     Bloco_ID: blocoId,
     ...body,
   });
 
-  // 🔹 Cria tarefas automaticamente
+  // 🔹 TAREFAS AUTOMÁTICAS
   await tarefasSheet.addRows([
     {
       Bloco_ID: blocoId,
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
     },
     {
       Bloco_ID: blocoId,
-      Tarefa: 'Revisar conteúdo',
+      Tarefa: 'Revisar',
       Status: 'Pendente',
       Perfil: body.Perfil,
     },
