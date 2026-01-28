@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -10,15 +11,17 @@ type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 type AgendaEvent = {
   id: string;
-  Data_Inicio: string;
-  Data_Fim: string;
-  Tipo_Evento: string;
-  Tipo: string;
-  Conteudo_Principal: string;
-  Conteudo_Secundario?: string;
-  CTA?: string;
-  Status_Postagem: string;
-  Perfil: Perfil;
+  title: string;
+  start: string;       // ISO string
+  end: string;         // ISO string
+  tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
+  perfil?: Perfil;
+  linkDrive?: string;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -29,7 +32,7 @@ export default function AgendaCalendar() {
   const [formVisible, setFormVisible] = useState(false);
   const [formData, setFormData] = useState<Partial<AgendaEvent>>({});
 
-  // Carregar eventos da planilha
+  // Carrega eventos da planilha
   useEffect(() => {
     async function fetchAgenda() {
       try {
@@ -43,73 +46,71 @@ export default function AgendaCalendar() {
     fetchAgenda();
   }, []);
 
-  // Filtrar por perfil
-  const filteredEvents = events.filter(e => e.Perfil === filterProfile);
+  // Filtra eventos por perfil
+  const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
-  // Abrir formulário ao clicar em um dia
+  // Ao clicar no calendário abre formulário
   const handleDateClick = (info: any) => {
-    setFormData({
-      Data_Inicio: info.dateStr,
-      Data_Fim: info.dateStr,
-      Tipo_Evento: '',
-      Tipo: '',
-      Conteudo_Principal: '',
-      Conteudo_Secundario: '',
-      CTA: '',
-      Status_Postagem: '',
-      Perfil: filterProfile,
-    });
     setFormVisible(true);
+    setFormData({
+      start: info.dateStr,
+      end: info.dateStr,
+    });
+  };
+
+  // Atualiza formulário
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   // Salvar evento
-  const handleSaveEvent = async () => {
-    const requiredFields = [
-      'Data_Inicio',
-      'Data_Fim',
-      'Tipo_Evento',
-      'Tipo',
-      'Conteudo_Principal',
-      'Status_Postagem',
-      'Perfil',
-    ] as const;
-
-    for (let field of requiredFields) {
-      if (!formData[field]) {
-        alert(`Preencha todos os campos obrigatórios! Campo faltando: ${field}`);
-        return;
-      }
+  const handleSave = async () => {
+    if (!formData.start || !formData.end || !formData.tipoEvento || !formData.tipo || !formData.conteudoPrincipal || !formData.perfil) {
+      alert('Preencha todos os campos obrigatórios!');
+      return;
     }
 
+    const newEvent: AgendaEvent = {
+      id: String(events.length),
+      start: formData.start,
+      end: formData.end,
+      tipoEvento: formData.tipoEvento,
+      tipo: formData.tipo,
+      conteudoPrincipal: formData.conteudoPrincipal,
+      conteudoSecundario: formData.conteudoSecundario,
+      cta: formData.cta,
+      statusPostagem: formData.statusPostagem,
+      perfil: formData.perfil as Perfil,
+      linkDrive: formData.linkDrive,
+      title: `${formData.tipo}: ${formData.conteudoPrincipal}`,
+    };
+
     try {
-      // Salvar na planilha Agenda
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(newEvent),
       });
 
-      if (!res.ok) throw new Error('Erro ao salvar na Agenda');
+      if (!res.ok) throw new Error('Erro ao salvar');
 
-      const savedEvent = await res.json();
-      setEvents([...events, savedEvent]);
+      setEvents(prev => [...prev, newEvent]);
       setFormVisible(false);
       setFormData({});
     } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar evento!');
+      console.error('Erro ao salvar evento', err);
+      alert('Erro ao salvar evento');
     }
   };
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div style={{ display: 'flex', gap: '1rem' }}>
+      {/* Calendário */}
       <div style={{ flex: 1 }}>
         <div style={{ marginBottom: '1rem' }}>
           <label>Filtrar por perfil: </label>
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
 
@@ -121,94 +122,44 @@ export default function AgendaCalendar() {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay'
           }}
-          events={filteredEvents.map(e => ({
-            id: e.id,
-            title: `${e.Tipo}: ${e.Conteudo_Principal}`,
-            start: e.Data_Inicio,
-            end: e.Data_Fim,
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.title,
+            start: ev.start,
+            end: ev.end,
           }))}
-          selectable={true}
           dateClick={handleDateClick}
         />
       </div>
 
       {/* Formulário lateral */}
       {formVisible && (
-        <div style={{ width: '350px', marginLeft: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
+        <div style={{ width: '300px', border: '1px solid #ccc', padding: '1rem', borderRadius: '4px' }}>
           <h3>Novo Evento</h3>
-
-          <label>Data Início *</label>
-          <input
-            type="date"
-            value={formData.Data_Inicio || ''}
-            onChange={e => setFormData({ ...formData, Data_Inicio: e.target.value })}
-          />
-
-          <label>Data Fim *</label>
-          <input
-            type="date"
-            value={formData.Data_Fim || ''}
-            onChange={e => setFormData({ ...formData, Data_Fim: e.target.value })}
-          />
-
-          <label>Tipo Evento *</label>
-          <input
-            type="text"
-            value={formData.Tipo_Evento || ''}
-            onChange={e => setFormData({ ...formData, Tipo_Evento: e.target.value })}
-          />
-
-          <label>Tipo *</label>
-          <input
-            type="text"
-            value={formData.Tipo || ''}
-            onChange={e => setFormData({ ...formData, Tipo: e.target.value })}
-          />
-
-          <label>Conteúdo Principal *</label>
-          <input
-            type="text"
-            value={formData.Conteudo_Principal || ''}
-            onChange={e => setFormData({ ...formData, Conteudo_Principal: e.target.value })}
-          />
-
-          <label>Conteúdo Secundário</label>
-          <input
-            type="text"
-            value={formData.Conteudo_Secundario || ''}
-            onChange={e => setFormData({ ...formData, Conteudo_Secundario: e.target.value })}
-          />
-
-          <label>CTA</label>
-          <input
-            type="text"
-            value={formData.CTA || ''}
-            onChange={e => setFormData({ ...formData, CTA: e.target.value })}
-          />
-
-          <label>Status Postagem *</label>
-          <input
-            type="text"
-            value={formData.Status_Postagem || ''}
-            onChange={e => setFormData({ ...formData, Status_Postagem: e.target.value })}
-          />
-
-          <label>Perfil *</label>
-          <select
-            value={formData.Perfil || ''}
-            onChange={e => setFormData({ ...formData, Perfil: e.target.value as Perfil })}
-          >
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+          <label>Data Início:</label>
+          <input type="date" name="start" value={formData.start || ''} onChange={handleChange} />
+          <label>Data Fim:</label>
+          <input type="date" name="end" value={formData.end || ''} onChange={handleChange} />
+          <label>Tipo Evento:</label>
+          <input type="text" name="tipoEvento" value={formData.tipoEvento || ''} onChange={handleChange} />
+          <label>Tipo:</label>
+          <input type="text" name="tipo" value={formData.tipo || ''} onChange={handleChange} />
+          <label>Conteúdo Principal:</label>
+          <input type="text" name="conteudoPrincipal" value={formData.conteudoPrincipal || ''} onChange={handleChange} />
+          <label>Conteúdo Secundário:</label>
+          <input type="text" name="conteudoSecundario" value={formData.conteudoSecundario || ''} onChange={handleChange} />
+          <label>CTA:</label>
+          <input type="text" name="cta" value={formData.cta || ''} onChange={handleChange} />
+          <label>Status Postagem:</label>
+          <input type="text" name="statusPostagem" value={formData.statusPostagem || ''} onChange={handleChange} />
+          <label>Perfil:</label>
+          <select name="perfil" value={formData.perfil || ''} onChange={handleChange}>
+            <option value="">Selecione</option>
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
 
-          <button onClick={handleSaveEvent} style={{ marginTop: '1rem' }}>
-            Salvar Evento
-          </button>
-          <button onClick={() => setFormVisible(false)} style={{ marginLeft: '0.5rem' }}>
-            Cancelar
-          </button>
+          <button onClick={handleSave} style={{ marginTop: '1rem' }}>Salvar</button>
+          <button onClick={() => { setFormVisible(false); setFormData({}); }} style={{ marginTop: '0.5rem' }}>Cancelar</button>
         </div>
       )}
     </div>
