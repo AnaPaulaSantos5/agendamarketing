@@ -2,56 +2,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(process.env.SHEET_ID!);
+// Conecta à planilha usando as variáveis de ambiente
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
 async function accessSpreadsheet() {
-  try {
-    console.log('Autenticando no Google Sheets...');
-    await doc.useServiceAccountAuth({
-      client_email: process.env.GOOGLE_CLIENT_EMAIL!,
-      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-    });
-    await doc.loadInfo();
-    console.log('Planilha carregada:', doc.title);
+  await doc.useServiceAccountAuth({
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  });
 
-    const agendaSheet = doc.sheetsByTitle['Agenda'];
-    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+  await doc.loadInfo();
 
-    if (!agendaSheet) throw new Error('Aba "Agenda" não encontrada!');
-    if (!tarefasSheet) console.warn('Aba "Tarefas" não encontrada!');
+  const agendaSheet = doc.sheetsByTitle['Agenda'];
+  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
 
-    return { agendaSheet, tarefasSheet };
-  } catch (error) {
-    console.error('ERRO ao acessar a planilha:', error);
-    throw error;
-  }
+  return { agendaSheet, tarefasSheet };
 }
 
-// Converte ISO string para YYYY-MM-DD
+// Converte data ISO para "YYYY-MM-DD"
 function formatDateForSheet(dateStr: string) {
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) throw new Error(`Data inválida: ${dateStr}`);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  } catch (error) {
-    console.error('ERRO ao formatar data:', error);
-    return '';
-  }
+  const d = new Date(dateStr);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-// ================== GET ==================
+// GET: retorna todos os eventos da Agenda
 export async function GET() {
   try {
-    console.log('GET /api/agenda iniciado...');
     const { agendaSheet } = await accessSpreadsheet();
     const rows = await agendaSheet.getRows();
-    console.log(`Linhas encontradas na agenda: ${rows.length}`);
 
-    const events = rows.map((row) => ({
-      id: row._rowNumber,
+    const events = rows.map(row => ({
+      id: row._rowNumber.toString(),
       start: row.Data_Inicio,
       end: row.Data_Fim,
       tipoEvento: row.Tipo_Evento,
@@ -65,24 +49,19 @@ export async function GET() {
 
     return NextResponse.json(events);
   } catch (error) {
-    console.error('ERRO COMPLETO GET /api/agenda:', error);
-    return NextResponse.json({ error: 'Erro ao carregar agenda', details: String(error) }, { status: 500 });
+    console.error('Erro ao carregar agenda', error);
+    return NextResponse.json({ error: 'Erro ao carregar agenda', details: (error as Error).message }, { status: 500 });
   }
 }
 
-// ================== POST ==================
+// POST: adiciona evento na Agenda e Tarefas
 export async function POST(req: NextRequest) {
   try {
-    console.log('POST /api/agenda iniciado...');
     const data = await req.json();
-    console.log('Dados recebidos:', data);
-
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    if (!agendaSheet) throw new Error('Agenda sheet não encontrada!');
-
     // ====== Salva na Agenda ======
-    const agendaRow = {
+    await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
       Tipo_Evento: data.tipoEvento || '',
@@ -92,13 +71,11 @@ export async function POST(req: NextRequest) {
       CTA: data.cta || '',
       Status_Postagem: data.statusPostagem || '',
       Perfil: data.perfil || '',
-    };
-    console.log('Salvando linha na agenda:', agendaRow);
-    await agendaSheet.addRow(agendaRow);
+    });
 
     // ====== Salva na Tarefas ======
-    if (data.tarefa && tarefasSheet) {
-      const tarefaRow = {
+    if (data.tarefa) {
+      await tarefasSheet.addRow({
         Bloco_ID: data.tarefa.blocoId || '',
         Titulo: data.tarefa.titulo || '',
         Responsavel: data.tarefa.responsavel || '',
@@ -106,15 +83,12 @@ export async function POST(req: NextRequest) {
         Status: data.tarefa.status || '',
         LinkDrive: data.tarefa.linkDrive || '',
         Notificar: data.tarefa.notificar || '',
-      };
-      console.log('Salvando linha na tarefas:', tarefaRow);
-      await tarefasSheet.addRow(tarefaRow);
+      });
     }
 
-    console.log('POST concluído com sucesso!');
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('ERRO COMPLETO POST /api/agenda:', error);
-    return NextResponse.json({ error: 'Erro ao salvar', details: String(error) }, { status: 500 });
+    console.error('Erro ao salvar evento', error);
+    return NextResponse.json({ error: 'Erro ao salvar', details: (error as Error).message }, { status: 500 });
   }
 }
