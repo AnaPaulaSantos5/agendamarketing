@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { DateClickArg, EventClickArg } from '@fullcalendar/interaction';
-import EventModal from './EventModal';
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
+import { EventClickArg } from '@fullcalendar/core';
+import EventModal, { AgendaEvent as ModalAgendaEvent } from './EventModal';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -14,19 +15,17 @@ export type AgendaEvent = {
   end: string;
   tipoEvento?: string;
   tipo?: string;
-  conteudoPrincipal: string;
+  conteudoPrincipal: string; // obrigatório para compatibilidade com EventModal
   conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
     data: string;
-    status: 'Pendente' | 'Concluída';
+    status: string;
     linkDrive?: string;
     notificar?: string;
-  };
+  } | null;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -34,24 +33,37 @@ const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
 
-  // Buscar eventos da API
+  // Fetch inicial da agenda
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data = await res.json();
-        setEvents(data || []);
-      } catch (err) {
-        console.error('Erro ao buscar eventos', err);
-      }
-    }
-    fetchEvents();
+    fetchAgenda();
   }, []);
 
-  // Abrir modal com informações do evento
+  async function fetchAgenda() {
+    try {
+      const res = await fetch('/api/agenda');
+      const data = await res.json();
+      setEvents(data || []);
+    } catch (err) {
+      console.error('Erro da API:', err);
+    }
+  }
+
+  // Clique em data para criar novo evento
+  const handleDateClick = (info: DateClickArg) => {
+    setSelectedEvent({
+      id: '',
+      start: info.dateStr,
+      end: info.dateStr,
+      conteudoPrincipal: '',
+      perfil: filterProfile,
+    });
+    setIsModalOpen(true);
+  };
+
+  // Clique em evento para ver informações
   const handleEventClick = (info: EventClickArg) => {
     const ev = events.find(e => e.id === info.event.id);
     if (!ev) return;
@@ -59,7 +71,7 @@ export default function AgendaCalendar() {
     setIsModalOpen(true);
   };
 
-  // Salvar novo evento ou edição
+  // Salvar evento (novo ou edição)
   const handleSave = async (ev: AgendaEvent, isEdit: boolean) => {
     try {
       const method = isEdit ? 'PATCH' : 'POST';
@@ -71,74 +83,72 @@ export default function AgendaCalendar() {
       if (!res.ok) throw new Error('Erro ao salvar');
 
       if (isEdit) {
-        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+        setEvents(prev =>
+          prev.map(e => (e.id === ev.id ? { ...e, ...ev } : e))
+        );
       } else {
-        // Para novo evento, atribuir id temporário
-        ev.id = String(events.length + 1);
-        setEvents(prev => [...prev, ev]);
+        const newId = String(events.length + 1);
+        setEvents(prev => [...prev, { ...ev, id: newId }]);
       }
       setIsModalOpen(false);
-      setSelectedEvent(null);
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
     }
   };
 
-  // Excluir evento/tarefa
+  // Excluir evento
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este evento/tarefa?')) return;
+    if (!confirm('Deseja realmente excluir este evento?')) return;
     try {
       const res = await fetch('/api/agenda', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error('Erro ao excluir');
+      if (!res.ok) throw new Error('Erro ao deletar');
       setEvents(prev => prev.filter(e => e.id !== id));
       setIsModalOpen(false);
-      setSelectedEvent(null);
     } catch (err) {
       console.error(err);
-      alert('Erro ao excluir evento');
+      alert('Erro ao deletar evento');
     }
   };
 
-  // Alterar status da tarefa (Concluída/Pendente)
-  const toggleTaskStatus = async (ev: AgendaEvent) => {
-    if (!ev.tarefa) return;
-    const newStatus = ev.tarefa.status === 'Pendente' ? 'Concluída' : 'Pendente';
-    const updated = { ...ev, tarefa: { ...ev.tarefa, status: newStatus } };
-    await handleSave(updated, true);
-  };
-
-  // Reagendar tarefa/evento
-  const rescheduleTask = async (ev: AgendaEvent) => {
-    const newDate = prompt('Nova data/hora (YYYY-MM-DD HH:MM)', ev.start);
-    if (!newDate) return;
-    const updated = { ...ev, start: newDate, end: newDate };
-    await handleSave(updated, true);
+  // Checklist lateral
+  const handleChecklistChange = async (
+    ev: AgendaEvent,
+    action: 'Concluída' | 'Reagendar' | 'Cancelar'
+  ) => {
+    let updatedEvent = { ...ev };
+    if (action === 'Concluída') updatedEvent.tarefa!.status = 'Concluída';
+    if (action === 'Cancelar') updatedEvent.tarefa!.status = 'Cancelada';
+    if (action === 'Reagendar') {
+      const newDate = prompt('Informe nova data (YYYY-MM-DD HH:mm)', ev.start);
+      if (!newDate) return;
+      updatedEvent.start = newDate;
+      updatedEvent.end = newDate;
+    }
+    await handleSave(updatedEvent, true);
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
-  // Tarefas do dia para checklist
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const tasksToday = events.filter(e => e.start.slice(0, 10) === todayStr && e.tarefa);
 
   return (
     <div style={{ display: 'flex' }}>
       {/* Calendário */}
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: 8 }}>
+        <div>
           Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+          <select
+            value={filterProfile}
+            onChange={e => setFilterProfile(e.target.value as Perfil)}
+          >
             {profiles.map(p => (
               <option key={p}>{p}</option>
             ))}
           </select>
         </div>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -153,56 +163,33 @@ export default function AgendaCalendar() {
             start: ev.start,
             end: ev.end,
           }))}
-          dateClick={info => {
-            setSelectedEvent({
-              id: '',
-              start: info.dateStr,
-              end: info.dateStr,
-              conteudoPrincipal: '',
-              perfil: filterProfile,
-            });
-            setIsModalOpen(true);
-          }}
+          dateClick={handleDateClick}
           eventClick={handleEventClick}
         />
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ width: 280, padding: 10, borderLeft: '1px solid #ccc' }}>
+      <div style={{ width: 300, padding: 10, borderLeft: '1px solid #ccc' }}>
         <h4>Checklist Hoje</h4>
-        {tasksToday.length === 0 && <p>Nenhuma tarefa hoje</p>}
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {tasksToday.map(e => (
-            <li
-              key={e.id}
-              style={{
-                marginBottom: 8,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                border: '1px solid #eee',
-                padding: '5px 8px',
-                borderRadius: 4,
-              }}
-            >
-              <div>
-                <input
-                  type="checkbox"
-                  checked={e.tarefa?.status === 'Concluída'}
-                  onChange={() => toggleTaskStatus(e)}
-                />{' '}
-                {e.conteudoPrincipal} ({e.tarefa?.titulo})
-              </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button onClick={() => rescheduleTask(e)} title="Reagendar">
-                  ⏰
-                </button>
-                <button onClick={() => e.id && handleDelete(e.id)} title="Cancelar">
-                  ❌
-                </button>
-              </div>
-            </li>
-          ))}
+        <ul>
+          {events
+            .filter(e => e.tarefa && e.start.slice(0, 10) === new Date().toISOString().slice(0, 10))
+            .map(e => (
+              <li key={e.id} style={{ marginBottom: 8 }}>
+                <strong>{e.conteudoPrincipal}</strong> ({e.tarefa!.status})
+                <div style={{ marginTop: 4 }}>
+                  <button onClick={() => handleChecklistChange(e, 'Concluída')}>
+                    Concluída
+                  </button>{' '}
+                  <button onClick={() => handleChecklistChange(e, 'Reagendar')}>
+                    Reagendar
+                  </button>{' '}
+                  <button onClick={() => handleChecklistChange(e, 'Cancelar')}>
+                    Cancelar
+                  </button>
+                </div>
+              </li>
+            ))}
         </ul>
       </div>
 
@@ -211,9 +198,11 @@ export default function AgendaCalendar() {
         <EventModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          event={selectedEvent}
-          onSave={(ev: AgendaEvent) => handleSave(ev, Boolean(ev.id))}
-          onDelete={handleDelete}
+          event={selectedEvent as ModalAgendaEvent}
+          onSave={(ev: ModalAgendaEvent) =>
+            handleSave(ev as AgendaEvent, Boolean(selectedEvent.id))
+          }
+          onDelete={() => handleDelete(selectedEvent.id)}
         />
       )}
     </div>
