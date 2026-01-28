@@ -2,77 +2,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+// IDs das planilhas
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+const AGENDA_SHEET_INDEX = 0; // Aba Agenda
+const TAREFAS_SHEET_INDEX = 1; // Aba Tarefas
 
-async function accessSheet() {
+// Função para formatar datas para YYYY-MM-DD
+function formatDateForSheet(dateString: string) {
+  const d = new Date(dateString);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function getSheets() {
+  const doc = new GoogleSpreadsheet(SPREADSHEET_ID!);
   await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_CLIENT_EMAIL!,
+    client_email: process.env.GOOGLE_SERVICE_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
-  const agendaSheet = doc.sheetsByTitle['Agenda'];
-  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+  const agendaSheet = doc.sheetsByIndex[AGENDA_SHEET_INDEX];
+  const tarefasSheet = doc.sheetsByIndex[TAREFAS_SHEET_INDEX];
   return { agendaSheet, tarefasSheet };
 }
 
-// GET: retorna eventos da aba Agenda
-export async function GET() {
-  try {
-    const { agendaSheet } = await accessSheet();
-    const rows = await agendaSheet.getRows();
-
-    const events = rows.map(row => ({
-      Data_Inicio: row.Data_Inicio,
-      Data_Fim: row.Data_Fim,
-      Tipo_Evento: row.Tipo_Evento,
-      Tipo: row.Tipo,
-      Conteudo_Principal: row.Conteudo_Principal,
-      Conteudo_Secundario: row.Conteudo_Secundario,
-      CTA: row.CTA,
-      Status_Postagem: row.Status_Postagem,
-      Perfil: row.Perfil,
-    }));
-
-    return NextResponse.json({ Agenda: events });
-  } catch (err) {
-    console.error('Erro GET agenda:', err);
-    return NextResponse.json({ error: 'Erro ao buscar agenda' }, { status: 500 });
-  }
-}
-
-// POST: adiciona novo evento na Agenda e cria tarefa correspondente
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSheet();
 
-    // 1️⃣ Adiciona na Agenda
-    const newRow = await agendaSheet.addRow({
-      Data_Inicio: data.Data_Inicio,
-      Data_Fim: data.Data_Fim,
-      Tipo_Evento: data.Tipo_Evento,
-      Tipo: data.Tipo,
-      Conteudo_Principal: data.Conteudo_Principal,
-      Conteudo_Secundario: data.Conteudo_Secundario,
-      CTA: data.CTA,
-      Status_Postagem: 'Pendente',
-      Perfil: data.Perfil,
+    if (!data.start || !data.end) {
+      return NextResponse.json({ error: 'Datas obrigatórias' }, { status: 400 });
+    }
+
+    const { agendaSheet, tarefasSheet } = await getSheets();
+
+    // Adiciona na Agenda
+    await agendaSheet.addRow({
+      Data_Inicio: formatDateForSheet(data.start),
+      Data_Fim: formatDateForSheet(data.end),
+      Tipo_Evento: data.tipoEvento || '',
+      Tipo: data.tipo || '',
+      Conteudo_Principal: data.conteudoPrincipal || '',
+      Conteudo_Secundario: data.conteudoSecundario || '',
+      CTA: data.cta || '',
+      Status_Postagem: data.statusPostagem || '',
+      Perfil: data.perfil || '',
     });
 
-    // 2️⃣ Cria tarefa correspondente
+    // Adiciona na Tarefas
     await tarefasSheet.addRow({
-      Bloco_ID: newRow._rowNumber,
-      Titulo: data.Conteudo_Principal,
-      Responsavel: data.Perfil,
-      Data: data.Data_Inicio,
-      Status: 'Pendente',
-      LinkDrive: data.LinkDrive || '',
-      Notificar: 'Sim',
+      Bloco_ID: data.id || '',
+      Titulo: data.conteudoPrincipal || '',
+      Responsavel: data.perfil || '',
+      Data: formatDateForSheet(data.start),
+      Status: data.statusPostagem || '',
+      LinkDrive: data.linkDrive || '',
+      Notificar: data.notificar || 'Sim',
     });
 
-    return NextResponse.json({ success: true, event: newRow });
-  } catch (err) {
-    console.error('Erro POST agenda:', err);
-    return NextResponse.json({ error: 'Erro ao adicionar evento' }, { status: 500 });
+    return NextResponse.json({ message: 'Evento salvo com sucesso' });
+  } catch (error) {
+    console.error('Erro ao salvar evento', error);
+    return NextResponse.json({ error: 'Erro ao salvar' }, { status: 500 });
   }
 }
