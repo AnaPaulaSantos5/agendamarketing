@@ -3,81 +3,63 @@
 import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<any[]>([]);
   const [perfil, setPerfil] = useState('Todos');
 
-  async function carregarAgenda() {
+  async function loadAgenda() {
     const res = await fetch('/api/agenda');
     const data = await res.json();
-    setEvents(data);
+    setEvents(data.events);
   }
 
   useEffect(() => {
-    carregarAgenda();
+    loadAgenda();
   }, []);
 
-  async function handleSelect(info: any) {
-    const conteudo = prompt('Conteúdo principal:');
-    if (!conteudo) return;
-
-    const tipo = prompt('Tipo (Story, Reels, Post):', 'Story') || 'Story';
-    const perfilSelecionado =
-      prompt('Perfil:', 'Confi Seguros') || 'Confi Seguros';
-
-    const payload = {
-      Data_Inicio: info.startStr,
-      Data_Fim: info.endStr || info.startStr,
-      Tipo_Evento: 'Conteúdo',
-      Tipo: tipo,
-      Conteudo_Principal: conteudo,
-      Conteudo_Secundario: '',
-      CTA: '',
-      Status_Postagem: 'Planejado',
-      Perfil: perfilSelecionado,
-    };
-
-    await fetch('/api/agenda', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    carregarAgenda();
-  }
-
-  const eventosFiltrados =
+  const filtered =
     perfil === 'Todos'
       ? events
-      : events.filter(
-          (e) => e.extendedProps?.perfil === perfil
-        );
+      : events.filter(e => e.extendedProps?.perfil === perfil);
 
   return (
     <>
-      {/* 🔽 FILTRO DE PERFIL */}
-      <div style={{ marginBottom: 16 }}>
-        <select
-          value={perfil}
-          onChange={(e) => setPerfil(e.target.value)}
-        >
-          <option value="Todos">Todos</option>
-          <option value="Confi Seguros">Confi Seguros</option>
-          <option value="Cecília">Cecília</option>
-          <option value="Luiza">Luiza</option>
-          <option value="Júlio">Júlio</option>
-        </select>
-      </div>
+      <select onChange={e => setPerfil(e.target.value)}>
+        <option value="Todos">Todos</option>
+        <option value="Confi">Confi</option>
+        <option value="Cecília">Cecília</option>
+        <option value="Luiza">Luiza</option>
+        <option value="Júlio">Júlio</option>
+      </select>
 
       <FullCalendar
-        plugins={[dayGridPlugin, interactionPlugin]}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
+        events={filtered}
         selectable
-        select={handleSelect}
-        events={eventosFiltrados}
-        height="auto"
+        editable
+        select={async (info) => {
+          const titulo = prompt('Nome da tarefa');
+          if (!titulo) return;
+
+          await fetch('/api/agenda', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              Data_Inicio: info.startStr,
+              Data_Fim: info.endStr,
+              Tipo: 'Tarefa',
+              Conteudo_Principal: titulo,
+              Status_Postagem: 'Pendente',
+              Perfil: 'Confi',
+            }),
+          });
+
+          loadAgenda(); // 🔥 ISSO É O QUE ESTAVA FALTANDO
+        }}
       />
     </>
   );
