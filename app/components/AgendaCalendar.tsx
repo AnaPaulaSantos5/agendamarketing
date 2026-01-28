@@ -8,17 +8,16 @@ import interactionPlugin from '@fullcalendar/interaction';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-type AgendaEvent = {
-  id: string;
-  start: string; // ISO string
-  end: string;   // ISO string
-  title: string;
+type EventData = {
+  id?: string;
+  start: string;           // Data_Inicio em YYYY-MM-DD
+  end: string;             // Data_Fim em YYYY-MM-DD
   tipo_evento: string;
   tipo: string;
   conteudo_principal: string;
-  conteudo_secundario: string;
-  cta: string;
-  status_postagem: string;
+  conteudo_secundario?: string;
+  cta?: string;
+  status_postagem?: string;
   profile: Perfil;
   linkDrive?: string;
 };
@@ -26,13 +25,13 @@ type AgendaEvent = {
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [events, setEvents] = useState<EventData[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState<Partial<AgendaEvent>>({});
+  const [newEvent, setNewEvent] = useState<Partial<EventData>>({});
 
-  // Carregar agenda da planilha
+  // Buscar eventos da planilha
   useEffect(() => {
     async function fetchAgenda() {
       try {
@@ -46,18 +45,20 @@ export default function AgendaCalendar() {
     fetchAgenda();
   }, []);
 
-  // Abrir modal para criar evento
-  const handleDateClick = (arg: any) => {
-    setNewEvent({ start: arg.dateStr, end: arg.dateStr, profile: filterProfile });
-    setModalOpen(true);
-  };
-
-  // Salvar evento na planilha
+  // Salvar evento novo
   const saveEvent = async () => {
-    if (!newEvent.start || !newEvent.end || !newEvent.title || !newEvent.profile) {
+    if (
+      !newEvent.start ||
+      !newEvent.end ||
+      !newEvent.tipo_evento ||
+      !newEvent.tipo ||
+      !newEvent.conteudo_principal ||
+      !newEvent.profile
+    ) {
       alert('Preencha todos os campos obrigatórios!');
       return;
     }
+
     try {
       const res = await fetch('/api/agenda', {
         method: 'POST',
@@ -74,18 +75,25 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Filtrar eventos por perfil
+  // Eventos filtrados por perfil
   const filteredEvents = events.filter(e => e.profile === filterProfile);
 
   return (
     <div>
+      <h2>Agenda</h2>
+
+      {/* Filtro por perfil */}
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
         <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          {profiles.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
+        <button style={{ marginLeft: '1rem' }} onClick={() => setModalOpen(true)}>Adicionar Evento</button>
       </div>
 
+      {/* Calendário */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
@@ -94,80 +102,72 @@ export default function AgendaCalendar() {
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
-        events={filteredEvents.map(e => ({
-          id: e.id,
-          title: `${e.tipo}: ${e.conteudo_principal}`,
-          start: e.start,
-          end: e.end,
-          extendedProps: { ...e },
+        events={filteredEvents.map(ev => ({
+          id: ev.id,
+          title: `${ev.tipo}: ${ev.conteudo_principal}`,
+          start: ev.start,
+          end: ev.end,
+          extendedProps: {
+            tipo_evento: ev.tipo_evento,
+            conteudo_secundario: ev.conteudo_secundario,
+            cta: ev.cta,
+            status_postagem: ev.status_postagem,
+            profile: ev.profile,
+            linkDrive: ev.linkDrive,
+          },
         }))}
-        selectable={true}
         editable={true}
-        dateClick={handleDateClick}
+        selectable={true}
         eventClick={(info) => {
-          const e = info.event.extendedProps as AgendaEvent;
-          alert(`Evento: ${e.conteudo_principal}\nLink do roteiro: ${e.linkDrive || ''}`);
+          const props = info.event.extendedProps;
+          alert(
+            `Evento: ${info.event.title}\n` +
+            `Tipo: ${props.tipo_evento}\n` +
+            `Conteúdo Secundário: ${props.conteudo_secundario || '-'}\n` +
+            `CTA: ${props.cta || '-'}\n` +
+            `Link do Roteiro: ${props.linkDrive || '-'}`
+          );
         }}
       />
 
-      {/* Modal para criar evento */}
+      {/* Modal simples para adicionar evento */}
       {modalOpen && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
-          justifyContent: 'center', alignItems: 'center'
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
         }}>
-          <div style={{ background: '#fff', padding: '2rem', borderRadius: '8px', width: '400px' }}>
-            <h2>Novo Evento</h2>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Início:</label>
-              <input type="date" value={newEvent.start?.slice(0,10) || ''} 
-                onChange={e => setNewEvent({...newEvent, start: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Fim:</label>
-              <input type="date" value={newEvent.end?.slice(0,10) || ''} 
-                onChange={e => setNewEvent({...newEvent, end: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Tipo Evento:</label>
-              <input type="text" value={newEvent.tipo_evento || ''} 
-                onChange={e => setNewEvent({...newEvent, tipo_evento: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Tipo:</label>
-              <input type="text" value={newEvent.tipo || ''} 
-                onChange={e => setNewEvent({...newEvent, tipo: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Conteúdo Principal:</label>
-              <input type="text" value={newEvent.conteudo_principal || ''} 
-                onChange={e => setNewEvent({...newEvent, conteudo_principal: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Conteúdo Secundário:</label>
-              <input type="text" value={newEvent.conteudo_secundario || ''} 
-                onChange={e => setNewEvent({...newEvent, conteudo_secundario: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>CTA:</label>
-              <input type="text" value={newEvent.cta || ''} 
-                onChange={e => setNewEvent({...newEvent, cta: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Status:</label>
-              <input type="text" value={newEvent.status_postagem || ''} 
-                onChange={e => setNewEvent({...newEvent, status_postagem: e.target.value})}/>
-            </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label>Perfil:</label>
-              <select value={newEvent.profile || ''} onChange={e => setNewEvent({...newEvent, profile: e.target.value as Perfil})}>
-                {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ background: '#fff', padding: '1rem', width: '400px', borderRadius: '5px' }}>
+            <h3>Adicionar Evento</h3>
+            <label>Data Início *</label>
+            <input type="date" value={newEvent.start || ''} onChange={e => setNewEvent({...newEvent, start: e.target.value})} />
+            
+            <label>Data Fim *</label>
+            <input type="date" value={newEvent.end || ''} onChange={e => setNewEvent({...newEvent, end: e.target.value})} />
+            
+            <label>Tipo de Evento *</label>
+            <input type="text" value={newEvent.tipo_evento || ''} onChange={e => setNewEvent({...newEvent, tipo_evento: e.target.value})} />
+            
+            <label>Tipo *</label>
+            <input type="text" value={newEvent.tipo || ''} onChange={e => setNewEvent({...newEvent, tipo: e.target.value})} />
+            
+            <label>Conteúdo Principal *</label>
+            <input type="text" value={newEvent.conteudo_principal || ''} onChange={e => setNewEvent({...newEvent, conteudo_principal: e.target.value})} />
+            
+            <label>Conteúdo Secundário</label>
+            <input type="text" value={newEvent.conteudo_secundario || ''} onChange={e => setNewEvent({...newEvent, conteudo_secundario: e.target.value})} />
+            
+            <label>CTA</label>
+            <input type="text" value={newEvent.cta || ''} onChange={e => setNewEvent({...newEvent, cta: e.target.value})} />
+            
+            <label>Perfil *</label>
+            <select value={newEvent.profile || ''} onChange={e => setNewEvent({...newEvent, profile: e.target.value as Perfil})}>
+              <option value="">Selecione</option>
+              {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+
+            <div style={{ marginTop: '1rem' }}>
               <button onClick={saveEvent}>Salvar</button>
-              <button onClick={() => setModalOpen(false)}>Cancelar</button>
+              <button style={{ marginLeft: '1rem' }} onClick={() => setModalOpen(false)}>Cancelar</button>
             </div>
           </div>
         </div>
