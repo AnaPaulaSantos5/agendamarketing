@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { DateSelectArg } from '@fullcalendar/interaction';
-import { EventInput } from '@fullcalendar/core';
+import interactionPlugin from '@fullcalendar/interaction';
+import { DateSelectArg, EventInput } from '@fullcalendar/core';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -16,30 +16,32 @@ export default function AgendaCalendar() {
   const [perfilFiltro, setPerfilFiltro] = useState<Perfil>('Confi');
 
   /* =============================
-     CARREGAR EVENTOS DA API
+     CARREGAR EVENTOS
      ============================= */
   useEffect(() => {
-    async function load() {
+    async function loadAgenda() {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
         setEvents(data);
-      } catch (e) {
-        console.error('Erro ao carregar agenda', e);
+      } catch (err) {
+        console.error('Erro ao carregar agenda', err);
       }
     }
-    load();
+    loadAgenda();
   }, []);
 
   /* =============================
-     CRIAR EVENTO (SELEÇÃO)
+     CRIAR EVENTO (BLOCO)
      ============================= */
   async function handleSelect(selectInfo: DateSelectArg) {
-    const title = prompt('Título do evento:');
+    const title = prompt('Título do evento');
     if (!title) return;
 
-    const tipo = prompt('Tipo (Story, Reel, Post, Organização):', 'Story') || '';
-    const linkDrive = prompt('Link do Drive (opcional):') || '';
+    const tipo =
+      prompt('Tipo (Story, Reel, Post, Organização)', 'Story') || 'Story';
+
+    const linkDrive = prompt('Link do Drive (opcional)') || '';
 
     const newEvent: EventInput = {
       id: String(Date.now()),
@@ -54,10 +56,10 @@ export default function AgendaCalendar() {
       },
     };
 
-    // 1️⃣ Atualiza UI imediatamente
+    // Atualiza UI
     setEvents(prev => [...prev, newEvent]);
 
-    // 2️⃣ Persiste no backend
+    // Persiste no backend
     await fetch('/api/agenda', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,7 +76,7 @@ export default function AgendaCalendar() {
 
   return (
     <div style={{ padding: 20 }}>
-      {/* ===== FILTRO ===== */}
+      {/* FILTRO */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ marginRight: 8 }}>Perfil:</label>
         <select
@@ -89,7 +91,7 @@ export default function AgendaCalendar() {
         </select>
       </div>
 
-      {/* ===== CALENDÁRIO ===== */}
+      {/* CALENDÁRIO */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
