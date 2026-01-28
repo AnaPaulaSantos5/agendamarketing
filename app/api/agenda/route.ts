@@ -1,32 +1,38 @@
 import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
+const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
+const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
+const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n');
 
-async function auth() {
+async function getSheet() {
+  const doc = new GoogleSpreadsheet(SHEET_ID);
   await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    client_email: CLIENT_EMAIL,
+    private_key: PRIVATE_KEY,
   });
   await doc.loadInfo();
+  return doc.sheetsByTitle['Agenda'];
 }
 
+/* =========================
+   GET — LISTAR EVENTOS
+   ========================= */
 export async function GET() {
   try {
-    await auth();
-    const sheet = doc.sheetsByTitle['Agenda'];
+    const sheet = await getSheet();
     const rows = await sheet.getRows();
 
     const events = rows.map(row => ({
-      id: row.ID,
-      title: row.Titulo,
-      start: row.Inicio,
-      end: row.Fim,
+      id: row.id,
+      title: row.title,
+      start: row.start,
+      end: row.end,
       extendedProps: {
-        profile: row.Perfil,
-        type: row.Tipo,
-        linkDrive: row.LinkDrive,
-        status: row.Status,
+        profile: row.profile,
+        type: row.type,
+        linkDrive: row.linkDrive,
+        status: row.status,
       },
     }));
 
@@ -37,22 +43,23 @@ export async function GET() {
   }
 }
 
+/* =========================
+   POST — CRIAR EVENTO
+   ========================= */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-
-    await auth();
-    const sheet = doc.sheetsByTitle['Agenda'];
+    const data = await req.json();
+    const sheet = await getSheet();
 
     await sheet.addRow({
-      ID: body.id,
-      Titulo: body.title,
-      Inicio: body.start,
-      Fim: body.end,
-      Perfil: body.extendedProps.profile,
-      Tipo: body.extendedProps.type,
-      LinkDrive: body.extendedProps.linkDrive || '',
-      Status: body.extendedProps.status || 'Pendente',
+      id: data.id,
+      title: data.title,
+      start: data.start,
+      end: data.end,
+      profile: data.extendedProps.profile,
+      type: data.extendedProps.type,
+      linkDrive: data.extendedProps.linkDrive || '',
+      status: data.extendedProps.status || 'Pendente',
     });
 
     return NextResponse.json({ success: true });
