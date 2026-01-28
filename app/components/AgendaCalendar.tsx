@@ -1,69 +1,67 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
+import FullCalendar, { EventInput } from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-interface AgendaEvent {
-  id: string;
-  title: string;
-  start: string; // ISO date string
-  end: string;   // ISO date string
+type EventoForm = {
+  Data_Inicio: string;
+  Data_Fim: string;
+  Tipo_Evento: string;
+  Tipo: string;
+  Conteudo_Principal: string;
+  Conteudo_Secundario: string;
+  CTA: string;
   Perfil: Perfil;
-  Tipo_Evento?: string;
-  Tipo?: string;
-  Conteudo_Principal?: string;
-  Conteudo_Secundario?: string;
-  CTA?: string;
-  Status_Postagem?: string;
   LinkDrive?: string;
-}
+};
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [events, setEvents] = useState<EventInput[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-
-  const [newEvent, setNewEvent] = useState({
-    start: '',
-    end: '',
+  const [form, setForm] = useState<EventoForm>({
+    Data_Inicio: '',
+    Data_Fim: '',
     Tipo_Evento: '',
     Tipo: '',
     Conteudo_Principal: '',
     Conteudo_Secundario: '',
     CTA: '',
-    Perfil: 'Confi' as Perfil,
+    Perfil: 'Confi',
+    LinkDrive: '',
   });
+  const [loading, setLoading] = useState(false);
 
-  // Buscar agenda da API
+  // Carregar eventos da planilha
   useEffect(() => {
     async function fetchAgenda() {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
-        console.log('Agenda recebida:', data);
-
-        const transformed = (data.Agenda || []).map((item: any, index: number) => ({
-          id: index.toString(),
-          title: item.Conteudo_Principal || '',
-          start: item.Data_Inicio,
-          end: item.Data_Fim,
-          Perfil: item.Perfil as Perfil,
-          Tipo_Evento: item.Tipo_Evento,
-          Tipo: item.Tipo,
-          Conteudo_Principal: item.Conteudo_Principal,
-          Conteudo_Secundario: item.Conteudo_Secundario,
-          CTA: item.CTA,
-          Status_Postagem: item.Status_Postagem,
-          LinkDrive: item.LinkDrive || '',
-        }));
-
-        setEvents(transformed);
+        if (data?.Agenda) {
+          const transformed: EventInput[] = data.Agenda.map((item: any, index: number) => ({
+            id: index.toString(),
+            title: `${item.Tipo}: ${item.Conteudo_Principal}`,
+            start: item.Data_Inicio,
+            end: item.Data_Fim,
+            extendedProps: {
+              Tipo_Evento: item.Tipo_Evento,
+              Conteudo_Principal: item.Conteudo_Principal,
+              Conteudo_Secundario: item.Conteudo_Secundario,
+              CTA: item.CTA,
+              Perfil: item.Perfil,
+              LinkDrive: item.LinkDrive || '',
+              Status: item.Status_Postagem,
+            },
+          }));
+          setEvents(transformed);
+        }
       } catch (err) {
         console.error('Erro ao carregar agenda:', err);
       }
@@ -71,129 +69,98 @@ export default function AgendaCalendar() {
     fetchAgenda();
   }, []);
 
-  // Filtrar por perfil
-  const filteredEvents = (events || []).filter(e => e.Perfil === filterProfile);
+  // Filtrar eventos por perfil
+  const filteredEvents = events.filter(e => e.extendedProps?.Perfil === filterProfile);
 
-  // Criar novo evento
-  const handleAddEvent = async () => {
-    if (!newEvent.start || !newEvent.end || !newEvent.Tipo_Evento) {
-      alert('Preencha pelo menos Data Início, Data Fim e Tipo de Evento');
-      return;
+  // Atualizar campos do formulário
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Enviar evento para API
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Checar campos obrigatórios
+    const requiredFields = ['Data_Inicio', 'Data_Fim', 'Tipo_Evento', 'Tipo', 'Conteudo_Principal', 'Perfil'];
+    for (const field of requiredFields) {
+      if (!form[field as keyof EventoForm]) {
+        alert(`Preencha o campo ${field}`);
+        return;
+      }
     }
 
+    setLoading(true);
     try {
       const res = await fetch('/api/agenda', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEvent),
+        body: JSON.stringify(form),
       });
-      const data = await res.json();
-      console.log('Evento salvo:', data);
+      if (!res.ok) throw new Error('Erro ao salvar evento');
 
-      // Atualiza a agenda local
+      // Atualizar calendário sem recarregar
       setEvents(prev => [
         ...prev,
         {
           id: (prev.length + 1).toString(),
-          title: newEvent.Conteudo_Principal || '',
-          start: newEvent.start,
-          end: newEvent.end,
-          Perfil: newEvent.Perfil,
-          Tipo_Evento: newEvent.Tipo_Evento,
-          Tipo: newEvent.Tipo,
-          Conteudo_Principal: newEvent.Conteudo_Principal,
-          Conteudo_Secundario: newEvent.Conteudo_Secundario,
-          CTA: newEvent.CTA,
-          Status_Postagem: 'Pendente',
+          title: `${form.Tipo}: ${form.Conteudo_Principal}`,
+          start: form.Data_Inicio,
+          end: form.Data_Fim,
+          extendedProps: { ...form, Status: 'Pendente' },
         },
       ]);
 
       // Resetar formulário
-      setNewEvent({
-        start: '',
-        end: '',
+      setForm({
+        Data_Inicio: '',
+        Data_Fim: '',
         Tipo_Evento: '',
         Tipo: '',
         Conteudo_Principal: '',
         Conteudo_Secundario: '',
         CTA: '',
         Perfil: 'Confi',
+        LinkDrive: '',
       });
     } catch (err) {
-      console.error('Erro ao salvar evento:', err);
+      console.error(err);
+      alert('Erro ao salvar evento');
     }
+    setLoading(false);
   };
 
   return (
     <div>
-      <h2>Agenda Marketing</h2>
-
-      {/* Filtro por perfil */}
+      {/* Filtro de perfil */}
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
-        <select
-          value={filterProfile}
-          onChange={e => setFilterProfile(e.target.value as Perfil)}
-        >
+        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
           {profiles.map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
       </div>
 
-      {/* Formulário de criação de evento */}
-      <div style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
+      {/* Formulário de evento */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
         <h3>Adicionar Evento</h3>
-        <input
-          type="date"
-          value={newEvent.start}
-          onChange={e => setNewEvent({ ...newEvent, start: e.target.value })}
-        />
-        <input
-          type="date"
-          value={newEvent.end}
-          onChange={e => setNewEvent({ ...newEvent, end: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Tipo de Evento"
-          value={newEvent.Tipo_Evento}
-          onChange={e => setNewEvent({ ...newEvent, Tipo_Evento: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Tipo"
-          value={newEvent.Tipo}
-          onChange={e => setNewEvent({ ...newEvent, Tipo: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Conteúdo Principal"
-          value={newEvent.Conteudo_Principal}
-          onChange={e => setNewEvent({ ...newEvent, Conteudo_Principal: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Conteúdo Secundário"
-          value={newEvent.Conteudo_Secundario}
-          onChange={e => setNewEvent({ ...newEvent, Conteudo_Secundario: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="CTA"
-          value={newEvent.CTA}
-          onChange={e => setNewEvent({ ...newEvent, CTA: e.target.value })}
-        />
-        <select
-          value={newEvent.Perfil}
-          onChange={e => setNewEvent({ ...newEvent, Perfil: e.target.value as Perfil })}
-        >
+        <input type="date" name="Data_Inicio" value={form.Data_Inicio} onChange={handleChange} required />
+        <input type="date" name="Data_Fim" value={form.Data_Fim} onChange={handleChange} required />
+        <input type="text" name="Tipo_Evento" placeholder="Tipo do Evento" value={form.Tipo_Evento} onChange={handleChange} required />
+        <input type="text" name="Tipo" placeholder="Tipo" value={form.Tipo} onChange={handleChange} required />
+        <input type="text" name="Conteudo_Principal" placeholder="Conteúdo Principal" value={form.Conteudo_Principal} onChange={handleChange} required />
+        <input type="text" name="Conteudo_Secundario" placeholder="Conteúdo Secundário" value={form.Conteudo_Secundario} onChange={handleChange} />
+        <input type="text" name="CTA" placeholder="CTA" value={form.CTA} onChange={handleChange} />
+        <input type="text" name="LinkDrive" placeholder="Link Drive" value={form.LinkDrive} onChange={handleChange} />
+        <select name="Perfil" value={form.Perfil} onChange={handleChange} required>
           {profiles.map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-        <button onClick={handleAddEvent}>Adicionar Evento</button>
-      </div>
+        <button type="submit" disabled={loading}>{loading ? 'Salvando...' : 'Adicionar Evento'}</button>
+      </form>
 
       {/* Calendário */}
       <FullCalendar
@@ -208,16 +175,12 @@ export default function AgendaCalendar() {
         editable={true}
         selectable={true}
         eventClick={(info) => {
-          alert(`
-Evento: ${info.event.title}
-Tipo Evento: ${info.event.extendedProps.Tipo_Evento}
-Conteúdo Principal: ${info.event.extendedProps.Conteudo_Principal}
-Conteúdo Secundário: ${info.event.extendedProps.Conteudo_Secundario}
-CTA: ${info.event.extendedProps.CTA}
-Link Drive: ${info.event.extendedProps.LinkDrive || 'Não informado'}
-Status: ${info.event.extendedProps.Status_Postagem || 'Pendente'}
-Perfil: ${info.event.extendedProps.Perfil}
-          `);
+          alert(
+            `Evento: ${info.event.title}\n` +
+            `Tipo do Evento: ${info.event.extendedProps.Tipo_Evento}\n` +
+            `Conteúdo Principal: ${info.event.extendedProps.Conteudo_Principal}\n` +
+            `Link do roteiro: ${info.event.extendedProps.LinkDrive || 'N/A'}`
+          );
         }}
       />
     </div>
