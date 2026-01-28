@@ -1,124 +1,109 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar, { EventInput, DateSelectArg, EventApi } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { EventInput } from '@fullcalendar/core';
 
-type EventData = {
-  id: string;
-  title: string;
-  start: string;       // ISO string
-  end: string;         // ISO string
-  profile: string;     // Confi, Cecília, Luiza, Júlio
-  linkDrive?: string;
-  status: string;
+type AgendaItem = {
+  Data: string;
+  Tipo: string;
+  Conteudo_Principal: string;
+  Conteudo_Secundario?: string;
+  CTA?: string;
+  Status_Postagem: string;
+  Perfil: string;
+  LinkDrive?: string;
 };
 
-const profiles = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const PROFILES = ['Todos', 'Confi Seguros', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [filterProfile, setFilterProfile] = useState<string>('Confi');
+  const [profileFilter, setProfileFilter] = useState('Todos');
 
-  // ✅ Busca e transforma dados da API
   useEffect(() => {
-    async function fetchAgenda() {
+    async function loadAgenda() {
       try {
         const res = await fetch('/api/agenda');
-        const data = await res.json();
+        const json = await res.json();
 
-        const transformed: EventInput[] = data.Agenda.map((item: any, index: number) => {
-          // Converte dd/mm/yy para ISO
-          const isoDate = new Date(item.Data.split('/').reverse().join('-')).toISOString();
-          return {
-            id: index.toString(),
-            title: `${item.Tipo}: ${item.Conteudo_Principal}`,
-            start: isoDate,
-            end: isoDate,
-            profile: item.Perfil,
-            extendedProps: {
-              linkDrive: item.LinkDrive || '',
-              status: item.Status_Postagem,
-            },
-          };
-        });
+        if (!json?.Agenda) return;
 
-        setEvents(transformed);
+        const parsed: EventInput[] = json.Agenda.map(
+          (item: AgendaItem, index: number) => {
+            const [day, month, year] = item.Data.split('/');
+            const isoDate = `20${year}-${month}-${day}`;
+
+            return {
+              id: String(index),
+              title: `${item.Tipo} — ${item.Conteudo_Principal}`,
+              start: isoDate,
+              end: isoDate,
+              extendedProps: {
+                profile: item.Perfil,
+                status: item.Status_Postagem,
+                linkDrive: item.LinkDrive || '',
+              },
+            };
+          }
+        );
+
+        setEvents(parsed);
       } catch (err) {
-        console.error('Erro ao carregar agenda:', err);
+        console.error('Erro ao carregar agenda', err);
       }
     }
 
-    fetchAgenda();
+    loadAgenda();
   }, []);
 
-  // ✅ Filtra eventos por perfil
-  const filteredEvents = events.filter(e => e.profile === filterProfile);
-
-  // ✅ Criação de evento clicando/arrastando
-  const handleSelect = (selectInfo: DateSelectArg) => {
-    const title = prompt('Título do evento:');
-    if (title) {
-      const newEvent: EventInput = {
-        id: String(events.length + 1),
-        title,
-        start: selectInfo.startStr,
-        end: selectInfo.endStr,
-        profile: filterProfile,
-        extendedProps: { status: 'Pendente', linkDrive: '' },
-      };
-      setEvents([...events, newEvent]);
-    }
-  };
-
-  // ✅ Quando arrastar evento para outro horário
-  const handleEventDrop = (eventDropInfo: { event: EventApi }) => {
-    const updatedEvents = events.map(e =>
-      e.id === eventDropInfo.event.id
-        ? { ...e, start: eventDropInfo.event.start?.toISOString(), end: eventDropInfo.event.end?.toISOString() }
-        : e
-    );
-    setEvents(updatedEvents);
-  };
-
-  // ✅ Clicar no evento
-  const handleEventClick = (eventInfo: { event: EventApi }) => {
-    alert(
-      `Evento: ${eventInfo.event.title}\n` +
-      `Link do roteiro: ${eventInfo.event.extendedProps.linkDrive || 'Sem link'}\n` +
-      `Status: ${eventInfo.event.extendedProps.status}`
-    );
-  };
+  const filteredEvents =
+    profileFilter === 'Todos'
+      ? events
+      : events.filter(
+          (e) => e.extendedProps?.profile === profileFilter
+        );
 
   return (
-    <div>
-      {/* Filtro por perfil */}
-      <div style={{ marginBottom: '1rem' }}>
-        <label>Filtrar por perfil: </label>
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
+    <div style={{ padding: 20 }}>
+      <h2 style={{ marginBottom: 10 }}>Agenda de Conteúdo</h2>
 
-      {/* Calendário */}
+      <select
+        value={profileFilter}
+        onChange={(e) => setProfileFilter(e.target.value)}
+        style={{ marginBottom: 20, padding: 6 }}
+      >
+        {PROFILES.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
+        locale="pt-br"
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
         events={filteredEvents}
-        editable={true}       // permite arrastar eventos
-        selectable={true}     // permite criar eventos clicando/arrastando
-        select={handleSelect}
-        eventClick={handleEventClick}
-        eventDrop={handleEventDrop}
+        editable
+        selectable
+        eventClick={(info) => {
+          const { profile, status, linkDrive } = info.event.extendedProps;
+
+          alert(
+            `Perfil: ${profile}\nStatus: ${status}\nRoteiro: ${
+              linkDrive || 'Não informado'
+            }`
+          );
+        }}
       />
     </div>
   );
