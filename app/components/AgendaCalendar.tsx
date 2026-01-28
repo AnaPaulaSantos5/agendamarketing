@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar, { EventInput } from '@fullcalendar/react';
+import FullCalendar, { EventInput, DateSelectArg, EventApi } from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -22,36 +22,79 @@ export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
   const [filterProfile, setFilterProfile] = useState<string>('Confi');
 
+  // ✅ Busca e transforma dados da API
   useEffect(() => {
     async function fetchAgenda() {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
-        // Transformar dados da API para o formato do FullCalendar
-        const transformed: EventInput[] = data.Agenda.map((item: any, index: number) => ({
-          id: index.toString(),
-          title: `${item.Tipo}: ${item.Conteudo_Principal}`,
-          start: item.Data,       // ajustar para ISO string se necessário
-          end: item.Data,         // pode ajustar para horários específicos
-          profile: item.Perfil,
-          extendedProps: {
-            linkDrive: item.LinkDrive || '',
-            status: item.Status_Postagem,
-          },
-        }));
+
+        const transformed: EventInput[] = data.Agenda.map((item: any, index: number) => {
+          // Converte dd/mm/yy para ISO
+          const isoDate = new Date(item.Data.split('/').reverse().join('-')).toISOString();
+          return {
+            id: index.toString(),
+            title: `${item.Tipo}: ${item.Conteudo_Principal}`,
+            start: isoDate,
+            end: isoDate,
+            profile: item.Perfil,
+            extendedProps: {
+              linkDrive: item.LinkDrive || '',
+              status: item.Status_Postagem,
+            },
+          };
+        });
+
         setEvents(transformed);
       } catch (err) {
         console.error('Erro ao carregar agenda:', err);
       }
     }
+
     fetchAgenda();
   }, []);
 
-  // Filtrar por perfil
+  // ✅ Filtra eventos por perfil
   const filteredEvents = events.filter(e => e.profile === filterProfile);
+
+  // ✅ Criação de evento clicando/arrastando
+  const handleSelect = (selectInfo: DateSelectArg) => {
+    const title = prompt('Título do evento:');
+    if (title) {
+      const newEvent: EventInput = {
+        id: String(events.length + 1),
+        title,
+        start: selectInfo.startStr,
+        end: selectInfo.endStr,
+        profile: filterProfile,
+        extendedProps: { status: 'Pendente', linkDrive: '' },
+      };
+      setEvents([...events, newEvent]);
+    }
+  };
+
+  // ✅ Quando arrastar evento para outro horário
+  const handleEventDrop = (eventDropInfo: { event: EventApi }) => {
+    const updatedEvents = events.map(e =>
+      e.id === eventDropInfo.event.id
+        ? { ...e, start: eventDropInfo.event.start?.toISOString(), end: eventDropInfo.event.end?.toISOString() }
+        : e
+    );
+    setEvents(updatedEvents);
+  };
+
+  // ✅ Clicar no evento
+  const handleEventClick = (eventInfo: { event: EventApi }) => {
+    alert(
+      `Evento: ${eventInfo.event.title}\n` +
+      `Link do roteiro: ${eventInfo.event.extendedProps.linkDrive || 'Sem link'}\n` +
+      `Status: ${eventInfo.event.extendedProps.status}`
+    );
+  };
 
   return (
     <div>
+      {/* Filtro por perfil */}
       <div style={{ marginBottom: '1rem' }}>
         <label>Filtrar por perfil: </label>
         <select value={filterProfile} onChange={e => setFilterProfile(e.target.value)}>
@@ -61,6 +104,7 @@ export default function AgendaCalendar() {
         </select>
       </div>
 
+      {/* Calendário */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
@@ -70,11 +114,11 @@ export default function AgendaCalendar() {
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
         events={filteredEvents}
-        editable={true}           // permite arrastar eventos
-        selectable={true}         // permite criar eventos clicando
-        eventClick={(info) => {
-          alert(`Evento: ${info.event.title}\nLink do roteiro: ${info.event.extendedProps.linkDrive}`);
-        }}
+        editable={true}       // permite arrastar eventos
+        selectable={true}     // permite criar eventos clicando/arrastando
+        select={handleSelect}
+        eventClick={handleEventClick}
+        eventDrop={handleEventDrop}
       />
     </div>
   );
