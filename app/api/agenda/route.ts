@@ -151,3 +151,24 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
+
+// DELETE evento/tarefa
+export async function DELETE(req: NextRequest) {
+  try {
+    const { id } = await req.json();
+    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+
+    // Remove evento
+    const row = (await agendaSheet.getRows()).find(r => String(r._rowNumber) === id);
+    if (row) await row.delete();
+
+    // Remove tarefa associada
+    const tarefaRow = (await tarefasSheet.getRows()).find(r => String(r.Bloco_ID) === id);
+    if (tarefaRow) await tarefaRow.delete();
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
