@@ -1,40 +1,44 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 
-export type Tarefa = {
-  titulo: string;
-  responsavel: string;
-  data: string;
-  status: 'Pendente' | 'Concluída';
-  linkDrive?: string;
-  notificar?: string;
-};
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
-  id: string;
+  id?: string;
   start: string;
   end: string;
-  conteudoPrincipal: string;
-  perfil?: string;
+  tipoEvento?: string;
   tipo?: 'Interno' | 'Perfil';
-  tarefa?: Tarefa | null;
+  conteudoPrincipal: string;
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
+  perfil?: Perfil;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: 'Pendente' | 'Concluída';
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
 };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  event: AgendaEvent;
-  onSave: (event: AgendaEvent, isEdit: boolean) => void;
-  onDelete: (eventId: string) => void;
+  event: Partial<AgendaEvent>;
+  onSave: (event: AgendaEvent) => void;
+  onDelete?: (id: string) => void;
 };
 
 export default function EventModal({ isOpen, onClose, event, onSave, onDelete }: Props) {
-  const [title, setTitle] = useState(event.conteudoPrincipal || '');
-  const [profile, setProfile] = useState(event.perfil || 'Confi');
-  const [type, setType] = useState<'Interno' | 'Perfil'>(event.tipo || 'Perfil');
-  const [linkDrive, setLinkDrive] = useState(event.tarefa?.linkDrive || '');
-  const [tarefaTitle, setTarefaTitle] = useState(event.tarefa?.titulo || '');
-  const [tarefaStatus, setTarefaStatus] = useState(event.tarefa?.status || 'Pendente');
+  const [title, setTitle] = useState('');
+  const [profile, setProfile] = useState<Perfil>('Confi');
+  const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
+  const [linkDrive, setLinkDrive] = useState('');
+  const [tarefaTitle, setTarefaTitle] = useState('');
+  const [tarefaStatus, setTarefaStatus] = useState<'Pendente' | 'Concluída'>('Pendente');
 
   useEffect(() => {
     setTitle(event.conteudoPrincipal || '');
@@ -47,58 +51,74 @@ export default function EventModal({ isOpen, onClose, event, onSave, onDelete }:
 
   if (!isOpen) return null;
 
-  const handleSaveClick = () => {
+  function handleSave() {
     if (!title) return alert('Informe o título do evento');
-    const updatedEvent: AgendaEvent = {
-      ...event,
+
+    const newEvent: AgendaEvent = {
+      id: event.id,
+      start: event.start || new Date().toISOString(),
+      end: event.end || new Date().toISOString(),
       conteudoPrincipal: title,
-      perfil: profile,
       tipo: type,
+      perfil: profile,
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
             responsavel: profile,
-            data: event.start,
-            status: tarefaStatus as 'Pendente' | 'Concluída',
+            data: event.start || new Date().toISOString(),
+            status: tarefaStatus,
             linkDrive,
             notificar: 'Sim',
           }
         : null,
     };
-    onSave(updatedEvent, !!event.id);
-  };
 
-  const handleDeleteClick = () => {
+    onSave(newEvent);
+    onClose();
+  }
+
+  function handleDelete() {
+    if (!event.id) return;
     if (confirm('Deseja realmente excluir este evento?')) {
-      onDelete(event.id);
+      onDelete && onDelete(event.id);
+      onClose();
     }
-  };
+  }
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>Evento: {event.conteudoPrincipal}</h3>
+        <h3>Evento/Tarefa</h3>
         <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
-        <select value={profile} onChange={e => setProfile(e.target.value)} style={input}>
+
+        <select value={profile} onChange={e => setProfile(e.target.value as Perfil)} style={input}>
           <option>Confi</option>
           <option>Cecília</option>
           <option>Luiza</option>
           <option>Júlio</option>
         </select>
+
         <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
           <option value="Perfil">Perfil</option>
           <option value="Interno">Interno</option>
         </select>
+
         <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
-        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
         <select value={tarefaStatus} onChange={e => setTarefaStatus(e.target.value as any)} style={input}>
           <option value="Pendente">Pendente</option>
           <option value="Concluída">Concluída</option>
         </select>
 
-        <button onClick={handleSaveClick} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
-        <button onClick={handleDeleteClick} style={{ ...input, marginTop: 5, backgroundColor: '#c71212', color: '#fff' }}>Excluir</button>
-        <button onClick={onClose} style={{ ...input, marginTop: 5 }}>Cancelar</button>
+        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
+          {event.id && (
+            <button onClick={handleDelete} style={{ ...input, backgroundColor: '#ff4d4f', color: '#fff' }}>Excluir</button>
+          )}
+        </div>
+
+        <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>Cancelar</button>
       </div>
     </div>
   );
