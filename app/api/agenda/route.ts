@@ -1,3 +1,4 @@
+// app/api/agenda/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
@@ -5,7 +6,7 @@ const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
 async function accessSheet() {
   await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+    client_email: process.env.GOOGLE_CLIENT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
@@ -14,78 +15,66 @@ async function accessSheet() {
   return { agendaSheet, tarefasSheet };
 }
 
+// GET: retorna eventos da aba Agenda
 export async function GET() {
   try {
-    const { agendaSheet, tarefasSheet } = await accessSheet();
-    const agendaRows = await agendaSheet.getRows();
-    const tarefasRows = await tarefasSheet.getRows();
+    const { agendaSheet } = await accessSheet();
+    const rows = await agendaSheet.getRows();
 
-    const agenda = agendaRows.map(r => ({
-      Data_Inicio: r.Data_Inicio,
-      Data_Fim: r.Data_Fim,
-      Tipo_Evento: r.Tipo_Evento,
-      Tipo: r.Tipo,
-      Conteudo_Principal: r.Conteudo_Principal,
-      Conteudo_Secundario: r.Conteudo_Secundario,
-      CTA: r.CTA,
-      Status_Postagem: r.Status_Postagem,
-      Perfil: r.Perfil,
+    const events = rows.map(row => ({
+      Data_Inicio: row.Data_Inicio,
+      Data_Fim: row.Data_Fim,
+      Tipo_Evento: row.Tipo_Evento,
+      Tipo: row.Tipo,
+      Conteudo_Principal: row.Conteudo_Principal,
+      Conteudo_Secundario: row.Conteudo_Secundario,
+      CTA: row.CTA,
+      Status_Postagem: row.Status_Postagem,
+      Perfil: row.Perfil,
+      LinkDrive: row.LinkDrive || '',
     }));
 
-    const tarefas = tarefasRows.map(r => ({
-      Bloco_ID: r.Bloco_ID,
-      Titulo: r.Titulo,
-      Responsavel: r.Responsavel,
-      Data: r.Data,
-      Status: r.Status,
-      LinkDrive: r.LinkDrive,
-      Notificar: r.Notificar,
-    }));
-
-    return NextResponse.json({ agenda, tarefas });
+    return NextResponse.json({ Agenda: events });
   } catch (err) {
-    console.error('Erro GET /api/agenda', err);
-    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
+    console.error('Erro GET agenda:', err);
+    return NextResponse.json({ error: 'Erro ao buscar agenda' }, { status: 500 });
   }
 }
 
+// POST: adiciona novo evento na Agenda e Tarefas
 export async function POST(req: NextRequest) {
   try {
+    const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSheet();
-    const body = await req.json();
 
-    // Criar linha na Agenda
-    const newRow = {
-      Data_Inicio: body.Data_Inicio,
-      Data_Fim: body.Data_Fim,
-      Tipo_Evento: body.Tipo_Evento,
-      Tipo: body.Tipo,
-      Conteudo_Principal: body.Conteudo_Principal,
-      Conteudo_Secundario: body.Conteudo_Secundario,
-      CTA: body.CTA,
-      Status_Postagem: body.Status_Postagem || 'Pendente',
-      Perfil: body.Perfil,
-    };
-    await agendaSheet.addRow(newRow);
+    // Adiciona na Agenda
+    const newRow = await agendaSheet.addRow({
+      Data_Inicio: data.start,
+      Data_Fim: data.end,
+      Tipo_Evento: data.Tipo_Evento,
+      Tipo: data.Tipo,
+      Conteudo_Principal: data.Conteudo_Principal,
+      Conteudo_Secundario: data.Conteudo_Secundario,
+      CTA: data.CTA,
+      Status_Postagem: 'Pendente',
+      Perfil: data.Perfil,
+      LinkDrive: data.LinkDrive || '',
+    });
 
-    // Criar linha na Tarefas vinculada ao bloco
-    if (body.Tarefas && body.Tarefas.length > 0) {
-      for (const tarefa of body.Tarefas) {
-        await tarefasSheet.addRow({
-          Bloco_ID: new Date().getTime().toString(),
-          Titulo: tarefa.Titulo,
-          Responsavel: tarefa.Responsavel,
-          Data: tarefa.Data,
-          Status: tarefa.Status || 'Pendente',
-          LinkDrive: tarefa.LinkDrive || '',
-          Notificar: tarefa.Notificar || 'Sim',
-        });
-      }
-    }
+    // Cria tarefa correspondente (um bloco por evento)
+    await tarefasSheet.addRow({
+      Bloco_ID: newRow._rowNumber,
+      Titulo: data.Conteudo_Principal,
+      Responsavel: data.Perfil,
+      Data: data.start,
+      Status: 'Pendente',
+      LinkDrive: data.LinkDrive || '',
+      Notificar: 'Sim',
+    });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, event: newRow });
   } catch (err) {
-    console.error('Erro POST /api/agenda', err);
-    return NextResponse.json({ error: 'Erro ao salvar evento' }, { status: 500 });
+    console.error('Erro POST agenda:', err);
+    return NextResponse.json({ error: 'Erro ao adicionar evento' }, { status: 500 });
   }
 }
