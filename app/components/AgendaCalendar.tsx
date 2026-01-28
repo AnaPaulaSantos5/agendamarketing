@@ -2,108 +2,98 @@
 
 import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
+import { DateSelectArg, EventInput, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventInput } from '@fullcalendar/core';
 
-type AgendaItem = {
-  Data: string;
-  Tipo: string;
-  Conteudo_Principal: string;
-  Conteudo_Secundario?: string;
-  CTA?: string;
-  Status_Postagem: string;
-  Perfil: string;
-  LinkDrive?: string;
-};
+type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-const PROFILES = ['Todos', 'Confi Seguros', 'Cecília', 'Luiza', 'Júlio'];
+const profiles: Profile[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<EventInput[]>([]);
-  const [profileFilter, setProfileFilter] = useState('Todos');
+  const [filterProfile, setFilterProfile] = useState<Profile>('Confi');
 
-  useEffect(() => {
-    async function loadAgenda() {
-      try {
-        const res = await fetch('/api/agenda');
-        const json = await res.json();
+  /**
+   * 🔹 CRIAR EVENTO AO SELECIONAR DATA/HORÁRIO
+   */
+  function handleDateSelect(selectInfo: DateSelectArg) {
+    const title = prompt('Digite a tarefa / conteúdo:');
 
-        if (!json?.Agenda) return;
-
-        const parsed: EventInput[] = json.Agenda.map(
-          (item: AgendaItem, index: number) => {
-            const [day, month, year] = item.Data.split('/');
-            const isoDate = `20${year}-${month}-${day}`;
-
-            return {
-              id: String(index),
-              title: `${item.Tipo} — ${item.Conteudo_Principal}`,
-              start: isoDate,
-              end: isoDate,
-              extendedProps: {
-                profile: item.Perfil,
-                status: item.Status_Postagem,
-                linkDrive: item.LinkDrive || '',
-              },
-            };
-          }
-        );
-
-        setEvents(parsed);
-      } catch (err) {
-        console.error('Erro ao carregar agenda', err);
-      }
+    if (!title) {
+      selectInfo.view.calendar.unselect();
+      return;
     }
 
-    loadAgenda();
-  }, []);
+    const newEvent: EventInput = {
+      id: String(Date.now()),
+      title,
+      start: selectInfo.startStr,
+      end: selectInfo.endStr,
+      extendedProps: {
+        profile: filterProfile,
+        status: 'Pendente',
+        linkDrive: '',
+      },
+    };
 
-  const filteredEvents =
-    profileFilter === 'Todos'
-      ? events
-      : events.filter(
-          (e) => e.extendedProps?.profile === profileFilter
-        );
+    setEvents(prev => [...prev, newEvent]);
+  }
+
+  /**
+   * 🔹 CLICAR NO EVENTO
+   */
+  function handleEventClick(clickInfo: EventClickArg) {
+    const link = clickInfo.event.extendedProps.linkDrive;
+
+    alert(
+      `Tarefa: ${clickInfo.event.title}\n` +
+      `Perfil: ${clickInfo.event.extendedProps.profile}\n` +
+      `Status: ${clickInfo.event.extendedProps.status}\n` +
+      (link ? `Roteiro: ${link}` : 'Sem roteiro ainda')
+    );
+  }
+
+  /**
+   * 🔹 FILTRO POR PERFIL
+   */
+  const filteredEvents = events.filter(
+    (event: any) => event.extendedProps?.profile === filterProfile
+  );
 
   return (
     <div style={{ padding: 20 }}>
-      <h2 style={{ marginBottom: 10 }}>Agenda de Conteúdo</h2>
+      {/* FILTRO */}
+      <div style={{ marginBottom: 16 }}>
+        <label>Perfil:&nbsp;</label>
+        <select
+          value={filterProfile}
+          onChange={(e) => setFilterProfile(e.target.value as Profile)}
+        >
+          {profiles.map(profile => (
+            <option key={profile} value={profile}>
+              {profile}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        value={profileFilter}
-        onChange={(e) => setProfileFilter(e.target.value)}
-        style={{ marginBottom: 20, padding: 6 }}
-      >
-        {PROFILES.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-
+      {/* CALENDÁRIO */}
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
-        locale="pt-br"
+        selectable={true}
+        editable={true}
+        select={handleDateSelect}
+        eventClick={handleEventClick}
+        events={filteredEvents}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
-        events={filteredEvents}
-        editable
-        selectable
-        eventClick={(info) => {
-          const { profile, status, linkDrive } = info.event.extendedProps;
-
-          alert(
-            `Perfil: ${profile}\nStatus: ${status}\nRoteiro: ${
-              linkDrive || 'Não informado'
-            }`
-          );
-        }}
+        height="auto"
       />
     </div>
   );
