@@ -1,21 +1,19 @@
+// Perfis disponíveis na agenda
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-export type AgendaEvent = {
+// Itens de checklist para cada evento
+export type TarefaItem = {
   id: string;
-  start: string; // ISO string com hora
-  end: string;   // ISO string com hora
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
-  perfil?: Perfil;
-  tarefa?: TarefaItem;
+  texto: string;
+  feito: boolean;
 };
 
-export type TarefaItem = {
-  titulo: string;
-  responsavel: Perfil;
-  data: string;        // ISO string
-  status: 'Pendente' | 'Concluída';
-  linkDrive?: string;
-  notificar?: 'Sim' | 'Não';
+// Evento da agenda
+export type AgendaEvent = {
+  id: string;
+  title: string;           // Título do evento
+  start: string;           // ISO string
+  end: string;             // ISO string
+  perfil: Perfil;
+  checklist: TarefaItem[];
 };
