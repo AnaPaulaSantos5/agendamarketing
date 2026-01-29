@@ -48,6 +48,7 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 
   const handleSave = () => {
     if (!title) return alert('Informe o título do evento');
+
     const ev: AgendaEvent = {
       id: event?.id || String(new Date().getTime()),
       start: startDate,
@@ -58,14 +59,14 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
-            responsavel: perfil,
-            data: startDate,
             status: event?.tarefa?.status || 'Pendente',
+            data: startDate,
             linkDrive,
             notificar: 'Sim',
           }
         : null,
     };
+
     onSave(ev, !!event);
     onClose();
   };
@@ -83,9 +84,7 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
         <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
 
         {event && !editing && (
-          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
-            ✏️ Editar
-          </button>
+          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>✏️ Editar</button>
         )}
 
         <div>
@@ -94,16 +93,16 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 
           <label>Perfil:</label>
           <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} disabled={!editing} style={input}>
-            <option value="Confi">Confi</option>
-            <option value="Cecília">Cecília</option>
-            <option value="Luiza">Luiza</option>
-            <option value="Júlio">Júlio</option>
+            <option>Confi</option>
+            <option>Cecília</option>
+            <option>Luiza</option>
+            <option>Júlio</option>
           </select>
 
           <label>Tipo:</label>
-          <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={input}>
-            <option value="Perfil">Perfil</option>
-            <option value="Interno">Interno</option>
+          <select value={tipo} onChange={e => setTipo(e.target.value as 'Interno' | 'Perfil')} disabled={!editing} style={input}>
+            <option>Perfil</option>
+            <option>Interno</option>
           </select>
 
           <label>Tarefa:</label>
@@ -119,10 +118,10 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
           <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!editing} style={input} />
         </div>
 
-        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ marginTop: 10 }}>
           <button onClick={handleSave}>Salvar</button>
-          <button onClick={onClose}>Fechar</button>
-          {event && <button onClick={handleDelete}>Excluir</button>}
+          <button onClick={onClose} style={{ marginLeft: 10 }}>Fechar</button>
+          {event && <button onClick={handleDelete} style={{ marginLeft: 10 }}>Excluir</button>}
         </div>
       </div>
     </div>
