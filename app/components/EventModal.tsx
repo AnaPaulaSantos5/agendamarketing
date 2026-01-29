@@ -113,6 +113,3 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 };
 const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
 const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
-const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
