@@ -1,7 +1,6 @@
 'use client'
 
-import { AgendaItem, Perfil } from '../types/agenda'
-import { useState } from 'react'
+import { AgendaItem } from '../types'
 
 type Props = {
   item: AgendaItem
@@ -10,89 +9,45 @@ type Props = {
   onClose: () => void
 }
 
-export default function EventModal({
-  item,
-  onSave,
-  onDelete,
-  onClose
-}: Props) {
-  const [data, setData] = useState<AgendaItem>(item)
+export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
+  function update(field: keyof AgendaItem, value: any) {
+    onSave({ ...item, [field]: value })
+  }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0,0,0,.4)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <div style={{ background: '#fff', padding: 20, width: 420 }}>
-        <h3>{item.title || 'Novo item'}</h3>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+      <div className="bg-white p-4 w-[400px] space-y-2">
+        <h2 className="font-bold">Evento</h2>
 
-        <input
-          placeholder="Título"
-          value={data.title}
-          onChange={e => setData({ ...data, title: e.target.value })}
-        />
+        <input type="datetime-local" value={item.dataInicio}
+          onChange={e => update('dataInicio', e.target.value)} />
 
-        <select
-          value={data.category}
-          onChange={e => setData({ ...data, category: e.target.value as any })}
-        >
-          <option value="evento">Evento</option>
-          <option value="tarefa">Tarefa</option>
-        </select>
+        <input type="datetime-local" value={item.dataFim}
+          onChange={e => update('dataFim', e.target.value)} />
 
-        <select
-          value={data.visibility}
-          onChange={e => setData({ ...data, visibility: e.target.value as any })}
-        >
-          <option value="interno">Interno</option>
-          <option value="perfil">Perfil</option>
-        </select>
+        <input placeholder="Tipo Evento"
+          value={item.tipoEvento}
+          onChange={e => update('tipoEvento', e.target.value)} />
 
-        {data.visibility === 'perfil' && (
-          <select
-            value={data.perfil}
-            onChange={e =>
-              setData({ ...data, perfil: e.target.value as Perfil })
-            }
-          >
-            <option value="Confi">Confi</option>
-            <option value="Luiza">Luiza</option>
-            <option value="Cecília">Cecília</option>
-            <option value="Júlio">Júlio</option>
-          </select>
-        )}
+        <input placeholder="Conteúdo Principal"
+          value={item.conteudoPrincipal}
+          onChange={e => update('conteudoPrincipal', e.target.value)} />
 
-        <textarea
-          placeholder="Conteúdo principal"
-          value={data.conteudoPrincipal || ''}
-          onChange={e =>
-            setData({ ...data, conteudoPrincipal: e.target.value })
-          }
-        />
+        <input placeholder="CTA"
+          value={item.cta}
+          onChange={e => update('cta', e.target.value)} />
 
-        <textarea
-          placeholder="Conteúdo secundário"
-          value={data.conteudoSecundario || ''}
-          onChange={e =>
-            setData({ ...data, conteudoSecundario: e.target.value })
-          }
-        />
+        <input placeholder="Perfil"
+          value={item.perfil}
+          onChange={e => update('perfil', e.target.value)} />
 
-        <input
-          placeholder="Link do Drive"
-          value={data.linkDrive || ''}
-          onChange={e =>
-            setData({ ...data, linkDrive: e.target.value })
-          }
-        />
+        <input placeholder="Link Drive"
+          value={item.linkDrive}
+          onChange={e => update('linkDrive', e.target.value)} />
 
-        <div style={{ marginTop: 12 }}>
-          <button onClick={() => onSave(data)}>Salvar</button>
-          <button onClick={() => onDelete(data.id)}>Excluir</button>
+        <div className="flex gap-2">
+          <button onClick={() => onSave(item)}>Salvar</button>
+          <button onClick={() => onDelete(item.id)}>Excluir</button>
           <button onClick={onClose}>Fechar</button>
         </div>
       </div>
