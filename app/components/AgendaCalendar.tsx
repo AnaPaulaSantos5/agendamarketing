@@ -15,7 +15,10 @@ export type AgendaEvent = {
   tipoEvento?: string;
   tipo?: string;
   conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  cta?: string;
   perfil?: Perfil;
+  statusPostagem?: string;
   tarefa?: any;
   allDay?: boolean;
 };
@@ -40,7 +43,6 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos da agenda
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -51,11 +53,7 @@ export default function AgendaCalendar() {
         console.error(err);
       }
     }
-    fetchEvents();
-  }, []);
 
-  // Busca checklist
-  useEffect(() => {
     async function fetchChecklist() {
       try {
         const res = await fetch('/api/checklist');
@@ -65,6 +63,8 @@ export default function AgendaCalendar() {
         console.error(err);
       }
     }
+
+    fetchEvents();
     fetchChecklist();
   }, []);
 
@@ -88,6 +88,22 @@ export default function AgendaCalendar() {
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
+    }
+  };
+
+  const deleteEvent = async (ev: AgendaEvent) => {
+    if (!confirm('Deseja realmente excluir este evento?')) return;
+    try {
+      await fetch('/api/agenda', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ev.id }),
+      });
+      setEvents(prev => prev.filter(e => e.id !== ev.id));
+      setModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir evento');
     }
   };
 
@@ -155,7 +171,7 @@ export default function AgendaCalendar() {
         />
       </div>
 
-      {/* Checklist */}
+      {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
         {checklist
@@ -172,7 +188,7 @@ export default function AgendaCalendar() {
           ))}
       </div>
 
-      {/* Modal */}
+      {/* Modal do evento */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
@@ -181,6 +197,7 @@ export default function AgendaCalendar() {
           end={selectedDate.end}
           event={selectedEvent}
           onSave={saveEvent}
+          onDelete={deleteEvent}
         />
       )}
     </div>
