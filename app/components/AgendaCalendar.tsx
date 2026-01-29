@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
 export type AgendaEvent = {
   id: string;
   start: string;
@@ -19,10 +20,19 @@ export type AgendaEvent = {
   allDay?: boolean;
 };
 
+export type ChecklistItem = {
+  ID: string;
+  Data: string;
+  Cliente: string;
+  Tarefa: string;
+  Done: string;
+};
+
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -30,6 +40,7 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Busca eventos da agenda
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -41,6 +52,20 @@ export default function AgendaCalendar() {
       }
     }
     fetchEvents();
+  }, []);
+
+  // Busca checklist
+  useEffect(() => {
+    async function fetchChecklist() {
+      try {
+        const res = await fetch('/api/checklist');
+        const data = await res.json();
+        setChecklist(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchChecklist();
   }, []);
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
@@ -66,21 +91,34 @@ export default function AgendaCalendar() {
     }
   };
 
+  const updateChecklistItem = async (item: ChecklistItem, done: boolean) => {
+    try {
+      await fetch('/api/checklist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.ID, done }),
+      });
+      setChecklist(prev => prev.map(c => (c.ID === item.ID ? { ...c, Done: done ? 'Sim' : 'Não' } : c)));
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao atualizar checklist');
+    }
+  };
+
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 3 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
-              <option key={p}>{p}</option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
         </div>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -118,37 +156,20 @@ export default function AgendaCalendar() {
       </div>
 
       {/* Checklist */}
-      <div style={{ width: 250, padding: 10, borderLeft: '1px solid #ccc' }}>
-        <h4>Checklist Hoje</h4>
-        <ul>
-          {events
-            .filter(e => e.start.slice(0, 10) === today && e.tarefa)
-            .map(e => (
-              <li key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  {e.tarefa.titulo} ({e.tipoEvento}) - {e.tarefa.status}
-                </span>
-                <div>
-                  <button
-                    onClick={() =>
-                      saveEvent({ ...e, tarefa: { ...e.tarefa, status: 'Concluída' } }, true)
-                    }
-                  >
-                    ✅
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedEvent(e);
-                      setSelectedDate({ start: e.start, end: e.end });
-                      setModalOpen(true);
-                    }}
-                  >
-                    ✏️
-                  </button>
-                </div>
-              </li>
-            ))}
-        </ul>
+      <div style={{ flex: 1 }}>
+        <h3>Checklist Hoje</h3>
+        {checklist
+          .filter(item => item.Data === today)
+          .map(item => (
+            <div key={item.ID} style={{ marginBottom: 10, border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
+              <strong>{item.Tarefa}</strong> ({item.Cliente}) - {item.Done}
+              <div style={{ marginTop: 5 }}>
+                {item.Done !== 'Sim' && (
+                  <button onClick={() => updateChecklistItem(item, true)}>✅ Concluir</button>
+                )}
+              </div>
+            </div>
+          ))}
       </div>
 
       {/* Modal */}
