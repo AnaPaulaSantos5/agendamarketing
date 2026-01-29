@@ -8,12 +8,14 @@ export type AgendaEvent = {
   tipo?: string;
   conteudoPrincipal?: string;
   perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-  };
+  tarefa?: TarefaItem;
+};
+
+export type TarefaItem = {
+  titulo: string;
+  responsavel: Perfil;
+  data: string;        // ISO string
+  status: 'Pendente' | 'Concluída';
+  linkDrive?: string;
+  notificar?: 'Sim' | 'Não';
 };
