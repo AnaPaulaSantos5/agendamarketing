@@ -1,92 +1,68 @@
-'use client';
-import React, { useState } from 'react';
-import { AgendaEvent, Perfil } from '../types';
-import { v4 as uuid } from 'uuid';
+import { useState } from 'react';
+import { AgendaEvent, Perfil, TarefaItem } from '@/app/types';
 
 type Props = {
   isOpen: boolean;
-  onClose: () => void;
-  onSave: (event: AgendaEvent) => void;
   start: string;
   end: string;
+  perfil: Perfil;
+  checklist: TarefaItem[];
+  onSave: (event: AgendaEvent) => void;
+  onClose: () => void;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, start, end }: Props) {
-  const [title, setTitle] = useState('');
-  const [profile, setProfile] = useState<Perfil>('Confi');
-  const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [linkDrive, setLinkDrive] = useState('');
-  const [tarefaTitle, setTarefaTitle] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
+export default function EventModal({ isOpen, start, end, perfil, checklist, onSave, onClose }: Props) {
+  const [conteudoPrincipal, setConteudoPrincipal] = useState('');
+  const [startTime, setStartTime] = useState(start.slice(11,16)); // 'HH:mm'
+  const [endTime, setEndTime] = useState(end.slice(11,16));
+  const [tarefas, setTarefas] = useState<TarefaItem[]>(checklist);
 
   if (!isOpen) return null;
 
-  function handleSave() {
-    if (!title) return alert('Informe o título do evento');
+  function save() {
+    if (!conteudoPrincipal) return alert('Preencha o título do evento');
 
-    const newEvent: AgendaEvent = {
-      id: uuid(),
-      start: `${start}T${startTime}`,
-      end: `${end}T${endTime}`,
-      tipoEvento: type,
-      conteudoPrincipal: title,
-      perfil: profile,
-      tarefa: tarefaTitle
-        ? {
-            titulo: tarefaTitle,
-            responsavel: profile,
-            data: `${start}T${startTime}`,
-            status: 'Pendente',
-            linkDrive,
-            notificar: 'Sim',
-          }
-        : undefined,
-    };
-
-    onSave(newEvent);
+    onSave({
+      id: Date.now().toString(),
+      title: conteudoPrincipal,
+      start: `${start.slice(0,10)}T${startTime}`,
+      end: `${start.slice(0,10)}T${endTime}`,
+      perfil,
+      checklist: tarefas,
+    });
     onClose();
+  }
 
-    // reset
-    setTitle('');
-    setTarefaTitle('');
-    setLinkDrive('');
-    setStartTime('09:00');
-    setEndTime('10:00');
+  function toggleTarefa(id: string) {
+    setTarefas(prev => prev.map(t => t.id === id ? { ...t, feito: !t.feito } : t));
   }
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        <h3>Novo Evento/Tarefa</h3>
+    <div className="modal-backdrop">
+      <div className="modal-content">
+        <h2>Novo Evento</h2>
+        <input
+          type="text"
+          placeholder="Título do evento"
+          value={conteudoPrincipal}
+          onChange={e => setConteudoPrincipal(e.target.value)}
+        />
+        <label>Início</label>
+        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+        <label>Fim</label>
+        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
 
-        <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
+        <h3>Checklist</h3>
+        {tarefas.map(t => (
+          <div key={t.id}>
+            <input type="checkbox" checked={t.feito} onChange={() => toggleTarefa(t.id)} />
+            <span>{t.texto}</span>
+          </div>
+        ))}
 
-        <select value={profile} onChange={e => setProfile(e.target.value as Perfil)} style={input}>
-          <option value="Confi">Confi</option>
-          <option value="Cecília">Cecília</option>
-          <option value="Luiza">Luiza</option>
-          <option value="Júlio">Júlio</option>
-        </select>
-
-        <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
-          <option value="Perfil">Perfil</option>
-          <option value="Interno">Interno</option>
-        </select>
-
-        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={input} />
-        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={input} />
-
-        <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
-        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
-
-        <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
-        <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>Cancelar</button>
+        <button onClick={save}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
       </div>
     </div>
   );
 }
-
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
-const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
