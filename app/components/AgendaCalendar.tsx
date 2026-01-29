@@ -1,64 +1,60 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useState } from 'react'
-import { AgendaEvent } from '@/app/types/agenda'
+
+import { AgendaEvent } from '@/app/types'
 import EventModal from './EventModal'
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([])
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null)
 
-  function handleDateClick(info: any) {
-    setSelectedEvent({
-      id: crypto.randomUUID(),
-      title: '',
-      date: info.dateStr,
-      tipo: 'tarefa',
-      status: 'pendente',
-      perfil: 'Confi',
-    })
-  }
-
-  function handleEventClick(info: any) {
-    const ev = events.find(e => e.id === info.event.id)
-    if (ev) setSelectedEvent(ev)
-  }
+  useEffect(() => {
+    fetch('/api/agenda')
+      .then((r) => r.json())
+      .then(setEvents)
+  }, [])
 
   function handleSave(ev: AgendaEvent) {
-    setEvents(prev => {
-      const exists = prev.find(e => e.id === ev.id)
-      if (exists) {
-        return prev.map(e => (e.id === ev.id ? ev : e))
-      }
-      return [...prev, ev]
-    })
-    setSelectedEvent(null)
+    setEvents((prev) =>
+      prev.some((e) => e.id === ev.id)
+        ? prev.map((e) => (e.id === ev.id ? ev : e))
+        : [...prev, { ...ev, id: crypto.randomUUID() }]
+    )
   }
 
   function handleDelete(id: string) {
-    setEvents(prev => prev.filter(e => e.id !== id))
+    setEvents((prev) => prev.filter((e) => e.id !== id))
     setSelectedEvent(null)
   }
 
   return (
-    <>
+    <div className="p-4">
       <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        events={events.map(e => ({
+        events={events.map((e) => ({
           id: e.id,
           title: e.title,
-          start: e.start ?? e.date,
-          end: e.end,
-          allDay: e.allDay,
+          date: e.date,
         }))}
-        dateClick={handleDateClick}
-        eventClick={handleEventClick}
-        height="auto"
+        dateClick={(info) =>
+          setSelectedEvent({
+            id: '',
+            title: '',
+            date: info.dateStr,
+            tipo: 'tarefa',
+            status: 'pendente',
+            perfil: 'Confi',
+          })
+        }
+        eventClick={(info) => {
+          const ev = events.find((e) => e.id === info.event.id)
+          if (ev) setSelectedEvent(ev)
+        }}
       />
 
       {selectedEvent && (
@@ -69,6 +65,6 @@ export default function AgendaCalendar() {
           onDelete={handleDelete}
         />
       )}
-    </>
+    </div>
   )
 }
