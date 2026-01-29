@@ -1,13 +1,16 @@
-export type ChecklistItem = {
-  id: string
-  text: string
-  done: boolean
-  time?: string
-}
-
-export type AgendaEvent = {
-  date: string
-  title: string
-  time: string
-  client: string
-}
+type AgendaEvent = {
+  id: string;
+  dateStart: string;
+  dateEnd?: string;
+  tipoEvento: string; // Ex: 'Evento', 'Tarefa'
+  tarefa?: {
+    titulo: string;
+    responsavel?: string;
+    status?: 'Pendente' | 'Concluído';
+    linkDrive?: string;
+    notificar?: string;
+  };
+  conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  perfil?: string;
+};
