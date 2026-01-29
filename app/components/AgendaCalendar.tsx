@@ -64,7 +64,7 @@ export default function AgendaCalendar() {
     fetchEvents();
   }, []);
 
-  // Busca checklist combinada (Checklist + Agenda + Tarefas)
+  // Busca checklist combinando todas as abas
   useEffect(() => {
     async function fetchChecklist() {
       try {
@@ -136,26 +136,20 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
   const todayChecklist = checklist.filter(c => {
-    const checkDate = new Date(c.date);
-    const todayDate = new Date(today);
-    return (
-      checkDate.getFullYear() === todayDate.getFullYear() &&
-      checkDate.getMonth() === todayDate.getMonth() &&
-      checkDate.getDate() === todayDate.getDate()
-    );
+    // Ajusta para datas do tipo "DD/MM/AA" ou ISO
+    const cDate = c.date.includes('/') ? c.date.split('/').reverse().join('-') : c.date;
+    return cDate.slice(0, 10) === today;
   });
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
-      <div style={{ flex: 2 }}>
+      <div style={{ flex: 3 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
-              <option key={p} value={p}>
-                {p}
-              </option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
         </div>
@@ -197,16 +191,18 @@ export default function AgendaCalendar() {
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
+      <div style={{ flex: 1, border: '1px solid #ccc', padding: 10, borderRadius: 8, maxHeight: '80vh', overflowY: 'auto' }}>
         <h3>Checklist Hoje</h3>
-        {todayChecklist.length === 0 && <p>Nenhum item para hoje</p>}
-        <ul>
+        {todayChecklist.length === 0 && <p>Nenhuma tarefa para hoje</p>}
+        <ul style={{ listStyle: 'none', padding: 0 }}>
           {todayChecklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 6 }}>
-              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
-              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>
-                ✅
-              </button>
+            <li key={item.id} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+              </div>
+              <div>
+                <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+              </div>
             </li>
           ))}
         </ul>
