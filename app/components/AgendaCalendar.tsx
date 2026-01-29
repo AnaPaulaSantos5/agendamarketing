@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
 export type AgendaEvent = {
   id: string;
   start: string;
@@ -18,10 +19,24 @@ export type AgendaEvent = {
   cta?: string;
   statusPostagem?: string;
   perfil?: Perfil;
-  tarefa?: { titulo: string; responsavel: Perfil; data: string; status: string; linkDrive?: string; notificar?: string } | null;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
   allDay?: boolean;
 };
-export type ChecklistItem = { id: string; date: string; client: string; task: string; done: boolean };
+
+export type ChecklistItem = {
+  id: string;
+  date: string;
+  client: string;
+  task: string;
+  done: boolean;
+};
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
@@ -32,7 +47,15 @@ export default function AgendaCalendar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+
   const today = new Date().toISOString().slice(0, 10);
+
+  // Função para converter DD/MM/YY → YYYY-MM-DD
+  const parseDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [day, month, year] = dateStr.split('/');
+    return `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
 
   // Busca eventos
   useEffect(() => {
@@ -119,25 +142,34 @@ export default function AgendaCalendar() {
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
+
+  // Filtra checklist de hoje
+  const todayChecklist = checklist.filter(c => parseDate(c.date) === today);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
-      {/* Calendário */}
       <div style={{ flex: 1 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => <option key={p}>{p}</option>)}
+            {profiles.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
           </select>
         </div>
+
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-          selectable={true}
-          editable={true}
-          events={filteredEvents.map(ev => ({ id: ev.id, title: ev.conteudoPrincipal, start: ev.start, end: ev.end }))}
+          selectable
+          editable
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.conteudoPrincipal,
+            start: ev.start,
+            end: ev.end,
+          }))}
           select={info => {
             setSelectedEvent(null);
             setSelectedDate({ start: info.startStr, end: info.endStr });
@@ -163,11 +195,14 @@ export default function AgendaCalendar() {
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ width: 300, border: '1px solid #ccc', padding: 10 }}>
+      <div style={{ width: 300, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
         <h3>Checklist Hoje</h3>
+        {todayChecklist.length === 0 && <p>Nenhuma tarefa hoje</p>}
         {todayChecklist.map(item => (
-          <div key={item.id} style={{ marginBottom: 10 }}>
-            <span>{item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}</span>
+          <div key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ flex: 1 }}>
+              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+            </span>
             <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
           </div>
         ))}
