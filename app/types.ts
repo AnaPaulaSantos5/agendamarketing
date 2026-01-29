@@ -1,22 +1,18 @@
-// Perfis disponíveis na agenda
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+export type Perfil = 'Confi Finanças' | 'Confi Seguros' | 'Confi Benefícios';
 
-// Itens de checklist para cada evento
-// app/types.ts
-export type TarefaItem = {
+export interface TarefaItem {
   id: string;
   texto: string;
-  status?: string;
+  feito: boolean;
+  status: 'Pendente' | 'Concluída';
   responsavel?: string;
-  feito?: boolean; // <- adiciona aqui
-};
+}
 
-// Evento da agenda
-export type AgendaEvent = {
+export interface AgendaEvent {
   id: string;
-  title: string;           // Título do evento
-  start: string;           // ISO string
-  end: string;             // ISO string
+  conteudoPrincipal: string;
   perfil: Perfil;
   checklist: TarefaItem[];
-};
+  start: string; // ISO string
+  end: string;   // ISO string
+}
