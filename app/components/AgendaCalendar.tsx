@@ -30,18 +30,27 @@ export type AgendaEvent = {
   allDay?: boolean;
 };
 
+export type ChecklistItem = {
+  id: string;
+  date: string;
+  client: string;
+  task: string;
+  done: boolean;
+};
+
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [filterProfile, setFilterProfile] = useState('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos
+  // Busca eventos da Agenda
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -53,6 +62,20 @@ export default function AgendaCalendar() {
       }
     }
     fetchEvents();
+  }, []);
+
+  // Busca itens do Checklist
+  useEffect(() => {
+    async function fetchChecklist() {
+      try {
+        const res = await fetch('/api/checklist');
+        const data = await res.json();
+        setChecklist(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchChecklist();
   }, []);
 
   // Salvar ou editar evento
@@ -95,20 +118,35 @@ export default function AgendaCalendar() {
     }
   };
 
+  // Marcar item do checklist como concluído
+  const completeChecklistItem = async (item: ChecklistItem) => {
+    try {
+      await fetch('/api/checklist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, done: true }),
+      });
+      setChecklist(prev => prev.map(i => (i.id === item.id ? { ...i, done: true } : i)));
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao atualizar checklist');
+    }
+  };
+
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
   return (
-    <div style={{ display: 'flex', gap: '20px' }}>
+    <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
       <div style={{ flex: 3 }}>
-        <label>
+        <div style={{ marginBottom: 10 }}>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-        </label>
+        </div>
 
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -149,27 +187,19 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
-        {events
-          .filter(e => e.tarefa && new Date(e.start).toLocaleDateString() === new Date(today).toLocaleDateString())
-          .map(e => (
-            <div key={e.id} style={{ marginBottom: 8 }}>
-              <span>{e.tarefa?.titulo} ({e.tipoEvento}) - {e.tarefa?.status}</span>
-              <button
-                onClick={() =>
-                  saveEvent({ ...e, tarefa: { ...e.tarefa!, status: 'Concluída' } }, true)
-                }
-              >
-                ✅
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedEvent(e);
-                  setSelectedDate({ start: e.start, end: e.end });
-                  setModalOpen(true);
-                }}
-              >
-                ✏️
-              </button>
+        {checklist
+          .filter(item => new Date(item.date).toISOString().slice(0, 10) === today)
+          .map(item => (
+            <div key={item.id} style={{ marginBottom: 8 }}>
+              <span>{item.client} - {item.task} [{item.done ? '✅' : '❌'}]</span>
+              {!item.done && (
+                <button
+                  style={{ marginLeft: 8 }}
+                  onClick={() => completeChecklistItem(item)}
+                >
+                  ✅
+                </button>
+              )}
             </div>
           ))}
       </div>
