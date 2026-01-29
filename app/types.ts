@@ -5,7 +5,8 @@ export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 export type TarefaItem = {
   id: string;
   texto: string;
-  feito: boolean;
+  status?: string;
+  responsavel?: string;
 };
 
 // Evento da agenda
