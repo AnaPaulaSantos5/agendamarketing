@@ -12,22 +12,9 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-  tipoEvento?: string;
-  tipo?: string;
   conteudoPrincipal?: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-  } | null;
-  allDay?: boolean;
+  tarefa?: { titulo: string; status: string; data: string } | null;
 };
 
 export type ChecklistItem = {
@@ -50,91 +37,58 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Função para converter DD/MM/YY → YYYY-MM-DD
   const parseDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const [day, month, year] = dateStr.split('/');
-    return `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      if (dateStr.includes('/')) return `20${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      return `${parts[0]}-${parts[1]}-${parts[2]}`;
+    }
+    return '';
   };
 
-  // Busca eventos
-  useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data = await res.json();
-        setEvents(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchEvents();
-  }, []);
-
-  // Busca checklist
+  // Busca dados da planilha e monta checklist
   useEffect(() => {
     async function fetchChecklist() {
       try {
         const res = await fetch('/api/checklist');
-        const data = await res.json();
-        setChecklist(data);
+        const data: ChecklistItem[] = await res.json();
+
+        // Adiciona tarefas do Agenda e Tarefas que ainda não estão na aba Checklist
+        const newItems: ChecklistItem[] = [];
+
+        // Converte eventos com tarefas em checklist
+        const agendaTasks = events
+          .filter(e => e.tarefa)
+          .map(e => ({
+            id: e.id,
+            date: e.start,
+            client: e.perfil || 'Confi',
+            task: e.tarefa!.titulo,
+            done: e.tarefa!.status === 'Concluída',
+          }));
+
+        agendaTasks.forEach(task => {
+          if (!data.find(d => d.id === task.id)) newItems.push(task);
+        });
+
+        setChecklist([...data, ...newItems]);
       } catch (err) {
         console.error(err);
       }
     }
     fetchChecklist();
-  }, []);
+  }, [events]);
 
-  // Salvar ou editar evento
-  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    try {
-      if (isEdit) {
-        await fetch('/api/agenda', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-      } else {
-        await fetch('/api/agenda', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => [...prev, ev]);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar evento');
-    }
-  };
-
-  // Excluir evento
-  const deleteEvent = async (id: string) => {
-    try {
-      await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir evento');
-    }
-  };
-
-  // Marcar item do checklist como concluído
+  // Marcar item como concluído (sai instantaneamente do checklist)
   const toggleChecklistItem = async (item: ChecklistItem) => {
     try {
-      const updated = { ...item, done: !item.done };
+      setChecklist(prev => prev.filter(c => c.id !== item.id)); // remove do estado local instantâneo
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, done: updated.done }),
+        body: JSON.stringify({ id: item.id, done: true }),
       });
-      setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
     } catch (err) {
       console.error(err);
       alert('Erro ao atualizar checklist');
@@ -143,7 +97,6 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
-  // Filtra checklist de hoje
   const todayChecklist = checklist.filter(c => parseDate(c.date) === today);
 
   return (
@@ -152,9 +105,7 @@ export default function AgendaCalendar() {
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
 
@@ -183,14 +134,6 @@ export default function AgendaCalendar() {
               setModalOpen(true);
             }
           }}
-          eventDrop={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
-          eventResize={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
         />
       </div>
 
@@ -201,7 +144,7 @@ export default function AgendaCalendar() {
         {todayChecklist.map(item => (
           <div key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ flex: 1 }}>
-              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+              {item.task} ({item.client})
             </span>
             <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
           </div>
@@ -216,8 +159,8 @@ export default function AgendaCalendar() {
           start={selectedDate.start}
           end={selectedDate.end}
           event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
+          onSave={() => {}}
+          onDelete={() => {}}
         />
       )}
     </div>
