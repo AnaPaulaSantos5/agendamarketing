@@ -50,98 +50,61 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos
+  // Dados de teste para checklist
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data = await res.json();
-        setEvents(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchEvents();
-  }, []);
-
-  // Busca checklist
-  useEffect(() => {
-    async function fetchChecklist() {
-      try {
-        const res = await fetch('/api/checklist');
-        const data = await res.json();
-        setChecklist(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchChecklist();
+    const testData: ChecklistItem[] = [
+      { id: '1', date: '26/01/26', client: 'Confi Seguros', task: 'Criar Story motivacional', done: false },
+      { id: '2', date: '26/01/26', client: 'Confi Seguros', task: 'Criar enquete de abertura de semana', done: false },
+      { id: '3', date: '27/01/26', client: 'Confi Finanças', task: 'Criar Reel educativo consórcio', done: false },
+      { id: '4', date: '28/01/26', client: 'Confi Seguros', task: 'Criar Post seguro automóvel', done: false },
+      { id: '5', date: '29/01/26', client: 'Confi Seguros', task: 'Criar Story quiz', done: false },
+      { id: '6', date: '30/01/26', client: 'Confi Benefícios', task: 'Criar Reel storytelling cliente', done: false },
+      { id: '7', date: '31/01/26', client: 'Confi Benefícios', task: 'Criar Story motivacional de lifestyle', done: false },
+    ];
+    setChecklist(testData);
   }, []);
 
   // Salvar ou editar evento
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    try {
-      if (isEdit) {
-        await fetch('/api/agenda', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-      } else {
-        await fetch('/api/agenda', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => [...prev, ev]);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar evento');
+    if (isEdit) {
+      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+    } else {
+      setEvents(prev => [...prev, ev]);
     }
+    setModalOpen(false);
   };
 
   // Excluir evento
   const deleteEvent = async (id: string) => {
-    try {
-      await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir evento');
-    }
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setModalOpen(false);
   };
 
   // Marcar item do checklist como concluído
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    try {
-      const updated = { ...item, done: !item.done };
-      await fetch('/api/checklist', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, done: updated.done }),
-      });
-      setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao atualizar checklist');
-    }
+  const toggleChecklistItem = (item: ChecklistItem) => {
+    const updated = { ...item, done: !item.done };
+    setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
+
+  // Filtrar checklist para hoje
+  const todayChecklist = checklist.filter(item => {
+    const [day, month, year] = item.date.split('/');
+    const itemDate = new Date(`20${year}-${month}-${day}`);
+    const todayDate = new Date();
+    return (
+      itemDate.getDate() === todayDate.getDate() &&
+      itemDate.getMonth() === todayDate.getMonth() &&
+      itemDate.getFullYear() === todayDate.getFullYear()
+    );
+  });
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
-      {/* Calendário */}
-      <div style={{ flex: 3 }}>
-        <div>
+      <div style={{ flex: 1 }}>
+        {/* Filtro de perfil */}
+        <div style={{ marginBottom: 10 }}>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
@@ -150,6 +113,7 @@ export default function AgendaCalendar() {
           </select>
         </div>
 
+        {/* Calendário */}
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -175,37 +139,25 @@ export default function AgendaCalendar() {
               setModalOpen(true);
             }
           }}
-          eventDrop={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
-          eventResize={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
         />
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ flex: 1 }}>
+      <div style={{ width: 300 }}>
         <h3>Checklist Hoje</h3>
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {todayChecklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 8 }}>
-              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
-              <button
-                onClick={() => toggleChecklistItem(item)}
-                style={{ marginLeft: 8 }}
-              >
-                ✅
-              </button>
-            </li>
-          ))}
-        </ul>
+        {todayChecklist.length === 0 && <p>Nenhum item para hoje</p>}
+        {todayChecklist.map(item => (
+          <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 6, marginBottom: 6, border: '1px solid #ccc', borderRadius: 4 }}>
+            <div>
+              <strong>{item.task}</strong> ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+            </div>
+            <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8, cursor: 'pointer' }}>✅</button>
+          </div>
+        ))}
       </div>
 
       {/* Modal */}
-      {modalOpen && selectedDate.start && (
+      {modalOpen && (
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
