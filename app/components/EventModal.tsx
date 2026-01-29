@@ -6,13 +6,14 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDelete?: (id: string) => void;
+  onDelete: (id: string) => void;
   start: string;
   end: string;
   event?: AgendaEvent | null;
 };
 
 export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event }: Props) {
+  const [editing, setEditing] = useState(!event);
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>('Confi');
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
@@ -20,7 +21,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   const [linkDrive, setLinkDrive] = useState('');
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
-  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -33,9 +33,14 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       setEndDate(event.end);
       setEditing(false);
     } else {
-      setEditing(true);
+      setTitle('');
+      setPerfil('Confi');
+      setTipo('Perfil');
+      setTarefaTitle('');
+      setLinkDrive('');
       setStartDate(start);
       setEndDate(end);
+      setEditing(true);
     }
   }, [event, start, end]);
 
@@ -43,7 +48,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 
   const handleSave = () => {
     if (!title) return alert('Informe o título do evento');
-
     const ev: AgendaEvent = {
       id: event?.id || String(new Date().getTime()),
       start: startDate,
@@ -62,7 +66,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
           }
         : null,
     };
-
     onSave(ev, !!event);
     onClose();
   };
@@ -70,81 +73,62 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   const handleDelete = () => {
     if (!event) return;
     if (confirm('Deseja realmente excluir este evento?')) {
-      onDelete?.(event.id);
-      onClose();
+      onDelete(event.id);
     }
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Título */}
         <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
 
-        {/* Ícone de Editar */}
         {event && !editing && (
           <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
             ✏️ Editar
           </button>
         )}
 
-        {/* Formulário de edição */}
-        {(editing || !event) && (
-          <>
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Título do evento"
-              style={input}
-            />
-            <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} style={input}>
-              <option>Confi</option>
-              <option>Cecília</option>
-              <option>Luiza</option>
-              <option>Júlio</option>
-            </select>
-            <select value={tipo} onChange={e => setTipo(e.target.value as any)} style={input}>
-              <option>Perfil</option>
-              <option>Interno</option>
-            </select>
-            <input
-              type="text"
-              value={tarefaTitle}
-              onChange={e => setTarefaTitle(e.target.value)}
-              placeholder="Título da tarefa"
-              style={input}
-            />
-            <input
-              type="text"
-              value={linkDrive}
-              onChange={e => setLinkDrive(e.target.value)}
-              placeholder="Link Drive"
-              style={input}
-            />
-            <label>
-              Início:
-              <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} style={input} />
-            </label>
-            <label>
-              Fim:
-              <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} style={input} />
-            </label>
-          </>
-        )}
+        <div>
+          <label>Título:</label>
+          <input value={title} onChange={e => setTitle(e.target.value)} disabled={!editing} style={input} />
 
-        {/* Botões */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-          <button onClick={handleSave}>💾 Salvar</button>
-          <button onClick={onClose}>❌ Fechar</button>
-          {event && <button onClick={handleDelete}>🗑️ Excluir</button>}
+          <label>Perfil:</label>
+          <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} disabled={!editing} style={input}>
+            <option value="Confi">Confi</option>
+            <option value="Cecília">Cecília</option>
+            <option value="Luiza">Luiza</option>
+            <option value="Júlio">Júlio</option>
+          </select>
+
+          <label>Tipo:</label>
+          <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={input}>
+            <option value="Perfil">Perfil</option>
+            <option value="Interno">Interno</option>
+          </select>
+
+          <label>Tarefa:</label>
+          <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} disabled={!editing} style={input} />
+
+          <label>Link Drive:</label>
+          <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} disabled={!editing} style={input} />
+
+          <label>Início:</label>
+          <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={!editing} style={input} />
+
+          <label>Fim:</label>
+          <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!editing} style={input} />
+        </div>
+
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          <button onClick={handleSave}>Salvar</button>
+          <button onClick={onClose}>Fechar</button>
+          {event && <button onClick={handleDelete}>Excluir</button>}
         </div>
       </div>
     </div>
   );
 }
 
-// Estilos
 const overlay: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
