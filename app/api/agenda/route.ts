@@ -1,84 +1,69 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+const auth = new JWT({
+  email: process.env.GOOGLE_CLIENT_EMAIL,
+  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
 
-async function accessSpreadsheet() {
-  await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  });
-
-  await doc.loadInfo();
-
-  const agendaSheet = doc.sheetsByTitle['Agenda'];
-  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-
-  if (!agendaSheet || !tarefasSheet) {
-    throw new Error('Abas Agenda ou Tarefas não encontradas');
-  }
-
-  return { agendaSheet, tarefasSheet };
-}
-
-function formatDate(dateStr: string) {
-  return dateStr.split('T')[0];
-}
+const doc = new GoogleSpreadsheet(
+  process.env.GOOGLE_SHEET_ID!,
+  auth
+);
 
 export async function GET() {
-  try {
-    const { agendaSheet } = await accessSpreadsheet();
-    const rows = await agendaSheet.getRows();
+  await doc.loadInfo();
+  const sheet = doc.sheetsByIndex[0];
+  const rows = await sheet.getRows();
 
-    return NextResponse.json(
-      rows.map(row => ({
-        id: row._rowNumber,
-        start: row.Data_Inicio,
-        end: row.Data_Fim,
-        tipoEvento: row.Tipo_Evento,
-        tipo: row.Tipo,
-        conteudoPrincipal: row.Conteudo_Principal,
-        perfil: row.Perfil,
-      }))
-    );
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
-  }
+  const events = rows.map((row, index) => ({
+    id: index + 1,
+    title: row.Conteudo_Principal || 'Evento',
+    start: row.Data_Inicio,
+    end: row.Data_Fim,
+    tipoEvento: row.Tipo_Evento,
+    tipo: row.Tipo,
+    conteudoPrincipal: row.Conteudo_Principal,
+    conteudoSecundario: row.Conteudo_Secundario,
+    cta: row.CTA,
+    statusPostagem: row.Status_Postagem,
+    perfil: row.Perfil,
+    checklist: row.Checklist
+      ? JSON.parse(row.Checklist)
+      : [],
+  }));
+
+  return NextResponse.json(events);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+    const body = await req.json();
 
-    await agendaSheet.addRow({
-      Data_Inicio: formatDate(data.start),
-      Data_Fim: formatDate(data.end),
-      Tipo_Evento: data.tipoEvento || '',
-      Tipo: data.tipo || '',
-      Conteudo_Principal: data.conteudoPrincipal || '',
-      Conteudo_Secundario: '',
-      CTA: '',
-      Status_Postagem: '',
-      Perfil: data.perfil || '',
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+
+    await sheet.addRow({
+      Data_Inicio: body.start,
+      Data_Fim: body.end,
+      Tipo_Evento: body.tipoEvento,
+      Tipo: body.tipo,
+      Conteudo_Principal: body.conteudoPrincipal,
+      Conteudo_Secundario: body.conteudoSecundario,
+      CTA: body.cta,
+      Status_Postagem: body.statusPostagem,
+      Perfil: body.perfil,
+      Checklist: JSON.stringify(body.checklist || []),
     });
 
-    if (data.tarefa) {
-      await tarefasSheet.addRow({
-        Bloco_ID: '',
-        Titulo: data.tarefa.titulo,
-        Responsavel: data.tarefa.responsavel,
-        Data: formatDate(data.tarefa.data),
-        Status: data.tarefa.status,
-        LinkDrive: data.tarefa.linkDrive,
-        Notificar: data.tarefa.notificar,
-      });
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Erro ao salvar' }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { error: 'Erro ao salvar' },
+      { status: 500 }
+    );
   }
 }
