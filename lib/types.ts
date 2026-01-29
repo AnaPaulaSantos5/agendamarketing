@@ -1,29 +1,21 @@
-export type Perfil =
-  | 'Confi'
-  | 'Cecília'
-  | 'Luiza'
-  | 'Júlio'
-  | 'Confi Finanças'
-  | 'Confi Benefícios'
-  | 'Confi Seguros';
+// Tipos globais usados em toda a aplicação
+
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
   id: string;
-  start: string; // ISO date string com hora
-  end: string;
-  tipoEvento: string;
-  tipo: string;
-  conteudoPrincipal: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
-  perfil: Perfil;
+  start: string; // ISO string completa: yyyy-mm-ddThh:mm
+  end: string;   // ISO string completa: yyyy-mm-ddThh:mm
+  tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal?: string;
+  perfil?: Perfil;
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
     data: string;
-    status: string;
+    status: 'Pendente' | 'Concluída';
     linkDrive?: string;
-    notificar?: string;
+    notificar?: 'Sim' | 'Não';
   };
 };
