@@ -1,6 +1,6 @@
 'use client'
 
-import { AgendaEvent } from '@/app/types'
+import { AgendaEvent } from '../types/agenda'
 
 type Props = {
   event: AgendaEvent
