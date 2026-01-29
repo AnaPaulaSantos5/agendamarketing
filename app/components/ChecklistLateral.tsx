@@ -1,73 +1,67 @@
 'use client'
+import { AgendaEvent } from '../types/AgendaEvent'
 
-import { useState } from 'react'
-
-type ChecklistItem = {
-  id: string
-  titulo: string
-  data: string
-  status: 'pendente' | 'concluida' | 'cancelada'
+type Props = {
+  events: AgendaEvent[]
+  onUpdate: (event: AgendaEvent) => void
+  onDelete: (id: string) => void
 }
 
-export default function ChecklistLateral() {
-  const [items, setItems] = useState<ChecklistItem[]>([
-    {
-      id: '1',
-      titulo: 'Criar flyer seguro residencial',
-      data: '2026-01-28',
-      status: 'pendente',
-    },
-    {
-      id: '2',
-      titulo: 'Post Instagram consórcio',
-      data: '2026-01-28',
-      status: 'pendente',
-    },
-  ])
-
-  function atualizarStatus(id: string, status: ChecklistItem['status']) {
-    setItems(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, status } : item
-      )
-    )
-  }
+export default function ChecklistLateral({ events, onUpdate, onDelete }: Props) {
+  const tarefasPendentes = events.filter(
+    e => e.tipo === 'tarefa' && e.status === 'pendente'
+  )
 
   return (
-    <aside className="w-[320px] border-l px-4 py-4 bg-white">
-      <h2 className="font-semibold text-lg mb-4">Checklist do dia</h2>
+    <aside className="w-[320px] border-l p-4 bg-gray-50">
+      <h2 className="font-semibold text-lg mb-4">Checklist</h2>
 
-      <ul className="space-y-3">
-        {items.filter(i => i.status === 'pendente').map(item => (
-          <li key={item.id} className="border rounded p-3">
-            <p className="font-medium">{item.titulo}</p>
-            <p className="text-sm text-gray-500">{item.data}</p>
+      {tarefasPendentes.length === 0 && (
+        <p className="text-sm text-gray-500">Nenhuma tarefa pendente</p>
+      )}
 
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => atualizarStatus(item.id, 'concluida')}
-                className="text-sm px-2 py-1 bg-green-600 text-white rounded"
-              >
-                Concluir
-              </button>
+      {tarefasPendentes.map(tarefa => (
+        <div key={tarefa.id} className="bg-white border rounded p-3 mb-3">
+          <p className="font-medium">{tarefa.title}</p>
+          <p className="text-xs text-gray-500">{tarefa.date}</p>
 
-              <button
-                onClick={() => atualizarStatus(item.id, 'pendente')}
-                className="text-sm px-2 py-1 bg-yellow-500 text-white rounded"
-              >
-                Reagendar
-              </button>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <button
+              onClick={() =>
+                onUpdate({ ...tarefa, status: 'concluida' })
+              }
+              className="bg-green-600 text-white px-2 py-1 rounded text-xs"
+            >
+              Concluir
+            </button>
 
-              <button
-                onClick={() => atualizarStatus(item.id, 'cancelada')}
-                className="text-sm px-2 py-1 bg-red-600 text-white rounded"
-              >
-                Cancelar
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            <button
+              onClick={() =>
+                onUpdate({ ...tarefa, status: 'pendente' })
+              }
+              className="bg-yellow-500 text-white px-2 py-1 rounded text-xs"
+            >
+              Reagendar
+            </button>
+
+            <button
+              onClick={() =>
+                onUpdate({ ...tarefa, status: 'cancelada' })
+              }
+              className="bg-gray-600 text-white px-2 py-1 rounded text-xs"
+            >
+              Cancelar
+            </button>
+
+            <button
+              onClick={() => onDelete(tarefa.id)}
+              className="bg-red-600 text-white px-2 py-1 rounded text-xs"
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      ))}
     </aside>
   )
 }
