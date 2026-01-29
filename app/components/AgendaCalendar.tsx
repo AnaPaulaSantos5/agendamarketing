@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
-import { AgendaEvent, Perfil, TarefaItem } from '@/lib/types';
+import { AgendaEvent, Perfil, TarefaItem } from '../types';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
