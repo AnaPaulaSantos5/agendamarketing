@@ -17,25 +17,23 @@ export type AgendaEvent = {
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
-  perfil?: Perfil;
   statusPostagem?: string;
-  tarefa?: any;
+  perfil?: Perfil;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
   allDay?: boolean;
-};
-
-export type ChecklistItem = {
-  ID: string;
-  Data: string;
-  Cliente: string;
-  Tarefa: string;
-  Done: string;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -43,6 +41,7 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Busca eventos
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -53,21 +52,10 @@ export default function AgendaCalendar() {
         console.error(err);
       }
     }
-
-    async function fetchChecklist() {
-      try {
-        const res = await fetch('/api/checklist');
-        const data = await res.json();
-        setChecklist(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
     fetchEvents();
-    fetchChecklist();
   }, []);
 
+  // Salvar ou editar evento
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     try {
       if (isEdit) {
@@ -91,33 +79,19 @@ export default function AgendaCalendar() {
     }
   };
 
-  const deleteEvent = async (ev: AgendaEvent) => {
-    if (!confirm('Deseja realmente excluir este evento?')) return;
+  // Excluir evento
+  const deleteEvent = async (id: string) => {
     try {
       await fetch('/api/agenda', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ev.id }),
+        body: JSON.stringify({ id }),
       });
-      setEvents(prev => prev.filter(e => e.id !== ev.id));
+      setEvents(prev => prev.filter(e => e.id !== id));
       setModalOpen(false);
     } catch (err) {
       console.error(err);
       alert('Erro ao excluir evento');
-    }
-  };
-
-  const updateChecklistItem = async (item: ChecklistItem, done: boolean) => {
-    try {
-      await fetch('/api/checklist', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.ID, done }),
-      });
-      setChecklist(prev => prev.map(c => (c.ID === item.ID ? { ...c, Done: done ? 'Sim' : 'Não' } : c)));
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao atualizar checklist');
     }
   };
 
@@ -135,6 +109,7 @@ export default function AgendaCalendar() {
             ))}
           </select>
         </div>
+
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -174,22 +149,35 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
-        {checklist
-          .filter(item => item.Data === today)
-          .map(item => (
-            <div key={item.ID} style={{ marginBottom: 10, border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-              <strong>{item.Tarefa}</strong> ({item.Cliente}) - {item.Done}
-              <div style={{ marginTop: 5 }}>
-                {item.Done !== 'Sim' && (
-                  <button onClick={() => updateChecklistItem(item, true)}>✅ Concluir</button>
-                )}
+        {events
+          .filter(e => e.start.slice(0, 10) === today && e.tarefa)
+          .map(e => (
+            <div key={e.id} style={{ marginBottom: 10, border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
+              <div>
+                {e.tarefa?.titulo} ({e.tipoEvento}) - {e.tarefa?.status}
               </div>
+              <button
+                onClick={() =>
+                  saveEvent({ ...e, tarefa: { ...e.tarefa!, status: 'Concluída' } }, true)
+                }
+              >
+                ✅
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedEvent(e);
+                  setSelectedDate({ start: e.start, end: e.end });
+                  setModalOpen(true);
+                }}
+              >
+                ✏️
+              </button>
             </div>
           ))}
       </div>
 
-      {/* Modal do evento */}
-      {modalOpen && (
+      {/* Modal */}
+      {modalOpen && selectedDate.start && (
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
