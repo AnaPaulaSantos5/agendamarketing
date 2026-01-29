@@ -10,17 +10,19 @@ async function accessSpreadsheet() {
   });
 
   await doc.loadInfo();
+
   const agendaSheet = doc.sheetsByTitle['Agenda'];
   const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+
+  if (!agendaSheet || !tarefasSheet) {
+    throw new Error('Abas Agenda ou Tarefas não encontradas');
+  }
+
   return { agendaSheet, tarefasSheet };
 }
 
-function formatDateForSheet(dateStr: string) {
-  const d = new Date(dateStr);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function formatDate(dateStr: string) {
+  return dateStr.split('T')[0];
 }
 
 export async function GET() {
@@ -28,23 +30,20 @@ export async function GET() {
     const { agendaSheet } = await accessSpreadsheet();
     const rows = await agendaSheet.getRows();
 
-    const events = rows.map(row => ({
-      id: row._rowNumber,
-      start: row.Data_Inicio,
-      end: row.Data_Fim,
-      tipoEvento: row.Tipo_Evento,
-      tipo: row.Tipo,
-      conteudoPrincipal: row.Conteudo_Principal,
-      conteudoSecundario: row.Conteudo_Secundario,
-      cta: row.CTA,
-      statusPostagem: row.Status_Postagem,
-      perfil: row.Perfil,
-    }));
-
-    return NextResponse.json(events);
-  } catch (error) {
-    console.error('Erro ao carregar agenda', error);
-    return NextResponse.json({ error: 'Erro ao carregar agenda', details: String(error) }, { status: 500 });
+    return NextResponse.json(
+      rows.map(row => ({
+        id: row._rowNumber,
+        start: row.Data_Inicio,
+        end: row.Data_Fim,
+        tipoEvento: row.Tipo_Evento,
+        tipo: row.Tipo,
+        conteudoPrincipal: row.Conteudo_Principal,
+        perfil: row.Perfil,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Erro ao carregar agenda' }, { status: 500 });
   }
 }
 
@@ -53,35 +52,33 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // Salva evento na Agenda
     await agendaSheet.addRow({
-      Data_Inicio: formatDateForSheet(data.start),
-      Data_Fim: formatDateForSheet(data.end),
+      Data_Inicio: formatDate(data.start),
+      Data_Fim: formatDate(data.end),
       Tipo_Evento: data.tipoEvento || '',
       Tipo: data.tipo || '',
       Conteudo_Principal: data.conteudoPrincipal || '',
-      Conteudo_Secundario: data.conteudoSecundario || '',
-      CTA: data.cta || '',
-      Status_Postagem: data.statusPostagem || '',
+      Conteudo_Secundario: '',
+      CTA: '',
+      Status_Postagem: '',
       Perfil: data.perfil || '',
     });
 
-    // Salva tarefa, se existir
     if (data.tarefa) {
       await tarefasSheet.addRow({
-        Bloco_ID: data.tarefa.blocoId || '',
-        Titulo: data.tarefa.titulo || '',
-        Responsavel: data.tarefa.responsavel || '',
-        Data: formatDateForSheet(data.tarefa.data || new Date().toISOString()),
-        Status: data.tarefa.status || '',
-        LinkDrive: data.tarefa.linkDrive || '',
-        Notificar: data.tarefa.notificar || '',
+        Bloco_ID: '',
+        Titulo: data.tarefa.titulo,
+        Responsavel: data.tarefa.responsavel,
+        Data: formatDate(data.tarefa.data),
+        Status: data.tarefa.status,
+        LinkDrive: data.tarefa.linkDrive,
+        Notificar: data.tarefa.notificar,
       });
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error('Erro ao salvar evento', error);
-    return NextResponse.json({ error: 'Erro ao salvar', details: String(error) }, { status: 500 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Erro ao salvar' }, { status: 500 });
   }
 }
