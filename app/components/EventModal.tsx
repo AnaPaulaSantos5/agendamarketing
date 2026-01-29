@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { AgendaEvent, Perfil } from '@/lib/types';
+import { AgendaEvent, Perfil } from '../types';
 import { v4 as uuid } from 'uuid';
 
 type Props = {
