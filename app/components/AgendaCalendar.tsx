@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
 export type AgendaEvent = {
   id: string;
   start: string;
@@ -137,17 +138,17 @@ export default function AgendaCalendar() {
   const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
 
   return (
-    <div style={{ display: 'flex', gap: '20px' }}>
+    <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
       <div style={{ flex: 3 }}>
-        <label>
+        <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-        </label>
+        </div>
 
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -188,11 +189,16 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
-        <ul>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
           {todayChecklist.map(item => (
             <li key={item.id} style={{ marginBottom: 8 }}>
-              <span>{item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}</span>
-              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+              <button
+                onClick={() => toggleChecklistItem(item)}
+                style={{ marginLeft: 8 }}
+              >
+                ✅
+              </button>
             </li>
           ))}
         </ul>
