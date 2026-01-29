@@ -7,21 +7,30 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
 export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-  tipoEvento?: 'Interno' | 'Perfil';
+  tipoEvento?: string;
+  tipo?: string;
   conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
   perfil?: Perfil;
-  tarefa?: { titulo: string; status: string; data: string; linkDrive?: string; notificar?: string } | null;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  } | null;
   allDay?: boolean;
 };
-
 export type ChecklistItem = {
   id: string;
-  date: string;
+  date: string; // DD/MM/YY
   client: string;
   task: string;
   done: boolean;
@@ -84,20 +93,6 @@ export default function AgendaCalendar() {
         });
         setEvents(prev => [...prev, ev]);
       }
-
-      // Atualiza checklist instantaneamente se for tarefa do dia
-      if (ev.tarefa && ev.start.slice(0, 10) === today) {
-        setChecklist(prev => [
-          ...prev,
-          {
-            id: ev.id,
-            date: ev.start,
-            client: ev.perfil || 'Confi',
-            task: ev.tarefa.titulo,
-            done: ev.tarefa.status === 'Concluída',
-          },
-        ]);
-      }
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
@@ -113,7 +108,6 @@ export default function AgendaCalendar() {
         body: JSON.stringify({ id }),
       });
       setEvents(prev => prev.filter(e => e.id !== id));
-      setChecklist(prev => prev.filter(c => c.id !== id)); // remove do checklist também
       setModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -121,16 +115,16 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Marcar item do checklist como concluído
+  // Concluir item do checklist
   const toggleChecklistItem = async (item: ChecklistItem) => {
     try {
-      const updated = { ...item, done: true };
+      // Atualiza no Google Sheet
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id, done: true }),
       });
-      // Remove imediatamente da lista
+      // Remove instantaneamente do checklist
       setChecklist(prev => prev.filter(c => c.id !== item.id));
     } catch (err) {
       console.error(err);
@@ -138,11 +132,18 @@ export default function AgendaCalendar() {
     }
   };
 
+  // Formata data do checklist para YYYY-MM-DD
+  const formatDate = (d: string) => {
+    const [day, month, year] = d.split('/');
+    return `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
+  const todayChecklist = checklist.filter(c => formatDate(c.date) === today);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
+      {/* Calendário */}
       <div style={{ flex: 3 }}>
         <div>
           Filtrar por perfil:{' '}
@@ -152,7 +153,6 @@ export default function AgendaCalendar() {
             ))}
           </select>
         </div>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -189,18 +189,25 @@ export default function AgendaCalendar() {
         />
       </div>
 
+      {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
         <ul>
           {todayChecklist.map(item => (
             <li key={item.id} style={{ marginBottom: 10 }}>
               {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
-              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+              <button
+                onClick={() => toggleChecklistItem(item)}
+                style={{ marginLeft: 8 }}
+              >
+                ✅
+              </button>
             </li>
           ))}
         </ul>
       </div>
 
+      {/* Modal */}
       {modalOpen && selectedDate.start && (
         <EventModal
           isOpen={modalOpen}
