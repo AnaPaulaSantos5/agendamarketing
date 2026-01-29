@@ -98,17 +98,17 @@ export default function AgendaCalendar() {
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
   return (
-    <div style={{ display: 'flex', gap: 20 }}>
+    <div style={{ display: 'flex', gap: '20px' }}>
       {/* Calendário */}
       <div style={{ flex: 3 }}>
-        <div>
+        <label>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-        </div>
+        </label>
 
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -150,12 +150,10 @@ export default function AgendaCalendar() {
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
         {events
-          .filter(e => e.start.slice(0, 10) === today && e.tarefa)
+          .filter(e => e.tarefa && new Date(e.start).toLocaleDateString() === new Date(today).toLocaleDateString())
           .map(e => (
-            <div key={e.id} style={{ marginBottom: 10, border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-              <div>
-                {e.tarefa?.titulo} ({e.tipoEvento}) - {e.tarefa?.status}
-              </div>
+            <div key={e.id} style={{ marginBottom: 8 }}>
+              <span>{e.tarefa?.titulo} ({e.tipoEvento}) - {e.tarefa?.status}</span>
               <button
                 onClick={() =>
                   saveEvent({ ...e, tarefa: { ...e.tarefa!, status: 'Concluída' } }, true)
