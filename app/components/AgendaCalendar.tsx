@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AgendaEvent, ChecklistItem } from '../types';
 import EventModal from './EventModal';
-import { mapPlanilhaParaEventos } from '../utils';
+import { mapPlanilhaParaEventos } from '../../utils';
 
 interface AgendaCalendarProps {
   sheetData: any[]; // dados da planilha
