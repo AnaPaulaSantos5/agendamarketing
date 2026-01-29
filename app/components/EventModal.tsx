@@ -59,6 +59,7 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
+            responsavel: perfil, // ✅ corrigido
             status: event?.tarefa?.status || 'Pendente',
             data: startDate,
             linkDrive,
@@ -81,48 +82,90 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
+        <h3>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
 
         {event && !editing && (
-          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>✏️ Editar</button>
+          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
+            ✏️ Editar
+          </button>
         )}
 
-        <div>
-          <label>Título:</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} disabled={!editing} style={input} />
+        <label>Título:</label>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          disabled={!editing}
+          style={input}
+        />
 
-          <label>Perfil:</label>
-          <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} disabled={!editing} style={input}>
-            <option>Confi</option>
-            <option>Cecília</option>
-            <option>Luiza</option>
-            <option>Júlio</option>
-          </select>
+        <label>Perfil:</label>
+        <select
+          value={perfil}
+          onChange={e => setPerfil(e.target.value as Perfil)}
+          disabled={!editing}
+          style={input}
+        >
+          <option>Confi</option>
+          <option>Cecília</option>
+          <option>Luiza</option>
+          <option>Júlio</option>
+        </select>
 
-          <label>Tipo:</label>
-          <select value={tipo} onChange={e => setTipo(e.target.value as 'Interno' | 'Perfil')} disabled={!editing} style={input}>
-            <option>Perfil</option>
-            <option>Interno</option>
-          </select>
+        <label>Tipo:</label>
+        <select
+          value={tipo}
+          onChange={e => setTipo(e.target.value as any)}
+          disabled={!editing}
+          style={input}
+        >
+          <option>Perfil</option>
+          <option>Interno</option>
+        </select>
 
-          <label>Tarefa:</label>
-          <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} disabled={!editing} style={input} />
+        <label>Tarefa:</label>
+        <input
+          type="text"
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+          disabled={!editing}
+          style={input}
+        />
 
-          <label>Link Drive:</label>
-          <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} disabled={!editing} style={input} />
+        <label>Link Drive:</label>
+        <input
+          type="text"
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          disabled={!editing}
+          style={input}
+        />
 
-          <label>Início:</label>
-          <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={!editing} style={input} />
+        <label>Início:</label>
+        <input
+          type="datetime-local"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          disabled={!editing}
+          style={input}
+        />
 
-          <label>Fim:</label>
-          <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!editing} style={input} />
-        </div>
+        <label>Fim:</label>
+        <input
+          type="datetime-local"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+          disabled={!editing}
+          style={input}
+        />
 
-        <div style={{ marginTop: 10 }}>
-          <button onClick={handleSave}>Salvar</button>
-          <button onClick={onClose} style={{ marginLeft: 10 }}>Fechar</button>
-          {event && <button onClick={handleDelete} style={{ marginLeft: 10 }}>Excluir</button>}
-        </div>
+        <button onClick={handleSave} style={{ marginRight: 8 }}>
+          Salvar
+        </button>
+        <button onClick={onClose} style={{ marginRight: 8 }}>
+          Fechar
+        </button>
+        {event && <button onClick={handleDelete}>Excluir</button>}
       </div>
     </div>
   );
