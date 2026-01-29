@@ -12,9 +12,11 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
+  tipoEvento?: 'Interno' | 'Perfil';
   conteudoPrincipal?: string;
   perfil?: Perfil;
-  tarefa?: { titulo: string; status: string; data: string } | null;
+  tarefa?: { titulo: string; status: string; data: string; linkDrive?: string; notificar?: string } | null;
+  allDay?: boolean;
 };
 
 export type ChecklistItem = {
@@ -34,61 +36,102 @@ export default function AgendaCalendar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-
   const today = new Date().toISOString().slice(0, 10);
 
-  const parseDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split(/[-/]/);
-    if (parts.length === 3) {
-      if (dateStr.includes('/')) return `20${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-      return `${parts[0]}-${parts[1]}-${parts[2]}`;
+  // Busca eventos
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/api/agenda');
+        const data = await res.json();
+        setEvents(data);
+      } catch (err) {
+        console.error(err);
+      }
     }
-    return '';
-  };
+    fetchEvents();
+  }, []);
 
-  // Busca dados da planilha e monta checklist
+  // Busca checklist
   useEffect(() => {
     async function fetchChecklist() {
       try {
         const res = await fetch('/api/checklist');
-        const data: ChecklistItem[] = await res.json();
-
-        // Adiciona tarefas do Agenda e Tarefas que ainda não estão na aba Checklist
-        const newItems: ChecklistItem[] = [];
-
-        // Converte eventos com tarefas em checklist
-        const agendaTasks = events
-          .filter(e => e.tarefa)
-          .map(e => ({
-            id: e.id,
-            date: e.start,
-            client: e.perfil || 'Confi',
-            task: e.tarefa!.titulo,
-            done: e.tarefa!.status === 'Concluída',
-          }));
-
-        agendaTasks.forEach(task => {
-          if (!data.find(d => d.id === task.id)) newItems.push(task);
-        });
-
-        setChecklist([...data, ...newItems]);
+        const data = await res.json();
+        setChecklist(data);
       } catch (err) {
         console.error(err);
       }
     }
     fetchChecklist();
-  }, [events]);
+  }, []);
 
-  // Marcar item como concluído (sai instantaneamente do checklist)
+  // Salvar ou editar evento
+  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
+    try {
+      if (isEdit) {
+        await fetch('/api/agenda', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ev),
+        });
+        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+      } else {
+        await fetch('/api/agenda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ev),
+        });
+        setEvents(prev => [...prev, ev]);
+      }
+
+      // Atualiza checklist instantaneamente se for tarefa do dia
+      if (ev.tarefa && ev.start.slice(0, 10) === today) {
+        setChecklist(prev => [
+          ...prev,
+          {
+            id: ev.id,
+            date: ev.start,
+            client: ev.perfil || 'Confi',
+            task: ev.tarefa.titulo,
+            done: ev.tarefa.status === 'Concluída',
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar evento');
+    }
+  };
+
+  // Excluir evento
+  const deleteEvent = async (id: string) => {
+    try {
+      await fetch('/api/agenda', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      setEvents(prev => prev.filter(e => e.id !== id));
+      setChecklist(prev => prev.filter(c => c.id !== id)); // remove do checklist também
+      setModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir evento');
+    }
+  };
+
+  // Marcar item do checklist como concluído
   const toggleChecklistItem = async (item: ChecklistItem) => {
     try {
-      setChecklist(prev => prev.filter(c => c.id !== item.id)); // remove do estado local instantâneo
+      const updated = { ...item, done: true };
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id, done: true }),
       });
+      // Remove imediatamente da lista
+      setChecklist(prev => prev.filter(c => c.id !== item.id));
     } catch (err) {
       console.error(err);
       alert('Erro ao atualizar checklist');
@@ -96,16 +139,17 @@ export default function AgendaCalendar() {
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
-  const todayChecklist = checklist.filter(c => parseDate(c.date) === today);
+  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 3 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+            {profiles.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
           </select>
         </div>
 
@@ -113,8 +157,8 @@ export default function AgendaCalendar() {
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-          selectable
-          editable
+          selectable={true}
+          editable={true}
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -134,24 +178,29 @@ export default function AgendaCalendar() {
               setModalOpen(true);
             }
           }}
+          eventDrop={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
+          eventResize={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
         />
       </div>
 
-      {/* Checklist lateral */}
-      <div style={{ width: 300, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
+      <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
-        {todayChecklist.length === 0 && <p>Nenhuma tarefa hoje</p>}
-        {todayChecklist.map(item => (
-          <div key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ flex: 1 }}>
-              {item.task} ({item.client})
-            </span>
-            <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
-          </div>
-        ))}
+        <ul>
+          {todayChecklist.map(item => (
+            <li key={item.id} style={{ marginBottom: 10 }}>
+              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* Modal */}
       {modalOpen && selectedDate.start && (
         <EventModal
           isOpen={modalOpen}
@@ -159,8 +208,8 @@ export default function AgendaCalendar() {
           start={selectedDate.start}
           end={selectedDate.end}
           event={selectedEvent}
-          onSave={() => {}}
-          onDelete={() => {}}
+          onSave={saveEvent}
+          onDelete={deleteEvent}
         />
       )}
     </div>
