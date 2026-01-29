@@ -5,37 +5,34 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useState } from 'react'
-import { AgendaItem } from '../types/agenda'
+import { AgendaItem } from '../types'
 import EventModal from './EventModal'
-import { v4 as uuid } from 'uuid'
 
 export default function AgendaCalendar() {
-  const [items, setItems] = useState<AgendaItem[]>([])
+  const [events, setEvents] = useState<AgendaItem[]>([])
   const [selected, setSelected] = useState<AgendaItem | null>(null)
 
-  function handleDateSelect(info: any) {
+  function handleDateClick(info: any) {
     setSelected({
-      id: uuid(),
-      title: '',
-      start: info.startStr,
-      end: info.endStr,
-      allDay: info.allDay,
-      category: 'evento',
-      visibility: 'interno',
-      status: 'pendente',
+      id: crypto.randomUUID(),
+      dataInicio: info.dateStr,
+      dataFim: info.dateStr,
+      tipoEvento: '',
+      tipo: '',
+      conteudoPrincipal: '',
+      conteudoSecundario: '',
+      cta: '',
+      statusPostagem: '',
+      perfil: '',
+      linkDrive: ''
     })
   }
 
-  function handleEventClick(info: any) {
-    const found = items.find(i => i.id === info.event.id)
-    if (found) setSelected(found)
-  }
-
   function handleSave(item: AgendaItem) {
-    setItems(prev => {
+    setEvents(prev => {
       const exists = prev.find(e => e.id === item.id)
       if (exists) {
-        return prev.map(e => (e.id === item.id ? item : e))
+        return prev.map(e => e.id === item.id ? item : e)
       }
       return [...prev, item]
     })
@@ -43,7 +40,7 @@ export default function AgendaCalendar() {
   }
 
   function handleDelete(id: string) {
-    setItems(prev => prev.filter(e => e.id !== id))
+    setEvents(prev => prev.filter(e => e.id !== id))
     setSelected(null)
   }
 
@@ -53,15 +50,14 @@ export default function AgendaCalendar() {
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         selectable
-        events={items.map(i => ({
-          id: i.id,
-          title: i.title,
-          start: i.start,
-          end: i.end,
-          allDay: i.allDay,
+        dateClick={handleDateClick}
+        events={events.map(e => ({
+          id: e.id,
+          title: e.conteudoPrincipal || 'Evento',
+          start: e.dataInicio,
+          end: e.dataFim
         }))}
-        select={handleDateSelect}
-        eventClick={handleEventClick}
+        height="auto"
       />
 
       {selected && (
