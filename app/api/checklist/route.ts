@@ -12,7 +12,6 @@ async function accessSpreadsheet() {
   return doc;
 }
 
-// Função para unificar tarefas de várias abas
 async function getAllTasks() {
   const doc = await accessSpreadsheet();
 
@@ -20,78 +19,80 @@ async function getAllTasks() {
   const agendaSheet = doc.sheetsByTitle['Agenda'];
   const tarefasSheet = doc.sheetsByTitle['Tarefas'];
 
-  const checklistRows = await checklistSheet.getRows();
-  const agendaRows = await agendaSheet.getRows();
-  const tarefasRows = await tarefasSheet.getRows();
-
   const tasks: any[] = [];
 
   // Aba Checklist
-  checklistRows.forEach(r => {
-    tasks.push({
-      id: `checklist-${r.ID}`,
-      date: r.Data,
-      client: r.Cliente,
-      task: r.Tarefa,
-      done: r.Done === 'Sim' || r.Done === 'TRUE',
-      sourceSheet: 'Checklist',
-    });
-  });
-
-  // Aba Agenda (pega somente tarefas do dia)
-  agendaRows.forEach(r => {
-    if (r.Tipo === 'Tarefa' || r.CTA || r.Conteudo_Principal) {
+  if (checklistSheet) {
+    const rows = await checklistSheet.getRows();
+    rows.forEach(r => {
       tasks.push({
-        id: `agenda-${r.Data_Inicio}-${r.Conteudo_Principal}`,
-        date: r.Data_Inicio,
-        client: r.Perfil || 'Geral',
-        task: r.Conteudo_Principal || r.CTA || 'Tarefa',
-        done: false,
-        sourceSheet: 'Agenda',
+        id: `checklist-${r.ID}`,
+        date: r.Data,
+        client: r.Cliente,
+        task: r.Tarefa,
+        done: r.Done === 'Sim' || r.Done === 'TRUE',
+        sourceSheet: 'Checklist',
       });
-    }
-  });
+    });
+  }
+
+  // Aba Agenda
+  if (agendaSheet) {
+    const rows = await agendaSheet.getRows();
+    rows.forEach(r => {
+      if (r.Tipo === 'Tarefa' || r.Conteudo_Principal) {
+        tasks.push({
+          id: `agenda-${r.Data_Inicio}-${r.Conteudo_Principal}`,
+          date: r.Data_Inicio,
+          client: r.Perfil || 'Geral',
+          task: r.Conteudo_Principal || 'Tarefa',
+          done: false,
+          sourceSheet: 'Agenda',
+        });
+      }
+    });
+  }
 
   // Aba Tarefas
-  tarefasRows.forEach(r => {
-    tasks.push({
-      id: `tarefas-${r.Bloco_ID}`,
-      date: r.Data,
-      client: r.Responsavel,
-      task: r.Titulo,
-      done: r.Status === 'Concluído' || r.Status === 'Sim',
-      sourceSheet: 'Tarefas',
+  if (tarefasSheet) {
+    const rows = await tarefasSheet.getRows();
+    rows.forEach(r => {
+      tasks.push({
+        id: `tarefas-${r.Bloco_ID}`,
+        date: r.Data,
+        client: r.Responsavel,
+        task: r.Titulo,
+        done: r.Status === 'Concluído' || r.Status === 'Sim',
+        sourceSheet: 'Tarefas',
+      });
     });
-  });
+  }
 
   return tasks;
 }
 
-// GET: retorna todas tarefas unificadas
 export async function GET() {
   try {
     const tasks = await getAllTasks();
-    return NextResponse.json(tasks);
+    // Remove duplicações
+    const uniqueTasks = Array.from(new Map(tasks.map(t => [t.id, t])).values());
+    return NextResponse.json(uniqueTasks);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
-// PATCH: marca tarefa como concluída
 export async function PATCH(req: NextRequest) {
   try {
     const { id } = await req.json();
     const tasks = await getAllTasks();
     const task = tasks.find(t => t.id === id);
-
     if (!task) throw new Error('Item não encontrado');
 
     const doc = await accessSpreadsheet();
-    let sheet;
-    let row;
+    let sheet, row;
 
-    // Descobre a aba correta
     if (task.sourceSheet === 'Checklist') {
       sheet = doc.sheetsByTitle['Checklist'];
       row = (await sheet.getRows()).find(r => `checklist-${r.ID}` === id);
@@ -100,10 +101,8 @@ export async function PATCH(req: NextRequest) {
       sheet = doc.sheetsByTitle['Tarefas'];
       row = (await sheet.getRows()).find(r => `tarefas-${r.Bloco_ID}` === id);
       if (row) row.Status = 'Concluído';
-    } else if (task.sourceSheet === 'Agenda') {
-      // Aqui você pode decidir se Agenda deve ser marcada, ou apenas ignorar
-      // Por enquanto não altera, apenas retorna sucesso
     }
+    // Aba Agenda apenas marca como concluído no frontend (opcional: pode salvar em outra coluna)
 
     if (row) await row.save();
 
