@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { TarefaItem } from '../lib/types';
+import { TarefaItem } from '../types';
 
 export default function Tarefas() {
   const [tarefas, setTarefas] = useState<TarefaItem[]>([]);
