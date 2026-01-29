@@ -50,13 +50,13 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos
+  // === Fetch Agenda ===
   useEffect(() => {
     async function fetchEvents() {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
-        setEvents(data);
+        setEvents(data ?? []);
       } catch (err) {
         console.error(err);
       }
@@ -64,13 +64,13 @@ export default function AgendaCalendar() {
     fetchEvents();
   }, []);
 
-  // Busca checklist unificado
+  // === Fetch Checklist ===
   useEffect(() => {
     async function fetchChecklist() {
       try {
         const res = await fetch('/api/checklist');
         const data = await res.json();
-        setChecklist(data);
+        setChecklist(data ?? []);
       } catch (err) {
         console.error(err);
       }
@@ -78,7 +78,7 @@ export default function AgendaCalendar() {
     fetchChecklist();
   }, []);
 
-  // Salvar ou editar evento
+  // === Save Event ===
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     try {
       if (isEdit) {
@@ -102,7 +102,7 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Excluir evento
+  // === Delete Event ===
   const deleteEvent = async (id: string) => {
     try {
       await fetch('/api/agenda', {
@@ -118,18 +118,15 @@ export default function AgendaCalendar() {
     }
   };
 
-  // Marcar item do checklist como concluído
+  // === Toggle Checklist ===
   const toggleChecklistItem = async (item: ChecklistItem) => {
     try {
       const updated = { ...item, done: !item.done };
-
-      // Atualiza somente se for da aba Checklist (ID numérico ou existente)
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item.id, done: updated.done }),
       });
-
       setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
     } catch (err) {
       console.error(err);
@@ -138,15 +135,16 @@ export default function AgendaCalendar() {
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
+
   const todayChecklist = checklist.filter(c => {
     const d = new Date(c.date);
-    return d.toISOString().slice(0, 10) === today;
+    return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === today;
   });
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
-      <div style={{ flex: 2 }}>
+      <div style={{ flex: 3 }}>
         <div style={{ marginBottom: 10 }}>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
@@ -164,7 +162,7 @@ export default function AgendaCalendar() {
           editable
           events={filteredEvents.map(ev => ({
             id: ev.id,
-            title: ev.conteudoPrincipal,
+            title: ev.conteudoPrincipal ?? 'Sem título',
             start: ev.start,
             end: ev.end,
           }))}
@@ -174,12 +172,10 @@ export default function AgendaCalendar() {
             setModalOpen(true);
           }}
           eventClick={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) {
-              setSelectedEvent(ev);
-              setSelectedDate({ start: ev.start, end: ev.end });
-              setModalOpen(true);
-            }
+            const ev = events.find(e => e.id === info.event.id) ?? null;
+            setSelectedEvent(ev);
+            setSelectedDate({ start: ev?.start ?? info.event.startStr, end: ev?.end ?? info.event.endStr });
+            setModalOpen(true);
           }}
           eventDrop={info => {
             const ev = events.find(e => e.id === info.event.id);
@@ -195,17 +191,18 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ flex: 1, border: '1px solid #ccc', padding: 10, borderRadius: 8, height: '100%', overflowY: 'auto' }}>
         <h3>Checklist Hoje</h3>
-        {todayChecklist.map(item => (
-          <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <span>
-              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
-            </span>
-            <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>
-              ✅
-            </button>
-          </div>
-        ))}
-        {todayChecklist.length === 0 && <p>Nenhum item hoje.</p>}
+        {todayChecklist.length > 0 ? (
+          todayChecklist.map(item => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span>
+                {item.task ?? 'Sem tarefa'} ({item.client ?? 'Sem cliente'}) - {item.done ? 'Concluído' : 'Pendente'}
+              </span>
+              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+            </div>
+          ))
+        ) : (
+          <p>Nenhum item hoje.</p>
+        )}
       </div>
 
       {/* Modal */}
@@ -215,7 +212,7 @@ export default function AgendaCalendar() {
           onClose={() => setModalOpen(false)}
           start={selectedDate.start}
           end={selectedDate.end}
-          event={selectedEvent}
+          event={selectedEvent ?? undefined}
           onSave={saveEvent}
           onDelete={deleteEvent}
         />
