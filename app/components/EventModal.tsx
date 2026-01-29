@@ -1,87 +1,86 @@
 'use client'
 
-import { AgendaEvent } from '../types/agenda'
+import { AgendaItem, Perfil } from '../types/agenda'
+import { useState } from 'react'
 
 type Props = {
-  event: AgendaEvent
-  onClose: () => void
-  onSave: (ev: AgendaEvent) => void
+  item: AgendaItem
+  onSave: (item: AgendaItem) => void
   onDelete: (id: string) => void
+  onClose: () => void
 }
 
-export default function EventModal({
-  event,
-  onClose,
-  onSave,
-  onDelete,
-}: Props) {
-  function update<K extends keyof AgendaEvent>(key: K, value: AgendaEvent[K]) {
-    onSave({ ...event, [key]: value })
-  }
+export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
+  const [data, setData] = useState<AgendaItem>(item)
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-[420px] rounded-lg p-4 space-y-3">
-        <h2 className="font-bold text-lg">
-          {event.id ? 'Editar' : 'Novo'} {event.tipo}
-        </h2>
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,.4)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      <div style={{ background: '#fff', padding: 20, width: 420 }}>
+        <h3>{data.id ? 'Editar' : 'Novo'} item</h3>
 
         <input
-          className="w-full border p-2"
-          value={event.title}
-          onChange={(e) => update('title', e.target.value)}
           placeholder="Título"
+          value={data.title}
+          onChange={e => setData({ ...data, title: e.target.value })}
+        />
+
+        <select
+          value={data.category}
+          onChange={e => setData({ ...data, category: e.target.value as any })}
+        >
+          <option value="evento">Evento</option>
+          <option value="tarefa">Tarefa</option>
+        </select>
+
+        <select
+          value={data.visibility}
+          onChange={e => setData({ ...data, visibility: e.target.value as any })}
+        >
+          <option value="interno">Interno</option>
+          <option value="perfil">Perfil</option>
+        </select>
+
+        {data.visibility === 'perfil' && (
+          <select
+            value={data.perfil}
+            onChange={e => setData({ ...data, perfil: e.target.value as Perfil })}
+          >
+            <option>Confi</option>
+            <option>Luiza</option>
+            <option>Cecília</option>
+            <option>Júlio</option>
+          </select>
+        )}
+
+        <textarea
+          placeholder="Conteúdo principal"
+          value={data.conteudoPrincipal}
+          onChange={e => setData({ ...data, conteudoPrincipal: e.target.value })}
+        />
+
+        <textarea
+          placeholder="Conteúdo secundário"
+          value={data.conteudoSecundario}
+          onChange={e => setData({ ...data, conteudoSecundario: e.target.value })}
         />
 
         <input
-          type="date"
-          className="w-full border p-2"
-          value={event.date}
-          onChange={(e) => update('date', e.target.value)}
+          placeholder="Link do Drive"
+          value={data.linkDrive}
+          onChange={e => setData({ ...data, linkDrive: e.target.value })}
         />
 
-        <select
-          className="w-full border p-2"
-          value={event.status}
-          onChange={(e) =>
-            update('status', e.target.value as AgendaEvent['status'])
-          }
-        >
-          <option value="pendente">Pendente</option>
-          <option value="concluida">Concluída</option>
-          <option value="cancelada">Cancelada</option>
-        </select>
-
-        <select
-          className="w-full border p-2"
-          value={event.perfil}
-          onChange={(e) =>
-            update('perfil', e.target.value as AgendaEvent['perfil'])
-          }
-        >
-          <option value="Confi">Confi</option>
-          <option value="Luiza">Luiza</option>
-          <option value="Cecília">Cecília</option>
-          <option value="Júlio">Júlio</option>
-        </select>
-
-        <div className="flex justify-between pt-3">
-          <button
-            className="text-red-600"
-            onClick={() => onDelete(event.id)}
-          >
-            Excluir
-          </button>
-
-          <div className="space-x-2">
-            <button onClick={onClose}>Cancelar</button>
-            <button
-              className="bg-black text-white px-3 py-1 rounded"
-              onClick={onClose}
-            >
-              Salvar
-            </button>
-          </div>
+        <div style={{ marginTop: 10 }}>
+          <button onClick={() => onSave(data)}>Salvar</button>
+          <button onClick={() => onDelete(data.id)}>Excluir</button>
+          <button onClick={onClose}>Fechar</button>
         </div>
       </div>
     </div>
