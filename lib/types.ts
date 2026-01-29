@@ -1,13 +1,17 @@
-export type ChecklistItem = {
-  id: string
-  text: string
-  done: boolean
-  time?: string
-}
+export type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-export type AgendaEvent = {
-  date: string
-  title: string
-  time: string
-  client: string
-}
+export type ChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+export type AgendaItem = {
+  id: string;
+  title: string;
+  profile: Profile;
+  type: 'Perfil' | 'Interno';
+  start: string; // ISO
+  end: string;   // ISO
+  checklist: ChecklistItem[];
+};
