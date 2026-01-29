@@ -1,36 +1,33 @@
-'use client'
-
-import { useState } from 'react'
-import { TarefaItem } from '../types'
+'use client';
+import { useState, useEffect } from 'react';
+import { TarefaItem } from '../lib/types';
 
 export default function Tarefas() {
-  const [tarefas, setTarefas] = useState<TarefaItem[]>([])
+  const [tarefas, setTarefas] = useState<TarefaItem[]>([]);
 
-  function add() {
-    setTarefas(prev => [...prev, {
-      id: crypto.randomUUID(),
-      blocoId: '',
-      titulo: '',
-      responsavel: '',
-      data: '',
-      status: '',
-      linkDrive: '',
-      notificar: false
-    }])
-  }
+  useEffect(() => {
+    async function fetchTarefas() {
+      try {
+        const res = await fetch('/api/tarefas');
+        const data: TarefaItem[] = await res.json();
+        setTarefas(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar tarefas:', err);
+      }
+    }
+    fetchTarefas();
+  }, []);
 
   return (
     <div>
-      <button onClick={add}>Nova tarefa</button>
-
-      {tarefas.map(t => (
-        <div key={t.id}>
-          <input placeholder="Título" />
-          <input placeholder="Responsável" />
-          <input type="date" />
-          <input placeholder="Link Drive" />
-        </div>
-      ))}
+      <h3>Checklist de Tarefas</h3>
+      <ul>
+        {tarefas.map(t => (
+          <li key={t.titulo}>
+            {t.titulo} - {t.status} ({t.responsavel})
+          </li>
+        ))}
+      </ul>
     </div>
-  )
+  );
 }
