@@ -1,45 +1,39 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AgendaEvent, ChecklistItem } from '../types';
-import EventModal from './EventModal';
-import { mapPlanilhaParaEventos } from '../utils';
+import { AgendaEvent, ChecklistItem, mapPlanilhaParaEventos } from '../utils';
 
 interface AgendaCalendarProps {
-  sheetData: any[]; // dados da planilha
+  sheetData: any[];
 }
 
-const AgendaCalendar: React.FC<AgendaCalendarProps> = ({ sheetData }) => {
+export default function AgendaCalendar({ sheetData }: AgendaCalendarProps) {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [modalEvent, setModalEvent] = useState<AgendaEvent | null>(null);
 
   useEffect(() => {
-    // mapeia todos os dados da planilha para eventos
-    const mappedEvents = mapPlanilhaParaEventos(sheetData);
-    setEvents(mappedEvents);
+    const mapped = mapPlanilhaParaEventos(sheetData);
+    setEvents(mapped);
 
-    // filtra checklist do dia
+    // Preenche checklist do dia
     const today = new Date().toISOString().slice(0, 10);
-    const todayTasks = mappedEvents
-      .map(ev => ev.tarefa)
-      .filter(t => t && !t.status)
-      .map((t, idx) => ({
-        id: t?.titulo + idx,
-        date: today,
-        client: t?.responsavel || '',
-        task: t?.titulo || '',
+    const todayChecklist: ChecklistItem[] = mapped
+      .filter(e => e.tarefa && e.dateStart.slice(0, 10) === today && e.tarefa.status !== 'Concluído')
+      .map(e => ({
+        id: e.id,
+        date: e.dateStart,
+        client: e.perfil,
+        task: e.tarefa!.titulo,
         done: false
-      })) as ChecklistItem[];
-
-    setChecklist(todayTasks);
+      }));
+    setChecklist(todayChecklist);
   }, [sheetData]);
 
   const concluirTarefa = async (id: string) => {
-    // remove instantaneamente da tela
+    // Atualiza instantaneamente na tela
     setChecklist(prev => prev.filter(c => c.id !== id));
 
-    // Atualiza na planilha via API
+    // Aqui você pode atualizar na planilha via API
     try {
       await fetch('/api/checklist', {
         method: 'PATCH',
@@ -54,43 +48,39 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({ sheetData }) => {
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
+      {/* Agenda principal */}
+      <div style={{ flex: 3 }}>
+        <h2>Agenda</h2>
+        {events.map(e => (
+          <div key={e.id} style={{ border: '1px solid #ccc', padding: 10, marginBottom: 10 }}>
+            <strong>{e.tipoEvento}</strong> - {e.dateStart}
+            {e.dateEnd && <> até {e.dateEnd}</>}
+            <div>{e.conteudoPrincipal}</div>
+            <div>{e.conteudoSecundario}</div>
+            {e.tarefa && (
+              <div>
+                Tarefa: {e.tarefa.titulo} - Status: {e.tarefa.status} - Perfil: {e.perfil}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
       {/* Checklist lateral */}
-      <div style={{ padding: 10, minWidth: 250 }}>
+      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {checklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+            <li key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ flex: 1 }}>
-                {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+                {item.task} ({item.client})
               </span>
-              <button style={{ marginLeft: 8 }} onClick={() => concluirTarefa(item.id)}>✅</button>
+              <button onClick={() => concluirTarefa(item.id)}>✅</button>
             </li>
           ))}
         </ul>
       </div>
-
-      {/* Calendário */}
-      <div style={{ flex: 1 }}>
-        <h3>Eventos</h3>
-        <ul>
-          {events.map(ev => (
-            <li key={ev.id} style={{ marginBottom: 10 }}>
-              <strong>{ev.tipoEvento}</strong>: {ev.conteudoPrincipal || ev.tarefa?.titulo}
-              <br />
-              <small>{ev.dateStart} - {ev.dateEnd} | {ev.perfil}</small>
-              <br />
-              <button onClick={() => setModalEvent(ev)}>Editar/Ver</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {modalEvent && (
-        <EventModal event={modalEvent} onClose={() => setModalEvent(null)} />
-      )}
     </div>
   );
-};
-
-export default AgendaCalendar;
+}
