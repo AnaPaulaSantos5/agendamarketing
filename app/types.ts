@@ -1,24 +1,19 @@
-export type AgendaItem = {
-  id: string
-  dataInicio: string
-  dataFim: string
-  tipoEvento: string
-  tipo: string
-  conteudoPrincipal: string
-  conteudoSecundario: string
-  cta: string
-  statusPostagem: string
-  perfil: string
-  linkDrive: string
-}
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
-export type TarefaItem = {
-  id: string
-  blocoId: string
-  titulo: string
-  responsavel: string
-  data: string
-  status: string
-  linkDrive: string
-  notificar: boolean
-}
+export type AgendaEvent = {
+  id: string;
+  start: string; // ISO string com hora
+  end: string;   // ISO string com hora
+  tipoEvento?: string;
+  tipo?: string;
+  conteudoPrincipal?: string;
+  perfil?: Perfil;
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: string;
+  };
+};
