@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -13,7 +13,7 @@ export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState({ start: '', end: '' });
+  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
     async function fetchAgenda() {
@@ -22,7 +22,7 @@ export default function AgendaCalendar() {
         const data = await res.json();
         setEvents(data || []);
       } catch (err) {
-        console.error(err);
+        console.error('Erro da API:', err);
       }
     }
     fetchAgenda();
@@ -35,19 +35,23 @@ export default function AgendaCalendar() {
 
   const handleSave = (newEvent: AgendaEvent) => {
     setEvents(prev => [...prev, newEvent]);
+    fetch('/api/agenda', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEvent),
+    }).catch(err => console.error('Erro ao salvar evento', err));
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
     <div style={{ display: 'flex' }}>
+      {/* Calendário */}
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: 10 }}>
+        <div>
           Filtrar por perfil: 
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)} style={{ marginLeft: 5 }}>
-            {profiles.map(p => <option key={p}>{p}</option>)}
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
         <FullCalendar
@@ -64,17 +68,19 @@ export default function AgendaCalendar() {
         />
       </div>
 
+      {/* Checklist lateral */}
       <div style={{ width: 250, padding: 10, borderLeft: '1px solid #ccc' }}>
         <h4>Checklist Hoje</h4>
         <ul>
-          {events.filter(e => e.start.startsWith(today)).map(e => (
-            <li key={e.id}>
-              {e.conteudoPrincipal} ({e.tipoEvento}) - {e.start.slice(11,16)} às {e.end.slice(11,16)}
-            </li>
-          ))}
+          {events
+            .filter(e => e.start.startsWith(new Date().toISOString().slice(0, 10)) && e.perfil === filterProfile)
+            .map(e => (
+              <li key={e.id}>{e.conteudoPrincipal} ({e.tipoEvento})</li>
+            ))}
         </ul>
       </div>
 
+      {/* Modal */}
       <EventModal
         isOpen={modalOpen}
         start={selectedDate.start}
