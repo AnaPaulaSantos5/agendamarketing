@@ -1,56 +1,79 @@
-'use client'
+'use client';
+import React, { useState } from 'react';
 
-import { AgendaItem } from '../types'
+type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 type Props = {
-  item: AgendaItem
-  onSave: (item: AgendaItem) => void
-  onDelete: (id: string) => void
-  onClose: () => void
-}
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (event: any) => void;
+  start: string;
+  end: string;
+};
 
-export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
-  function update(field: keyof AgendaItem, value: any) {
-    onSave({ ...item, [field]: value })
+export default function EventModal({ isOpen, onClose, onSave, start, end }: Props) {
+  const [title, setTitle] = useState('');
+  const [profile, setProfile] = useState<Profile>('Confi');
+  const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
+  const [linkDrive, setLinkDrive] = useState('');
+  const [tarefaTitle, setTarefaTitle] = useState('');
+
+  if (!isOpen) return null;
+
+  function handleSave() {
+    if (!title) return alert('Informe o título do evento');
+
+    const eventData = {
+      start,
+      end,
+      tipoEvento: type,
+      conteudoPrincipal: title,
+      perfil: profile,
+      tarefa: tarefaTitle ? {
+        titulo: tarefaTitle,
+        responsavel: profile,
+        data: start,
+        status: 'Pendente',
+        linkDrive,
+        notificar: 'Sim',
+      } : undefined,
+    };
+
+    onSave(eventData);
+    onClose();
+    setTitle('');
+    setTarefaTitle('');
+    setLinkDrive('');
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-      <div className="bg-white p-4 w-[400px] space-y-2">
-        <h2 className="font-bold">Evento</h2>
+    <div style={overlay}>
+      <div style={modal}>
+        <h3>Novo Evento/Tarefa</h3>
+        <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
 
-        <input type="datetime-local" value={item.dataInicio}
-          onChange={e => update('dataInicio', e.target.value)} />
+        <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
+          <option>Confi</option>
+          <option>Cecília</option>
+          <option>Luiza</option>
+          <option>Júlio</option>
+        </select>
 
-        <input type="datetime-local" value={item.dataFim}
-          onChange={e => update('dataFim', e.target.value)} />
+        <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
+          <option value="Perfil">Perfil</option>
+          <option value="Interno">Interno</option>
+        </select>
 
-        <input placeholder="Tipo Evento"
-          value={item.tipoEvento}
-          onChange={e => update('tipoEvento', e.target.value)} />
+        <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
+        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
 
-        <input placeholder="Conteúdo Principal"
-          value={item.conteudoPrincipal}
-          onChange={e => update('conteudoPrincipal', e.target.value)} />
-
-        <input placeholder="CTA"
-          value={item.cta}
-          onChange={e => update('cta', e.target.value)} />
-
-        <input placeholder="Perfil"
-          value={item.perfil}
-          onChange={e => update('perfil', e.target.value)} />
-
-        <input placeholder="Link Drive"
-          value={item.linkDrive}
-          onChange={e => update('linkDrive', e.target.value)} />
-
-        <div className="flex gap-2">
-          <button onClick={() => onSave(item)}>Salvar</button>
-          <button onClick={() => onDelete(item.id)}>Excluir</button>
-          <button onClick={onClose}>Fechar</button>
-        </div>
+        <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
+        <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>Cancelar</button>
       </div>
     </div>
-  )
+  );
 }
+
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
+const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
