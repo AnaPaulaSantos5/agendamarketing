@@ -2,11 +2,13 @@
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 // Itens de checklist para cada evento
+// app/types.ts
 export type TarefaItem = {
   id: string;
   texto: string;
   status?: string;
   responsavel?: string;
+  feito?: boolean; // <- adiciona aqui
 };
 
 // Evento da agenda
