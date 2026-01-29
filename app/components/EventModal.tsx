@@ -1,125 +1,93 @@
 'use client';
 
-import React, { useState } from 'react';
-
-type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+import { useState } from 'react';
+import { AgendaItem, ChecklistItem, Profile } from '@/lib/types';
+import { v4 as uuid } from 'uuid';
 
 type Props = {
-  isOpen: boolean;
+  date: string;
+  onSave: (event: AgendaItem) => void;
   onClose: () => void;
-  onSave: (event: any) => void;
-  start: string;
-  end: string;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, start, end }: Props) {
-  const [title, setTitle] = useState('');
-  const [profile, setProfile] = useState<Profile>('Confi');
-  const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [tarefaTitle, setTarefaTitle] = useState('');
-  const [linkDrive, setLinkDrive] = useState('');
+export default function EventModal({ date, onSave, onClose }: Props) {
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('10:00');
 
-  if (!isOpen) return null;
+  const [conteudoPrincipal, setConteudoPrincipal] = useState('');
+  const [perfil, setPerfil] = useState<Profile>('Confi');
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
 
-  function handleSave() {
-    if (!title) {
-      alert('Informe o título');
-      return;
-    }
+  function addChecklist() {
+    setChecklist([
+      ...checklist,
+      { id: uuid(), label: '', done: false },
+    ]);
+  }
 
+  function save() {
     onSave({
-      start,
-      end,
-      tipoEvento: type,
-      tipo: tarefaTitle ? 'Tarefa' : 'Evento',
-      conteudoPrincipal: title,
-      perfil: profile,
-      tarefa: tarefaTitle
-        ? {
-            titulo: tarefaTitle,
-            responsavel: profile,
-            data: start,
-            status: 'Pendente',
-            linkDrive,
-            notificar: 'Sim',
-          }
-        : undefined,
+      id: Date.now(),
+      title: conteudoPrincipal || 'Evento',
+      start: `${date}T${startTime}`,
+      end: `${date}T${endTime}`,
+      tipoEvento: 'Agenda',
+      tipo: '',
+      conteudoPrincipal,
+      conteudoSecundario: '',
+      cta: '',
+      statusPostagem: 'Pendente',
+      perfil,
+      checklist,
     });
-
-    setTitle('');
-    setTarefaTitle('');
-    setLinkDrive('');
   }
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        <h3>Novo Evento / Tarefa</h3>
+    <div className="modal">
+      <h2>Novo evento</h2>
 
-        <input style={input} placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} />
+      <input
+        placeholder="Título"
+        value={conteudoPrincipal}
+        onChange={e => setConteudoPrincipal(e.target.value)}
+      />
 
-        <select style={input} value={profile} onChange={e => setProfile(e.target.value as Profile)}>
-          <option>Confi</option>
-          <option>Cecília</option>
-          <option>Luiza</option>
-          <option>Júlio</option>
-        </select>
+      <div>
+        <label>Início</label>
+        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+      </div>
 
-        <select style={input} value={type} onChange={e => setType(e.target.value as any)}>
-          <option value="Perfil">Perfil</option>
-          <option value="Interno">Interno</option>
-        </select>
+      <div>
+        <label>Fim</label>
+        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+      </div>
 
+      <select value={perfil} onChange={e => setPerfil(e.target.value as Profile)}>
+        <option value="Confi">Confi</option>
+        <option value="Luiza">Luiza</option>
+        <option value="Cecilia">Cecília</option>
+      </select>
+
+      <h3>Checklist</h3>
+      {checklist.map((item, i) => (
         <input
-          style={input}
-          placeholder="Título da tarefa (opcional)"
-          value={tarefaTitle}
-          onChange={e => setTarefaTitle(e.target.value)}
+          key={item.id}
+          placeholder="Item"
+          value={item.label}
+          onChange={e => {
+            const copy = [...checklist];
+            copy[i].label = e.target.value;
+            setChecklist(copy);
+          }}
         />
+      ))}
 
-        <input
-          style={input}
-          placeholder="Link do Drive (opcional)"
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
-        />
+      <button onClick={addChecklist}>+ Item</button>
 
-        <button style={saveBtn} onClick={handleSave}>
-          Salvar
-        </button>
-        <button style={input} onClick={onClose}>
-          Cancelar
-        </button>
+      <div className="actions">
+        <button onClick={onClose}>Cancelar</button>
+        <button onClick={save}>Salvar</button>
       </div>
     </div>
   );
 }
-
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 9999,
-};
-
-const modal: React.CSSProperties = {
-  background: '#fff',
-  padding: 20,
-  width: 360,
-  borderRadius: 8,
-};
-
-const input: React.CSSProperties = {
-  width: '100%',
-  marginBottom: 10,
-  padding: 8,
-};
-
-const saveBtn: React.CSSProperties = {
-  ...input,
-  background: '#1260c7',
-  color: '#fff',
-};
