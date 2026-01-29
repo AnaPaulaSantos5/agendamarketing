@@ -1,11 +1,9 @@
-// Tipos globais usados em toda a aplicação
-
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
   id: string;
-  start: string; // ISO string completa: yyyy-mm-ddThh:mm
-  end: string;   // ISO string completa: yyyy-mm-ddThh:mm
+  start: string; // ISO string com hora
+  end: string;   // ISO string com hora
   tipoEvento?: string;
   tipo?: string;
   conteudoPrincipal?: string;
@@ -14,8 +12,8 @@ export type AgendaEvent = {
     titulo: string;
     responsavel: Perfil;
     data: string;
-    status: 'Pendente' | 'Concluída';
+    status: string;
     linkDrive?: string;
-    notificar?: 'Sim' | 'Não';
+    notificar?: string;
   };
 };
