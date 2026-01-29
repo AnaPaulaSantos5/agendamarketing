@@ -7,7 +7,6 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
 export type AgendaEvent = {
   id: string;
   start: string;
@@ -43,14 +42,14 @@ const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState('Confi');
+  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos da Agenda
+  // Busca eventos
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -64,7 +63,7 @@ export default function AgendaCalendar() {
     fetchEvents();
   }, []);
 
-  // Busca itens do Checklist
+  // Busca checklist
   useEffect(() => {
     async function fetchChecklist() {
       try {
@@ -119,14 +118,15 @@ export default function AgendaCalendar() {
   };
 
   // Marcar item do checklist como concluído
-  const completeChecklistItem = async (item: ChecklistItem) => {
+  const toggleChecklistItem = async (item: ChecklistItem) => {
     try {
+      const updated = { ...item, done: !item.done };
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, done: true }),
+        body: JSON.stringify({ id: item.id, done: updated.done }),
       });
-      setChecklist(prev => prev.map(i => (i.id === item.id ? { ...i, done: true } : i)));
+      setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
     } catch (err) {
       console.error(err);
       alert('Erro ao atualizar checklist');
@@ -134,19 +134,20 @@ export default function AgendaCalendar() {
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
+  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
 
   return (
-    <div style={{ display: 'flex', gap: 20 }}>
+    <div style={{ display: 'flex', gap: '20px' }}>
       {/* Calendário */}
       <div style={{ flex: 3 }}>
-        <div style={{ marginBottom: 10 }}>
+        <label>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
-        </div>
+        </label>
 
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -187,21 +188,14 @@ export default function AgendaCalendar() {
       {/* Checklist lateral */}
       <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
-        {checklist
-          .filter(item => new Date(item.date).toISOString().slice(0, 10) === today)
-          .map(item => (
-            <div key={item.id} style={{ marginBottom: 8 }}>
-              <span>{item.client} - {item.task} [{item.done ? '✅' : '❌'}]</span>
-              {!item.done && (
-                <button
-                  style={{ marginLeft: 8 }}
-                  onClick={() => completeChecklistItem(item)}
-                >
-                  ✅
-                </button>
-              )}
-            </div>
+        <ul>
+          {todayChecklist.map(item => (
+            <li key={item.id} style={{ marginBottom: 8 }}>
+              <span>{item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}</span>
+              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+            </li>
           ))}
+        </ul>
       </div>
 
       {/* Modal */}
