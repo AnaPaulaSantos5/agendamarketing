@@ -18,23 +18,10 @@ export type AgendaEvent = {
   cta?: string;
   statusPostagem?: string;
   perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-  } | null;
+  tarefa?: { titulo: string; responsavel: Perfil; data: string; status: string; linkDrive?: string; notificar?: string } | null;
   allDay?: boolean;
 };
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
+export type ChecklistItem = { id: string; date: string; client: string; task: string; done: boolean };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
@@ -45,33 +32,33 @@ export default function AgendaCalendar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-
   const today = new Date().toISOString().slice(0, 10);
 
   // Busca eventos
-  const fetchEvents = async () => {
-    try {
-      const res = await fetch('/api/agenda');
-      const data = await res.json();
-      setEvents(data);
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/api/agenda');
+        const data = await res.json();
+        setEvents(data);
+      } catch (err) {
+        console.error(err);
+      }
     }
-  };
+    fetchEvents();
+  }, []);
 
   // Busca checklist
-  const fetchChecklist = async () => {
-    try {
-      const res = await fetch('/api/checklist');
-      const data = await res.json();
-      setChecklist(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
-    fetchEvents();
+    async function fetchChecklist() {
+      try {
+        const res = await fetch('/api/checklist');
+        const data = await res.json();
+        setChecklist(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
     fetchChecklist();
   }, []);
 
@@ -93,8 +80,6 @@ export default function AgendaCalendar() {
         });
         setEvents(prev => [...prev, ev]);
       }
-      // Atualiza checklist em tempo real após salvar evento
-      fetchChecklist();
     } catch (err) {
       console.error(err);
       alert('Erro ao salvar evento');
@@ -111,7 +96,6 @@ export default function AgendaCalendar() {
       });
       setEvents(prev => prev.filter(e => e.id !== id));
       setModalOpen(false);
-      fetchChecklist(); // Atualiza checklist após exclusão
     } catch (err) {
       console.error(err);
       alert('Erro ao excluir evento');
@@ -125,9 +109,8 @@ export default function AgendaCalendar() {
       await fetch('/api/checklist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, done: updated.done ? 'Sim' : 'Não' }), // Salva como Sim/Não
+        body: JSON.stringify({ id: item.id, done: updated.done }),
       });
-      // Atualiza estado local imediatamente
       setChecklist(prev => prev.map(c => (c.id === item.id ? updated : c)));
     } catch (err) {
       console.error(err);
@@ -136,20 +119,16 @@ export default function AgendaCalendar() {
   };
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
-  const todayChecklist = checklist.filter(c => {
-    // Convertendo data para comparar dia corretamente
-    const d = c.date.split('/').reverse().join('-'); // "26/01/26" => "26-01-26"
-    return d.startsWith(today.slice(0, 4) + '-' + today.slice(5, 7) + '-' + today.slice(8, 10));
-  });
+  const todayChecklist = checklist.filter(c => c.date.slice(0, 10) === today);
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
-      <div style={{ flex: 3 }}>
+      <div style={{ flex: 1 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+            {profiles.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
         <FullCalendar
@@ -158,12 +137,7 @@ export default function AgendaCalendar() {
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
           selectable={true}
           editable={true}
-          events={filteredEvents.map(ev => ({
-            id: ev.id,
-            title: ev.conteudoPrincipal,
-            start: ev.start,
-            end: ev.end,
-          }))}
+          events={filteredEvents.map(ev => ({ id: ev.id, title: ev.conteudoPrincipal, start: ev.start, end: ev.end }))}
           select={info => {
             setSelectedEvent(null);
             setSelectedDate({ start: info.startStr, end: info.endStr });
@@ -189,17 +163,14 @@ export default function AgendaCalendar() {
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ flex: 1, border: '1px solid #ccc', padding: 10, borderRadius: 8 }}>
+      <div style={{ width: 300, border: '1px solid #ccc', padding: 10 }}>
         <h3>Checklist Hoje</h3>
-        {todayChecklist.length === 0 && <p>Nenhuma tarefa para hoje</p>}
-        <ul>
-          {todayChecklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 8 }}>
-              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
-              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
-            </li>
-          ))}
-        </ul>
+        {todayChecklist.map(item => (
+          <div key={item.id} style={{ marginBottom: 10 }}>
+            <span>{item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}</span>
+            <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
+          </div>
+        ))}
       </div>
 
       {/* Modal */}
