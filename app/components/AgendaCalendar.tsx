@@ -5,7 +5,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
-import { AgendaEvent } from '@/app/types'
+import { AgendaEvent } from './app/types'
 import EventModal from './EventModal'
 
 export default function AgendaCalendar() {
