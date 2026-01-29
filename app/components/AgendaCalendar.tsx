@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import EventModal from './EventModal';
 import { AgendaEvent, Perfil, TarefaItem } from '../types';
+import EventModal from './EventModal';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [selectedPerfil, setSelectedPerfil] = useState<Perfil>('Confi');
-  const [selectedChecklist, setSelectedChecklist] = useState<TarefaItem[]>([]);
-
-  const handleDateClick = (arg: any) => {
-    setSelectedDate({ start: arg.dateStr, end: arg.dateStr });
-    setSelectedPerfil('Confi');         // perfil default
-    setSelectedChecklist([]);           // checklist default
-    setModalOpen(true);
-  };
+  const [selectedDate, setSelectedDate] = useState({ start: '', end: '' });
+  const [currentPerfil, setCurrentPerfil] = useState<Perfil>('Confi Finanças');
 
   const handleSave = (newEvent: AgendaEvent) => {
     setEvents([...events, newEvent]);
@@ -25,26 +14,29 @@ export default function AgendaCalendar() {
 
   return (
     <div>
-      <FullCalendar
-        plugins={[dayGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={events.map(ev => ({
-          title: ev.title,
-          start: ev.start,
-          end: ev.end,
-        }))}
-        dateClick={handleDateClick}
-      />
+      <button
+        onClick={() => setModalOpen(true)}
+      >
+        Adicionar Evento
+      </button>
 
       <EventModal
         isOpen={modalOpen}
-        start={selectedDate.start}
-        end={selectedDate.end}
-        perfil={selectedPerfil}
-        checklist={selectedChecklist}
+        start={selectedDate.start || new Date().toISOString()}
+        end={selectedDate.end || new Date().toISOString()}
+        perfil={currentPerfil}
+        checklist={[]}
         onSave={handleSave}
         onClose={() => setModalOpen(false)}
       />
+
+      <ul>
+        {events.map(e => (
+          <li key={e.id}>
+            {e.conteudoPrincipal} ({e.perfil}) - {e.checklist.length} tarefas
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
