@@ -10,7 +10,12 @@ type Props = {
   onClose: () => void
 }
 
-export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
+export default function EventModal({
+  item,
+  onSave,
+  onDelete,
+  onClose
+}: Props) {
   const [data, setData] = useState<AgendaItem>(item)
 
   return (
@@ -19,11 +24,11 @@ export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
       inset: 0,
       background: 'rgba(0,0,0,.4)',
       display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center'
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
       <div style={{ background: '#fff', padding: 20, width: 420 }}>
-        <h3>{data.id ? 'Editar' : 'Novo'} item</h3>
+        <h3>{item.title || 'Novo item'}</h3>
 
         <input
           placeholder="Título"
@@ -50,34 +55,42 @@ export default function EventModal({ item, onSave, onDelete, onClose }: Props) {
         {data.visibility === 'perfil' && (
           <select
             value={data.perfil}
-            onChange={e => setData({ ...data, perfil: e.target.value as Perfil })}
+            onChange={e =>
+              setData({ ...data, perfil: e.target.value as Perfil })
+            }
           >
-            <option>Confi</option>
-            <option>Luiza</option>
-            <option>Cecília</option>
-            <option>Júlio</option>
+            <option value="Confi">Confi</option>
+            <option value="Luiza">Luiza</option>
+            <option value="Cecília">Cecília</option>
+            <option value="Júlio">Júlio</option>
           </select>
         )}
 
         <textarea
           placeholder="Conteúdo principal"
-          value={data.conteudoPrincipal}
-          onChange={e => setData({ ...data, conteudoPrincipal: e.target.value })}
+          value={data.conteudoPrincipal || ''}
+          onChange={e =>
+            setData({ ...data, conteudoPrincipal: e.target.value })
+          }
         />
 
         <textarea
           placeholder="Conteúdo secundário"
-          value={data.conteudoSecundario}
-          onChange={e => setData({ ...data, conteudoSecundario: e.target.value })}
+          value={data.conteudoSecundario || ''}
+          onChange={e =>
+            setData({ ...data, conteudoSecundario: e.target.value })
+          }
         />
 
         <input
           placeholder="Link do Drive"
-          value={data.linkDrive}
-          onChange={e => setData({ ...data, linkDrive: e.target.value })}
+          value={data.linkDrive || ''}
+          onChange={e =>
+            setData({ ...data, linkDrive: e.target.value })
+          }
         />
 
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 12 }}>
           <button onClick={() => onSave(data)}>Salvar</button>
           <button onClick={() => onDelete(data.id)}>Excluir</button>
           <button onClick={onClose}>Fechar</button>
