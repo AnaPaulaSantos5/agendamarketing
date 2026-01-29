@@ -1,90 +1,96 @@
-import { useEffect, useState } from 'react';
-import { AgendaEvent } from '../types';
-import { mapPlanilhaParaEventos } from '../utils';
-import EventModal from './EventModal';
+'use client';
 
-export default function AgendaCalendar() {
+import { useEffect, useState } from 'react';
+import { AgendaEvent, ChecklistItem } from '../types';
+import EventModal from './EventModal';
+import { mapPlanilhaParaEventos } from '../utils';
+
+interface AgendaCalendarProps {
+  sheetData: any[]; // dados da planilha
+}
+
+const AgendaCalendar: React.FC<AgendaCalendarProps> = ({ sheetData }) => {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<AgendaEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [modalEvent, setModalEvent] = useState<AgendaEvent | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/getPlanilha');
-        const data = await res.json();
-        const allEvents = mapPlanilhaParaEventos(data);
-        setEvents(allEvents);
+    // mapeia todos os dados da planilha para eventos
+    const mappedEvents = mapPlanilhaParaEventos(sheetData);
+    setEvents(mappedEvents);
 
-        const today = new Date().toISOString().slice(0, 10);
-        setChecklist(
-          allEvents.filter(
-            e => e.dateStart.slice(0, 10) === today && e.tarefa && e.tarefa.status !== 'Concluído'
-          )
-        );
-      } catch (err) {
-        console.error(err);
-      }
-    };
+    // filtra checklist do dia
+    const today = new Date().toISOString().slice(0, 10);
+    const todayTasks = mappedEvents
+      .map(ev => ev.tarefa)
+      .filter(t => t && !t.status)
+      .map((t, idx) => ({
+        id: t?.titulo + idx,
+        date: today,
+        client: t?.responsavel || '',
+        task: t?.titulo || '',
+        done: false
+      })) as ChecklistItem[];
 
-    fetchData();
-  }, []);
+    setChecklist(todayTasks);
+  }, [sheetData]);
+
+  const concluirTarefa = async (id: string) => {
+    // remove instantaneamente da tela
+    setChecklist(prev => prev.filter(c => c.id !== id));
+
+    // Atualiza na planilha via API
+    try {
+      await fetch('/api/checklist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao concluir tarefa');
+    }
+  };
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
-      {/* Calendário (lista simples) */}
-      <div style={{ flex: 3 }}>
-        <h2>Agenda</h2>
-        <ul>
-          {events.map(event => (
-            <li key={event.id} style={{ marginBottom: 10 }}>
-              <b>{event.tipoEvento}</b> ({event.perfil})
-              <div>{event.conteudoPrincipal}</div>
-              <div>{event.conteudoSecundario}</div>
-              {event.tarefa && <div>Tarefa: {event.tarefa.titulo}</div>}
-              <button onClick={() => setSelectedEvent(event)}>Editar</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
       {/* Checklist lateral */}
-      <div style={{ flex: 1, padding: 10, border: '1px solid #ccc' }}>
+      <div style={{ padding: 10, minWidth: 250 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {checklist.map(item => (
             <li key={item.id} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
               <span style={{ flex: 1 }}>
-                {item.tarefa?.titulo} ({item.perfil}) - {item.tarefa?.status || 'Pendente'}
+                {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
               </span>
-              <button
-                style={{ marginLeft: 8 }}
-                onClick={async () => {
-                  setChecklist(prev => prev.filter(c => c.id !== item.id));
-                  try {
-                    await fetch('/api/checklist', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ id: item.id, status: 'Concluído' })
-                    });
-                  } catch (err) {
-                    console.error(err);
-                    alert('Erro ao concluir tarefa');
-                  }
-                }}
-              >
-                ✅
-              </button>
+              <button style={{ marginLeft: 8 }} onClick={() => concluirTarefa(item.id)}>✅</button>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Modal de edição */}
-      {selectedEvent && (
-        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      {/* Calendário */}
+      <div style={{ flex: 1 }}>
+        <h3>Eventos</h3>
+        <ul>
+          {events.map(ev => (
+            <li key={ev.id} style={{ marginBottom: 10 }}>
+              <strong>{ev.tipoEvento}</strong>: {ev.conteudoPrincipal || ev.tarefa?.titulo}
+              <br />
+              <small>{ev.dateStart} - {ev.dateEnd} | {ev.perfil}</small>
+              <br />
+              <button onClick={() => setModalEvent(ev)}>Editar/Ver</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {modalEvent && (
+        <EventModal event={modalEvent} onClose={() => setModalEvent(null)} />
       )}
     </div>
   );
-}
+};
+
+export default AgendaCalendar;
