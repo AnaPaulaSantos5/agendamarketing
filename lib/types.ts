@@ -9,7 +9,7 @@ export type Perfil =
 
 export type AgendaEvent = {
   id: string;
-  start: string;
+  start: string; // ISO date string com hora
   end: string;
   tipoEvento: string;
   tipo: string;
