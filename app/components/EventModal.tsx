@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AgendaEvent, Perfil, TarefaItem } from '@/app/types';
+import React, { useState } from 'react';
+import { AgendaEvent, Perfil, TarefaItem } from '@/lib/types';
 
 type Props = {
   isOpen: boolean;
@@ -13,29 +13,33 @@ type Props = {
 
 export default function EventModal({ isOpen, start, end, perfil, checklist, onSave, onClose }: Props) {
   const [conteudoPrincipal, setConteudoPrincipal] = useState('');
-  const [startTime, setStartTime] = useState(start.slice(11,16)); // 'HH:mm'
-  const [endTime, setEndTime] = useState(end.slice(11,16));
-  const [tarefas, setTarefas] = useState<TarefaItem[]>(checklist);
 
-  if (!isOpen) return null;
+  const [tarefas, setTarefas] = useState<TarefaItem[]>(checklist || []);
 
-  function save() {
-    if (!conteudoPrincipal) return alert('Preencha o título do evento');
+  const handleAddTarefa = () => {
+    const novaTarefa: TarefaItem = {
+      id: Date.now().toString(),
+      texto: '',
+      feito: false,
+    };
+    setTarefas([...tarefas, novaTarefa]);
+  };
 
+  const handleSave = () => {
     onSave({
       id: Date.now().toString(),
       title: conteudoPrincipal,
-      start: `${start.slice(0,10)}T${startTime}`,
-      end: `${start.slice(0,10)}T${endTime}`,
+      start,
+      end,
       perfil,
       checklist: tarefas,
     });
+    setConteudoPrincipal('');
+    setTarefas([]);
     onClose();
-  }
+  };
 
-  function toggleTarefa(id: string) {
-    setTarefas(prev => prev.map(t => t.id === id ? { ...t, feito: !t.feito } : t));
-  }
+  if (!isOpen) return null;
 
   return (
     <div className="modal-backdrop">
@@ -45,23 +49,25 @@ export default function EventModal({ isOpen, start, end, perfil, checklist, onSa
           type="text"
           placeholder="Título do evento"
           value={conteudoPrincipal}
-          onChange={e => setConteudoPrincipal(e.target.value)}
+          onChange={(e) => setConteudoPrincipal(e.target.value)}
         />
-        <label>Início</label>
-        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-        <label>Fim</label>
-        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-
-        <h3>Checklist</h3>
-        {tarefas.map(t => (
-          <div key={t.id}>
-            <input type="checkbox" checked={t.feito} onChange={() => toggleTarefa(t.id)} />
-            <span>{t.texto}</span>
-          </div>
-        ))}
-
-        <button onClick={save}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
+        <div className="checklist">
+          {tarefas.map((tarefa, idx) => (
+            <input
+              key={tarefa.id}
+              type="text"
+              value={tarefa.texto}
+              onChange={(e) => {
+                const updated = [...tarefas];
+                updated[idx].texto = e.target.value;
+                setTarefas(updated);
+              }}
+            />
+          ))}
+        </div>
+        <button onClick={handleAddTarefa}>Adicionar Tarefa</button>
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Cancelar</button>
       </div>
     </div>
   );
