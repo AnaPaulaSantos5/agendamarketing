@@ -43,7 +43,7 @@ const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState('Confi');
+  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
@@ -64,7 +64,7 @@ export default function AgendaCalendar() {
     fetchEvents();
   }, []);
 
-  // Busca checklist (sincronizado com Agenda e Tarefas)
+  // Busca checklist combinada (Checklist + Agenda + Tarefas)
   useEffect(() => {
     async function fetchChecklist() {
       try {
@@ -136,21 +136,26 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
   const todayChecklist = checklist.filter(c => {
-    // Ajusta data para o mesmo formato ISO
-    const [day, month, year] = c.date.split('/'); // formato "dd/mm/yy"
-    const iso = `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    return iso === today;
+    const checkDate = new Date(c.date);
+    const todayDate = new Date(today);
+    return (
+      checkDate.getFullYear() === todayDate.getFullYear() &&
+      checkDate.getMonth() === todayDate.getMonth() &&
+      checkDate.getDate() === todayDate.getDate()
+    );
   });
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       {/* Calendário */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 2 }}>
         <div>
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>
+                {p}
+              </option>
             ))}
           </select>
         </div>
@@ -192,15 +197,19 @@ export default function AgendaCalendar() {
       </div>
 
       {/* Checklist lateral */}
-      <div style={{ width: 300, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
+      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 10 }}>
         <h3>Checklist Hoje</h3>
-        {todayChecklist.length === 0 && <p>Nenhuma tarefa hoje</p>}
-        {todayChecklist.map(item => (
-          <div key={item.id} style={{ marginBottom: 10 }}>
-            <span>{item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}</span>
-            <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>✅</button>
-          </div>
-        ))}
+        {todayChecklist.length === 0 && <p>Nenhum item para hoje</p>}
+        <ul>
+          {todayChecklist.map(item => (
+            <li key={item.id} style={{ marginBottom: 6 }}>
+              {item.task} ({item.client}) - {item.done ? 'Concluído' : 'Pendente'}
+              <button onClick={() => toggleChecklistItem(item)} style={{ marginLeft: 8 }}>
+                ✅
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Modal */}
