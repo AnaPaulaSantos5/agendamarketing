@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState } from 'react';
 
 type Profile = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
@@ -15,32 +16,36 @@ export default function EventModal({ isOpen, onClose, onSave, start, end }: Prop
   const [title, setTitle] = useState('');
   const [profile, setProfile] = useState<Profile>('Confi');
   const [type, setType] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [linkDrive, setLinkDrive] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
+  const [linkDrive, setLinkDrive] = useState('');
 
   if (!isOpen) return null;
 
   function handleSave() {
-    if (!title) return alert('Informe o título do evento');
+    if (!title) {
+      alert('Informe o título');
+      return;
+    }
 
-    const eventData = {
+    onSave({
       start,
       end,
       tipoEvento: type,
+      tipo: tarefaTitle ? 'Tarefa' : 'Evento',
       conteudoPrincipal: title,
       perfil: profile,
-      tarefa: tarefaTitle ? {
-        titulo: tarefaTitle,
-        responsavel: profile,
-        data: start,
-        status: 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      } : undefined,
-    };
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: profile,
+            data: start,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : undefined,
+    });
 
-    onSave(eventData);
-    onClose();
     setTitle('');
     setTarefaTitle('');
     setLinkDrive('');
@@ -49,31 +54,72 @@ export default function EventModal({ isOpen, onClose, onSave, start, end }: Prop
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>Novo Evento/Tarefa</h3>
-        <input placeholder="Título do evento" value={title} onChange={e => setTitle(e.target.value)} style={input} />
+        <h3>Novo Evento / Tarefa</h3>
 
-        <select value={profile} onChange={e => setProfile(e.target.value as Profile)} style={input}>
+        <input style={input} placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} />
+
+        <select style={input} value={profile} onChange={e => setProfile(e.target.value as Profile)}>
           <option>Confi</option>
           <option>Cecília</option>
           <option>Luiza</option>
           <option>Júlio</option>
         </select>
 
-        <select value={type} onChange={e => setType(e.target.value as any)} style={input}>
+        <select style={input} value={type} onChange={e => setType(e.target.value as any)}>
           <option value="Perfil">Perfil</option>
           <option value="Interno">Interno</option>
         </select>
 
-        <input placeholder="Título da tarefa (opcional)" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} style={input} />
-        <input placeholder="Link do Drive (opcional)" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} style={input} />
+        <input
+          style={input}
+          placeholder="Título da tarefa (opcional)"
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+        />
 
-        <button onClick={handleSave} style={{ ...input, backgroundColor: '#1260c7', color: '#fff' }}>Salvar</button>
-        <button onClick={onClose} style={{ ...input, marginTop: '0.5rem' }}>Cancelar</button>
+        <input
+          style={input}
+          placeholder="Link do Drive (opcional)"
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+        />
+
+        <button style={saveBtn} onClick={handleSave}>
+          Salvar
+        </button>
+        <button style={input} onClick={onClose}>
+          Cancelar
+        </button>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 350, borderRadius: 8 };
-const input: React.CSSProperties = { width: '100%', marginBottom: 10, padding: 8 };
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 9999,
+};
+
+const modal: React.CSSProperties = {
+  background: '#fff',
+  padding: 20,
+  width: 360,
+  borderRadius: 8,
+};
+
+const input: React.CSSProperties = {
+  width: '100%',
+  marginBottom: 10,
+  padding: 8,
+};
+
+const saveBtn: React.CSSProperties = {
+  ...input,
+  background: '#1260c7',
+  color: '#fff',
+};
