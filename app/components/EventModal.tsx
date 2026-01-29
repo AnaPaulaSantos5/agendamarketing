@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AgendaEvent, Perfil, TarefaItem } from '@/lib/types';
+import { AgendaEvent, Perfil, TarefaItem } from '../types';
 
 type Props = {
   isOpen: boolean;
