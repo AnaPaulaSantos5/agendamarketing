@@ -1,4 +1,3 @@
-// app/api/checklist/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
@@ -13,78 +12,62 @@ async function accessSpreadsheet() {
   return doc;
 }
 
-// Função para pegar todos os itens combinando abas: Checklist + Agenda + Tarefas
-async function getChecklistItems() {
-  const doc = await accessSpreadsheet();
+// GET: retorna checklist unificado
+export async function GET() {
+  try {
+    const doc = await accessSpreadsheet();
+    const sheetChecklist = doc.sheetsByTitle['Checklist'];
+    const sheetAgenda = doc.sheetsByTitle['Agenda'];
+    const sheetTarefas = doc.sheetsByTitle['Tarefas'];
 
-  const checklistSheet = doc.sheetsByTitle['Checklist'];
-  const agendaSheet = doc.sheetsByTitle['Agenda'];
-  const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+    const rowsChecklist = await sheetChecklist.getRows();
+    const rowsAgenda = await sheetAgenda.getRows();
+    const rowsTarefas = await sheetTarefas.getRows();
 
-  const checklistRows = await checklistSheet.getRows();
-  const agendaRows = await agendaSheet.getRows();
-  const tarefasRows = await tarefasSheet.getRows();
-
-  const checklistItems = checklistRows.map(r => ({
-    id: r.ID,
-    date: r.Data,
-    client: r.Cliente,
-    task: r.Tarefa,
-    done: r.Done === 'Sim' || r.Done === true,
-  }));
-
-  // Adiciona tarefas da aba Agenda que ainda não estão na checklist
-  agendaRows.forEach(r => {
-    if (r.Tipo === 'Tarefa' || r.Tipo === 'Perfil') {
-      if (!checklistItems.find(c => c.id === r.ID)) {
-        checklistItems.push({
-          id: r.ID || String(new Date().getTime()) + Math.random(),
+    // Constrói checklist com base nas três abas
+    const checklist = [
+      ...rowsChecklist.map(r => ({
+        id: r.ID,
+        date: r.Data,
+        client: r.Cliente,
+        task: r.Tarefa,
+        done: r.Done === 'Sim',
+      })),
+      ...rowsAgenda
+        .filter(r => r.Tipo === 'Tarefa' && r.Conteudo_Principal)
+        .map(r => ({
+          id: `agenda-${r.Data_Inicio}-${r.Conteudo_Principal}`,
           date: r.Data_Inicio,
-          client: r.Perfil || '',
-          task: r.Conteudo_Principal || 'Sem descrição',
+          client: r.Perfil,
+          task: r.Conteudo_Principal,
           done: false,
-        });
-      }
-    }
-  });
-
-  // Adiciona itens da aba Tarefas que ainda não estão na checklist
-  tarefasRows.forEach(r => {
-    if (!checklistItems.find(c => c.id === r.Bloco_ID)) {
-      checklistItems.push({
-        id: r.Bloco_ID,
+        })),
+      ...rowsTarefas.map(r => ({
+        id: `tarefa-${r.Bloco_ID}`,
         date: r.Data,
         client: r.Responsavel,
         task: r.Titulo,
         done: r.Status === 'Concluída',
-      });
-    }
-  });
+      })),
+    ];
 
-  return checklistItems;
-}
-
-// GET
-export async function GET() {
-  try {
-    const items = await getChecklistItems();
-    return NextResponse.json(items);
+    return NextResponse.json(checklist);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
-// PATCH
+// PATCH: atualiza apenas a aba Checklist
 export async function PATCH(req: NextRequest) {
   try {
     const { id, done } = await req.json();
     const doc = await accessSpreadsheet();
-    const checklistSheet = doc.sheetsByTitle['Checklist'];
-    const rows = await checklistSheet.getRows();
-    const row = rows.find(r => r.ID === id);
+    const sheetChecklist = doc.sheetsByTitle['Checklist'];
 
-    if (!row) throw new Error('Item não encontrado');
+    const row = (await sheetChecklist.getRows()).find(r => r.ID === id);
+    if (!row) throw new Error('Item não encontrado na aba Checklist');
+
     row.Done = done ? 'Sim' : 'Não';
     await row.save();
 
