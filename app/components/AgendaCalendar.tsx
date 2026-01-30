@@ -26,7 +26,7 @@ export type AgendaEvent = {
     status: string;
     linkDrive?: string;
     notificar?: string;
-    responsavelChatId?: string;
+    responsavelChatId?: string; // ✅ adicionado
   } | null;
   allDay?: boolean;
 };
@@ -71,9 +71,8 @@ export default function AgendaCalendar() {
       try {
         const res = await fetch('/api/checklist');
         const data: ChecklistItem[] = await res.json();
-        const todayTasks = Array.from(
-          new Map(data.map(item => [item.id, item])).values()
-        ).filter(item => item.date.slice(0, 10) === today && !item.done);
+        const todayTasks = Array.from(new Map(data.map(item => [item.id, item])).values())
+          .filter(item => item.date.slice(0, 10) === today && !item.done);
         setChecklist(todayTasks);
       } catch (err) {
         console.error(err);
@@ -154,64 +153,68 @@ export default function AgendaCalendar() {
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
   return (
-    <div>
-      <div>
-        Filtrar por perfil:{' '}
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
+    <div style={{ display: 'flex', gap: 20 }}>
+      {/* Calendário */}
+      <div style={{ flex: 3 }}>
+        <div>
+          Filtrar por perfil:{' '}
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="timeGridWeek"
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          selectable={true}
+          editable={true}
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.conteudoPrincipal,
+            start: ev.start,
+            end: ev.end,
+          }))}
+          select={info => {
+            setSelectedEvent(null);
+            setSelectedDate({ start: info.startStr, end: info.endStr });
+            setModalOpen(true);
+          }}
+          eventClick={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) {
+              setSelectedEvent(ev);
+              setSelectedDate({ start: ev.start, end: ev.end });
+              setModalOpen(true);
+            }
+          }}
+          eventDrop={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
+          eventResize={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
+        />
       </div>
 
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-        selectable
-        editable
-        events={filteredEvents.map(ev => ({
-          id: ev.id,
-          title: ev.conteudoPrincipal,
-          start: ev.start,
-          end: ev.end,
-        }))}
-        select={info => {
-          setSelectedEvent(null);
-          setSelectedDate({ start: info.startStr, end: info.endStr });
-          setModalOpen(true);
-        }}
-        eventClick={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            setSelectedEvent(ev);
-            setSelectedDate({ start: ev.start, end: ev.end });
-            setModalOpen(true);
-          }
-        }}
-        eventDrop={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-        eventResize={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-      />
-
-      <div>
+      {/* Checklist lateral */}
+      <div style={{ flex: 1 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul>
           {checklist.map(item => (
             <li key={item.id}>
-              {item.task} ({item.client})
+              {item.task} ({item.client}){' '}
               <button onClick={() => toggleChecklistItem(item)}>✅</button>
             </li>
           ))}
         </ul>
       </div>
 
+      {/* Modal */}
       {modalOpen && selectedDate.start && (
         <EventModal
           isOpen={modalOpen}
