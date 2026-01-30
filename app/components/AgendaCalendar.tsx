@@ -1,8 +1,8 @@
 // app/components/AgendaCalendar.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
+import React, { useEffect, useState } from 'react';
+import FullCalendar, { EventInput } from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -32,77 +32,74 @@ export interface AgendaEvent {
   tarefa?: Tarefa | null;
 }
 
-export default function AgendaCalendar() {
+const AgendaCalendar: React.FC = () => {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
 
-  // Busca os eventos do Google Sheet
-  const fetchEvents = async () => {
+  // Carregar eventos da planilha
+  const loadEvents = async () => {
     try {
       const res = await fetch('/api/agenda');
       const data: AgendaEvent[] = await res.json();
-
-      // Ajusta as datas para o calendário
-      const formatted = data.map(ev => ({
-        ...ev,
-        start: new Date(ev.start),
-        end: new Date(ev.end),
-      }));
-
-      setEvents(formatted);
+      setEvents(data);
     } catch (err) {
-      console.error('Erro ao buscar eventos:', err);
+      console.error('Erro ao carregar eventos:', err);
     }
   };
 
   useEffect(() => {
-    fetchEvents();
+    loadEvents();
   }, []);
 
   // Salvar ou editar evento
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     try {
-      const method = isEdit ? 'PATCH' : 'POST';
-      const body = { ...ev };
-
-      await fetch('/api/agenda', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
       if (isEdit) {
+        await fetch('/api/agenda', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ev),
+        });
         setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
       } else {
+        await fetch('/api/agenda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ev),
+        });
         setEvents(prev => [...prev, ev]);
       }
+      setModalOpen(false);
     } catch (err) {
-      console.error('Erro ao salvar evento:', err);
+      console.error(err);
       alert('Erro ao salvar evento');
     }
   };
 
-  // Abrir modal ao clicar no evento
-  const handleEventClick = (info: any) => {
-    const ev = events.find(e => e.id === info.event.id);
+  // Abrir modal com evento selecionado
+  const handleEventClick = (clickInfo: any) => {
+    const ev = events.find(e => e.id === clickInfo.event.id);
     if (ev) {
       setSelectedEvent(ev);
       setModalOpen(true);
     }
   };
 
+  // Conversão para FullCalendar
+  const calendarEvents: EventInput[] = events.map(e => ({
+    id: e.id,
+    title: e.conteudoPrincipal,
+    start: e.start instanceof Date ? e.start.toISOString() : e.start,
+    end: e.end instanceof Date ? e.end.toISOString() : e.end,
+  }));
+
   return (
     <div>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        events={events.map(ev => ({
-          id: ev.id,
-          title: ev.conteudoPrincipal,
-          start: ev.start,
-          end: ev.end,
-        }))}
+        events={calendarEvents}
         eventClick={handleEventClick}
       />
 
@@ -110,8 +107,16 @@ export default function AgendaCalendar() {
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          start={selectedEvent.start}
-          end={selectedEvent.end}
+          start={
+            selectedEvent.start instanceof Date
+              ? selectedEvent.start.toISOString()
+              : selectedEvent.start
+          }
+          end={
+            selectedEvent.end instanceof Date
+              ? selectedEvent.end.toISOString()
+              : selectedEvent.end
+          }
           event={selectedEvent}
           onSave={saveEvent}
           onDelete={async (id: string) => {
@@ -127,4 +132,6 @@ export default function AgendaCalendar() {
       )}
     </div>
   );
-}
+};
+
+export default AgendaCalendar;
