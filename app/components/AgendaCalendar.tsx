@@ -1,13 +1,10 @@
 // app/components/AgendaCalendar.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import FullCalendar, { EventInput } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import EventModal from './EventModal';
-
 interface Tarefa {
   titulo: string;
   responsavel: string;
