@@ -1,239 +1,130 @@
+// app/components/AgendaCalendar.tsx
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+export interface Tarefa {
+  titulo: string;
+  responsavel: string;
+  responsavelChatId?: string;
+  data: string;
+  status: string;
+  linkDrive?: string;
+  notificar?: string;
+}
 
-export type AgendaEvent = {
+export interface AgendaEvent {
   id: string;
-  start: string;
-  end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
+  start: string | Date;
+  end: string | Date;
+  tipoEvento: string;
+  tipo: string;
+  conteudoPrincipal: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-  perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-    responsavelChatId?: string;
-  } | null;
-  allDay?: boolean;
-};
-
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
-
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+  perfil?: string;
+  tarefa?: Tarefa | null;
+}
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const today = new Date().toISOString().slice(0, 10);
 
-  // Busca eventos da planilha
-  useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data: AgendaEvent[] = await res.json();
-        setEvents(data);
-      } catch (err) {
-        console.error(err);
-      }
+  // Busca os eventos do Google Sheet
+  const fetchEvents = async () => {
+    try {
+      const res = await fetch('/api/agenda');
+      const data: AgendaEvent[] = await res.json();
+
+      // Ajusta as datas para o calendário
+      const formatted = data.map(ev => ({
+        ...ev,
+        start: new Date(ev.start),
+        end: new Date(ev.end),
+      }));
+
+      setEvents(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar eventos:', err);
     }
+  };
+
+  useEffect(() => {
     fetchEvents();
   }, []);
-
-  // Busca checklist das tarefas do dia
-  useEffect(() => {
-    async function fetchChecklist() {
-      try {
-        const res = await fetch('/api/checklist');
-        const data: ChecklistItem[] = await res.json();
-        const todayTasks = Array.from(
-          new Map(data.map(item => [item.id, item])).values()
-        ).filter(item => item.date.slice(0, 10) === today && !item.done);
-        setChecklist(todayTasks);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchChecklist();
-  }, [today]);
 
   // Salvar ou editar evento
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     try {
-      const payload: AgendaEvent = {
-        ...ev,
-        conteudoSecundario: ev.conteudoSecundario || '',
-        cta: ev.cta || '',
-        tarefa: ev.tarefa
-          ? {
-              ...ev.tarefa,
-              responsavelChatId: ev.tarefa.responsavelChatId || '',
-            }
-          : null,
-      };
+      const method = isEdit ? 'PATCH' : 'POST';
+      const body = { ...ev };
+
+      await fetch('/api/agenda', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
       if (isEdit) {
-        await fetch('/api/agenda', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        setEvents(prev => prev.map(e => (e.id === payload.id ? payload : e)));
+        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
       } else {
-        await fetch('/api/agenda', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        setEvents(prev => [...prev, payload]);
-
-        if (payload.tarefa) {
-          setChecklist(prev => [
-            ...prev,
-            {
-              id: payload.id,
-              date: payload.start,
-              client: payload.perfil || 'Confi',
-              task: payload.tarefa.titulo,
-              done: false,
-            },
-          ]);
-        }
+        setEvents(prev => [...prev, ev]);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao salvar evento:', err);
       alert('Erro ao salvar evento');
     }
   };
 
-  // Excluir evento
-  const deleteEvent = async (id: string) => {
-    try {
-      await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setChecklist(prev => prev.filter(c => c.id !== id));
-      setModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir evento');
+  // Abrir modal ao clicar no evento
+  const handleEventClick = (info: any) => {
+    const ev = events.find(e => e.id === info.event.id);
+    if (ev) {
+      setSelectedEvent(ev);
+      setModalOpen(true);
     }
   };
-
-  // Marcar item do checklist como concluído
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
-    try {
-      await fetch('/api/checklist', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id }),
-      });
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao atualizar checklist');
-    }
-  };
-
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
   return (
-    <>
-      <div>
-        Filtrar por perfil:{' '}
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
-
+    <div>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-        selectable={true}
-        editable={true}
-        events={filteredEvents.map(ev => ({
+        initialView="dayGridMonth"
+        events={events.map(ev => ({
           id: ev.id,
           title: ev.conteudoPrincipal,
           start: ev.start,
           end: ev.end,
         }))}
-        select={info => {
-          setSelectedEvent(null);
-          setSelectedDate({ start: info.startStr, end: info.endStr });
-          setModalOpen(true);
-        }}
-        eventClick={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            setSelectedEvent(ev);
-            setSelectedDate({ start: ev.start, end: ev.end });
-            setModalOpen(true);
-          }
-        }}
-        eventDrop={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-        eventResize={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
+        eventClick={handleEventClick}
       />
 
-      <div>
-        <h3>Checklist Hoje</h3>
-        {checklist.length === 0 && <div>Sem tarefas para hoje ✅</div>}
-        <ul>
-          {checklist.map(item => (
-            <li key={item.id}>
-              {item.task} ({item.client})
-              <button onClick={() => toggleChecklistItem(item)}>✅</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {modalOpen && selectedDate.start && (
+      {modalOpen && selectedEvent && (
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
+          start={selectedEvent.start}
+          end={selectedEvent.end}
           event={selectedEvent}
           onSave={saveEvent}
-          onDelete={deleteEvent}
+          onDelete={async (id: string) => {
+            await fetch('/api/agenda', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id }),
+            });
+            setEvents(prev => prev.filter(e => e.id !== id));
+            setModalOpen(false);
+          }}
         />
       )}
-    </>
+    </div>
   );
 }
