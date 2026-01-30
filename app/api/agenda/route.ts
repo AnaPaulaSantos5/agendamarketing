@@ -8,9 +8,7 @@ async function accessSpreadsheet() {
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
-
   await doc.loadInfo();
-
   return {
     agendaSheet: doc.sheetsByTitle['Agenda'],
     tarefasSheet: doc.sheetsByTitle['Tarefas'],
@@ -36,7 +34,6 @@ export async function GET() {
 
     const events = agendaRows.map(row => {
       const tarefa = tarefaRows.find(tr => String(tr.Bloco_ID) === String(row._rowNumber));
-
       return {
         id: String(row._rowNumber),
         start: row.Data_Inicio,
@@ -52,7 +49,7 @@ export async function GET() {
           ? {
               titulo: tarefa.Titulo,
               responsavel: tarefa.Responsavel,
-              responsavelChatId: tarefa.ResponsavelChatID || '',
+              responsavelChatId: tarefa.ResponsavelChatID || '', // ✅ ajuste
               data: tarefa.Data,
               status: tarefa.Status,
               linkDrive: tarefa.LinkDrive,
@@ -90,9 +87,9 @@ export async function POST(req: NextRequest) {
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: newRow._rowNumber,
-        Titulo: data.tarefa.titulo,
-        Responsavel: data.tarefa.responsavel,
-        ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ adicionado
+        Titulo: data.tarefa.titulo || '',
+        Responsavel: data.tarefa.responsavel || '',
+        ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ ajuste
         Data: formatDateForSheet(data.tarefa.data),
         Status: data.tarefa.status || 'Pendente',
         LinkDrive: data.tarefa.linkDrive || '',
@@ -132,7 +129,7 @@ export async function PATCH(req: NextRequest) {
       if (tarefaRow) {
         tarefaRow.Titulo = data.tarefa.titulo || tarefaRow.Titulo;
         tarefaRow.Responsavel = data.tarefa.responsavel || tarefaRow.Responsavel;
-        tarefaRow.ResponsavelChatID = data.tarefa.responsavelChatId || tarefaRow.ResponsavelChatID; // ✅ adicionado
+        tarefaRow.ResponsavelChatID = data.tarefa.responsavelChatId || tarefaRow.ResponsavelChatID; // ✅ ajuste
         tarefaRow.Data = formatDateForSheet(data.tarefa.data);
         tarefaRow.Status = data.tarefa.status || tarefaRow.Status;
         tarefaRow.LinkDrive = data.tarefa.linkDrive || tarefaRow.LinkDrive;
@@ -141,9 +138,9 @@ export async function PATCH(req: NextRequest) {
       } else {
         await tarefasSheet.addRow({
           Bloco_ID: data.id,
-          Titulo: data.tarefa.titulo,
-          Responsavel: data.tarefa.responsavel,
-          ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ adicionado
+          Titulo: data.tarefa.titulo || '',
+          Responsavel: data.tarefa.responsavel || '',
+          ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ ajuste
           Data: formatDateForSheet(data.tarefa.data),
           Status: data.tarefa.status || 'Pendente',
           LinkDrive: data.tarefa.linkDrive || '',
