@@ -1,4 +1,5 @@
-type AgendaEvent = {
+// Lib/types.ts
+export type AgendaEvent = {
   id: string;
   dateStart: string;
   dateEnd?: string;
