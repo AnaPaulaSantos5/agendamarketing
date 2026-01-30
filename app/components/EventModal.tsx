@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { AgendaEvent } from '../Lib/types';
+import { AgendaEvent } from '../lib/types';
 
 type Props = {
   isOpen: boolean;
