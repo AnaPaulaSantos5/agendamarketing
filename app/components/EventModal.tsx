@@ -1,228 +1,157 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import EventModal from './EventModal';
+import React, { useState, useEffect } from 'react';
+import { AgendaEvent, Perfil } from './AgendaCalendar';
 
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
-export type AgendaEvent = {
-  id: string;
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
+  onDelete: (id: string) => void;
   start: string;
   end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
-  perfil?: Perfil;
-  tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-    responsavelChatId?: string;
-  } | null;
-  allDay?: boolean;
+  event?: AgendaEvent | null;
 };
 
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
+export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event }: Props) {
+  const [editing, setEditing] = useState(!event);
+  const [title, setTitle] = useState('');
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
+  const [tarefaTitle, setTarefaTitle] = useState('');
+  const [linkDrive, setLinkDrive] = useState('');
+  const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [startDate, setStartDate] = useState(start);
+  const [endDate, setEndDate] = useState(end);
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
-
-export default function AgendaCalendar() {
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Busca eventos da planilha
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch('/api/agenda');
-        const data: AgendaEvent[] = await res.json();
-        setEvents(data);
-      } catch (err) {
-        console.error(err);
-      }
+    if (event) {
+      setTitle(event.conteudoPrincipal || '');
+      setPerfil(event.perfil || 'Confi');
+      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
+      setTarefaTitle(event.tarefa?.titulo || '');
+      setLinkDrive(event.tarefa?.linkDrive || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
+      setStartDate(event.start);
+      setEndDate(event.end);
+      setEditing(false);
+    } else {
+      setTitle('');
+      setPerfil('Confi');
+      setTipo('Perfil');
+      setTarefaTitle('');
+      setLinkDrive('');
+      setResponsavelChatId('');
+      setStartDate(start);
+      setEndDate(end);
+      setEditing(true);
     }
-    fetchEvents();
-  }, []);
+  }, [event, start, end]);
 
-  // Busca checklist das tarefas do dia
-  useEffect(() => {
-    async function fetchChecklist() {
-      try {
-        const res = await fetch('/api/checklist');
-        const data: ChecklistItem[] = await res.json();
-        const todayTasks = Array.from(
-          new Map(data.map(item => [item.id, item])).values()
-        ).filter(item => item.date.slice(0, 10) === today && !item.done);
-        setChecklist(todayTasks);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchChecklist();
-  }, [today]);
+  if (!isOpen) return null;
 
-  // Salvar ou editar evento
-  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    try {
-      if (isEdit) {
-        await fetch('/api/agenda', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-      } else {
-        await fetch('/api/agenda', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ev),
-        });
-        setEvents(prev => [...prev, ev]);
+  const handleSave = () => {
+    if (!title) return alert('Informe o título do evento');
 
-        if (ev.tarefa) {
-          setChecklist(prev => [
-            ...prev,
-            {
-              id: ev.id,
-              date: ev.start,
-              client: ev.perfil || 'Confi',
-              task: ev.tarefa.titulo,
-              done: false,
-            },
-          ]);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar evento');
+    const ev: AgendaEvent = {
+      id: event?.id || String(new Date().getTime()),
+      start: startDate,
+      end: endDate,
+      conteudoPrincipal: title,
+      perfil,
+      tipoEvento: tipo,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: perfil,
+            status: event?.tarefa?.status || 'Pendente',
+            data: startDate,
+            linkDrive,
+            notificar: 'Sim',
+            responsavelChatId,
+          }
+        : null,
+    };
+    onSave(ev, !!event);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    if (!event) return;
+    if (confirm('Deseja realmente excluir este evento?')) {
+      onDelete(event.id);
     }
   };
 
-  // Excluir evento
-  const deleteEvent = async (id: string) => {
-    try {
-      await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setChecklist(prev => prev.filter(c => c.id !== id));
-      setModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir evento');
-    }
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    marginBottom: 10,
+    padding: 8,
   };
 
-  // Marcar item do checklist como concluído
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
-    try {
-      await fetch('/api/checklist', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, done: true }),
-      });
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao atualizar checklist');
-    }
+  const modalStyle: React.CSSProperties = {
+    background: '#fff',
+    padding: 20,
+    width: 350,
+    borderRadius: 8,
   };
 
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.4)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  };
 
   return (
-    <div>
-      <div>
-        Filtrar por perfil:{' '}
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+    <div style={overlayStyle}>
+      <div style={modalStyle}>
+        <h3>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
+
+        {event && !editing && (
+          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
+            ✏️ Editar
+          </button>
+        )}
+
+        <label>Título:</label>
+        <input type="text" value={title} onChange={e => setTitle(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <label>Perfil:</label>
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} disabled={!editing} style={inputStyle}>
+          <option>Confi</option>
+          <option>Cecília</option>
+          <option>Luiza</option>
+          <option>Júlio</option>
         </select>
+
+        <label>Tipo:</label>
+        <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={inputStyle}>
+          <option>Interno</option>
+          <option>Perfil</option>
+        </select>
+
+        <label>Tarefa:</label>
+        <input type="text" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <label>Link Drive:</label>
+        <input type="text" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <label>Responsável ChatId:</label>
+        <input type="text" value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <label>Início:</label>
+        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <label>Fim:</label>
+        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!editing} style={inputStyle} />
+
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
+        {event && <button onClick={handleDelete}>Excluir</button>}
       </div>
-
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
-        selectable
-        editable
-        events={filteredEvents.map(ev => ({
-          id: ev.id,
-          title: ev.conteudoPrincipal,
-          start: ev.start,
-          end: ev.end,
-        }))}
-        select={info => {
-          setSelectedEvent(null);
-          setSelectedDate({ start: info.startStr, end: info.endStr });
-          setModalOpen(true);
-        }}
-        eventClick={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            setSelectedEvent(ev);
-            setSelectedDate({ start: ev.start, end: ev.end });
-            setModalOpen(true);
-          }
-        }}
-        eventDrop={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-        eventResize={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-      />
-
-      <div>
-        <h3>Checklist Hoje</h3>
-        {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
-        <ul>
-          {checklist.map(item => (
-            <li key={item.id}>
-              {item.task} ({item.client})
-              <button onClick={() => toggleChecklistItem(item)}>✅</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {modalOpen && selectedDate.start && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
-          event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
-        />
-      )}
     </div>
   );
 }
