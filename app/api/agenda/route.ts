@@ -26,53 +26,13 @@ function formatDateForSheet(dateStr: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-// GET eventos com tarefas
-export async function GET() {
-  try {
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-    const agendaRows = await agendaSheet.getRows();
-    const tarefaRows = await tarefasSheet.getRows();
-
-    const events = agendaRows.map(row => {
-      const tarefa = tarefaRows.find(tr => String(tr.Bloco_ID) === String(row._rowNumber));
-      return {
-        id: String(row._rowNumber),
-        start: row.Data_Inicio,
-        end: row.Data_Fim,
-        tipoEvento: row.Tipo_Evento,
-        tipo: row.Tipo,
-        conteudoPrincipal: row.Conteudo_Principal,
-        conteudoSecundario: row.Conteudo_Secundario,
-        cta: row.CTA,
-        statusPostagem: row.Status_Postagem,
-        perfil: row.Perfil,
-        tarefa: tarefa
-          ? {
-              titulo: tarefa.Titulo,
-              responsavel: tarefa.Responsavel,
-              responsavelChatId: tarefa.ResponsavelChatID || '',
-              data: tarefa.Data,
-              status: tarefa.Status,
-              linkDrive: tarefa.LinkDrive,
-              notificar: tarefa.Notificar,
-            }
-          : null,
-      };
-    });
-
-    return NextResponse.json(events);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
-
 // POST novo evento
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
+    // Salva o evento na aba Agenda
     const newRow = await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
@@ -85,13 +45,13 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil || '',
     });
 
+    // Se houver tarefa, salva na aba Tarefas, incluindo responsavelChatId
     if (data.tarefa) {
-      const chatId = data.tarefa.responsavelChatId || '';
       await tarefasSheet.addRow({
         Bloco_ID: newRow._rowNumber,
         Titulo: data.tarefa.titulo || '',
         Responsavel: data.tarefa.responsavel || '',
-        ResponsavelChatID: chatId,
+        ResponsavelChatId: data.tarefa.responsavelChatId || '', // ⚡ garante que salva
         Data: formatDateForSheet(data.tarefa.data),
         Status: data.tarefa.status || 'Pendente',
         LinkDrive: data.tarefa.linkDrive || '',
@@ -127,13 +87,11 @@ export async function PATCH(req: NextRequest) {
     await row.save();
 
     if (data.tarefa) {
-      const chatId = data.tarefa.responsavelChatId || '';
       const tarefaRow = (await tarefasSheet.getRows()).find(tr => String(tr.Bloco_ID) === data.id);
-
       if (tarefaRow) {
         tarefaRow.Titulo = data.tarefa.titulo || tarefaRow.Titulo;
         tarefaRow.Responsavel = data.tarefa.responsavel || tarefaRow.Responsavel;
-        tarefaRow.ResponsavelChatID = chatId;
+        tarefaRow.ResponsavelChatId = data.tarefa.responsavelChatId || tarefaRow.ResponsavelChatId; // ⚡ garante que atualiza
         tarefaRow.Data = formatDateForSheet(data.tarefa.data);
         tarefaRow.Status = data.tarefa.status || tarefaRow.Status;
         tarefaRow.LinkDrive = data.tarefa.linkDrive || tarefaRow.LinkDrive;
@@ -144,7 +102,7 @@ export async function PATCH(req: NextRequest) {
           Bloco_ID: data.id,
           Titulo: data.tarefa.titulo || '',
           Responsavel: data.tarefa.responsavel || '',
-          ResponsavelChatID: chatId,
+          ResponsavelChatId: data.tarefa.responsavelChatId || '', // ⚡ garante que salva
           Data: formatDateForSheet(data.tarefa.data),
           Status: data.tarefa.status || 'Pendente',
           LinkDrive: data.tarefa.linkDrive || '',
@@ -152,25 +110,6 @@ export async function PATCH(req: NextRequest) {
         });
       }
     }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
-
-// DELETE evento/tarefa
-export async function DELETE(req: NextRequest) {
-  try {
-    const { id } = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-
-    const row = (await agendaSheet.getRows()).find(r => String(r._rowNumber) === id);
-    if (row) await row.delete();
-
-    const tarefaRow = (await tarefasSheet.getRows()).find(r => String(r.Bloco_ID) === id);
-    if (tarefaRow) await tarefaRow.delete();
 
     return NextResponse.json({ ok: true });
   } catch (err) {
