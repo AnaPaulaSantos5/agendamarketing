@@ -1,3 +1,4 @@
+// app/api/agenda/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
@@ -49,7 +50,7 @@ export async function GET() {
           ? {
               titulo: tarefa.Titulo,
               responsavel: tarefa.Responsavel,
-              responsavelChatId: tarefa.ResponsavelChatID || '', // ✅ ajuste
+              responsavelChatId: tarefa.ResponsavelChatID || '',
               data: tarefa.Data,
               status: tarefa.Status,
               linkDrive: tarefa.LinkDrive,
@@ -85,11 +86,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (data.tarefa) {
+      const chatId = data.tarefa.responsavelChatId || '';
       await tarefasSheet.addRow({
         Bloco_ID: newRow._rowNumber,
         Titulo: data.tarefa.titulo || '',
         Responsavel: data.tarefa.responsavel || '',
-        ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ ajuste
+        ResponsavelChatID: chatId,
         Data: formatDateForSheet(data.tarefa.data),
         Status: data.tarefa.status || 'Pendente',
         LinkDrive: data.tarefa.linkDrive || '',
@@ -125,11 +127,13 @@ export async function PATCH(req: NextRequest) {
     await row.save();
 
     if (data.tarefa) {
+      const chatId = data.tarefa.responsavelChatId || '';
       const tarefaRow = (await tarefasSheet.getRows()).find(tr => String(tr.Bloco_ID) === data.id);
+
       if (tarefaRow) {
         tarefaRow.Titulo = data.tarefa.titulo || tarefaRow.Titulo;
         tarefaRow.Responsavel = data.tarefa.responsavel || tarefaRow.Responsavel;
-        tarefaRow.ResponsavelChatID = data.tarefa.responsavelChatId || tarefaRow.ResponsavelChatID; // ✅ ajuste
+        tarefaRow.ResponsavelChatID = chatId;
         tarefaRow.Data = formatDateForSheet(data.tarefa.data);
         tarefaRow.Status = data.tarefa.status || tarefaRow.Status;
         tarefaRow.LinkDrive = data.tarefa.linkDrive || tarefaRow.LinkDrive;
@@ -140,7 +144,7 @@ export async function PATCH(req: NextRequest) {
           Bloco_ID: data.id,
           Titulo: data.tarefa.titulo || '',
           Responsavel: data.tarefa.responsavel || '',
-          ResponsavelChatID: data.tarefa.responsavelChatId || '', // ✅ ajuste
+          ResponsavelChatID: chatId,
           Data: formatDateForSheet(data.tarefa.data),
           Status: data.tarefa.status || 'Pendente',
           LinkDrive: data.tarefa.linkDrive || '',
@@ -162,11 +166,9 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // Remove evento
     const row = (await agendaSheet.getRows()).find(r => String(r._rowNumber) === id);
     if (row) await row.delete();
 
-    // Remove tarefa associada
     const tarefaRow = (await tarefasSheet.getRows()).find(r => String(r.Bloco_ID) === id);
     if (tarefaRow) await tarefaRow.delete();
 
