@@ -1,4 +1,5 @@
-// app/components/AgendaCalendar.tsx
+'use client'; // ⚠️ Adicione esta linha como a primeira do arquivo
+
 import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -35,13 +36,11 @@ const AgendaCalendar = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
 
-  // Carrega os eventos da planilha ao iniciar
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         const res = await fetch('/api/agenda');
         const data = await res.json();
-        // Garante que datas são strings
         const formatted = data.map((ev: AgendaEvent) => ({
           ...ev,
           start: typeof ev.start === 'string' ? ev.start : new Date(ev.start).toISOString(),
@@ -55,7 +54,6 @@ const AgendaCalendar = () => {
     fetchEvents();
   }, []);
 
-  // Salva ou edita evento
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     try {
       if (isEdit) {
@@ -81,7 +79,6 @@ const AgendaCalendar = () => {
     }
   };
 
-  // Deleta evento
   const deleteEvent = async (id: string) => {
     try {
       await fetch('/api/agenda', {
@@ -97,7 +94,6 @@ const AgendaCalendar = () => {
     }
   };
 
-  // Ao clicar em um evento
   const handleEventClick = (clickInfo: any) => {
     const ev = events.find(e => e.id === clickInfo.event.id);
     if (!ev) return;
