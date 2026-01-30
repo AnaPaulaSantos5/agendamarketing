@@ -19,8 +19,11 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
+  const [secondaryContent, setSecondaryContent] = useState('');
+  const [cta, setCta] = useState('');
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
+  const [responsavelChatId, setResponsavelChatId] = useState('');
 
   useEffect(() => {
     if (event) {
@@ -29,8 +32,11 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
+      setSecondaryContent(event.conteudoSecundario || '');
+      setCta(event.cta || '');
       setStartDate(event.start);
       setEndDate(event.end);
+      setResponsavelChatId(event.responsavelChatId || '');
       setEditing(false);
     } else {
       setTitle('');
@@ -38,8 +44,11 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       setTipo('Perfil');
       setTarefaTitle('');
       setLinkDrive('');
+      setSecondaryContent('');
+      setCta('');
       setStartDate(start);
       setEndDate(end);
+      setResponsavelChatId('');
       setEditing(true);
     }
   }, [event, start, end]);
@@ -56,16 +65,21 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       conteudoPrincipal: title,
       perfil,
       tipoEvento: tipo,
+      tipo,
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
-            responsavel: perfil, // ✅ corrigido
-            status: event?.tarefa?.status || 'Pendente',
+            responsavel: perfil,
             data: startDate,
+            status: 'Pendente',
             linkDrive,
             notificar: 'Sim',
           }
         : null,
+      conteudoSecundario: secondaryContent,
+      cta: cta,
+      statusPostagem: 'Pendente',
+      responsavelChatId,
     };
 
     onSave(ev, !!event);
@@ -82,89 +96,50 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
+        <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
 
-        {event && !editing && (
-          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
-            ✏️ Editar
-          </button>
-        )}
+        {event && !editing && <button onClick={() => setEditing(true)}>✏️ Editar</button>}
 
-        <label>Título:</label>
-        <input
-          type="text"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <label>Título do Evento (Conteúdo Principal):</label>
+        <input type="text" value={title} onChange={e => setTitle(e.target.value)} disabled={!editing} style={input} />
 
         <label>Perfil:</label>
-        <select
-          value={perfil}
-          onChange={e => setPerfil(e.target.value as Perfil)}
-          disabled={!editing}
-          style={input}
-        >
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} disabled={!editing} style={input}>
           <option>Confi</option>
           <option>Cecília</option>
           <option>Luiza</option>
           <option>Júlio</option>
         </select>
 
-        <label>Tipo:</label>
-        <select
-          value={tipo}
-          onChange={e => setTipo(e.target.value as any)}
-          disabled={!editing}
-          style={input}
-        >
+        <label>Tipo do Evento:</label>
+        <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={input}>
           <option>Perfil</option>
           <option>Interno</option>
         </select>
 
-        <label>Tarefa:</label>
-        <input
-          type="text"
-          value={tarefaTitle}
-          onChange={e => setTarefaTitle(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <label>Tarefa (opcional):</label>
+        <input type="text" value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} disabled={!editing} style={input} />
 
-        <label>Link Drive:</label>
-        <input
-          type="text"
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <label>Link Drive (opcional):</label>
+        <input type="text" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} disabled={!editing} style={input} />
+
+        <label>Conteúdo Secundário (opcional):</label>
+        <input type="text" value={secondaryContent} onChange={e => setSecondaryContent(e.target.value)} disabled={!editing} style={input} />
+
+        <label>CTA (opcional):</label>
+        <input type="text" value={cta} onChange={e => setCta(e.target.value)} disabled={!editing} style={input} />
+
+        <label>Responsável (ChatId) (opcional, para envio de WA):</label>
+        <input type="text" value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} disabled={!editing} style={input} />
 
         <label>Início:</label>
-        <input
-          type="datetime-local"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={!editing} style={input} />
 
         <label>Fim:</label>
-        <input
-          type="datetime-local"
-          value={endDate}
-          onChange={e => setEndDate(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!editing} style={input} />
 
-        <button onClick={handleSave} style={{ marginRight: 8 }}>
-          Salvar
-        </button>
-        <button onClick={onClose} style={{ marginRight: 8 }}>
-          Fechar
-        </button>
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
         {event && <button onClick={handleDelete}>Excluir</button>}
       </div>
     </div>
@@ -184,7 +159,7 @@ const overlay: React.CSSProperties = {
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 350,
+  width: 400,
   borderRadius: 8,
 };
 
