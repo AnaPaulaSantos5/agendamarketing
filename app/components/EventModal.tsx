@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { AgendaEvent, Perfil } from './AgendaCalendar';
+import { AgendaEvent } from '../Lib/types';
 
 type Props = {
   isOpen: boolean;
@@ -12,33 +12,24 @@ type Props = {
   event?: AgendaEvent | null;
 };
 
-export default function EventModal({
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-  start,
-  end,
-  event,
-}: Props) {
+export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event }: Props) {
   const [editing, setEditing] = useState(!event);
   const [title, setTitle] = useState('');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
-  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
+  const [perfil, setPerfil] = useState('Confi');
+  const [tipo, setTipo] = useState<'Evento' | 'Tarefa'>('Tarefa');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
-  // Atualiza campos quando abre o modal
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setConteudoSecundario(event.conteudoSecundario || '');
       setPerfil(event.perfil || 'Confi');
-      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
+      setTipo(event.tipoEvento === 'Evento' ? 'Evento' : 'Tarefa');
       setTarefaTitle(event.tarefa?.titulo || '');
       setResponsavelChatId(event.tarefa?.responsavel || event.perfil || 'Confi');
       setLinkDrive(event.tarefa?.linkDrive || '');
@@ -49,7 +40,7 @@ export default function EventModal({
       setTitle('');
       setConteudoSecundario('');
       setPerfil('Confi');
-      setTipo('Perfil');
+      setTipo('Tarefa');
       setTarefaTitle('');
       setResponsavelChatId('');
       setLinkDrive('');
@@ -80,7 +71,7 @@ export default function EventModal({
             linkDrive,
             notificar: 'Sim',
           }
-        : null,
+        : undefined,
     };
 
     onSave(ev, !!event);
@@ -97,7 +88,7 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h3>
+        <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
 
         {event && !editing && (
           <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
@@ -105,7 +96,6 @@ export default function EventModal({
           </button>
         )}
 
-        {/* Título */}
         <label>Título:</label>
         <input
           type="text"
@@ -115,42 +105,30 @@ export default function EventModal({
           style={input}
         />
 
-        {/* Conteúdo Secundário */}
         <label>Conteúdo Secundário:</label>
-        <textarea
+        <input
+          type="text"
           value={conteudoSecundario}
           onChange={e => setConteudoSecundario(e.target.value)}
           disabled={!editing}
           style={input}
         />
 
-        {/* Perfil */}
         <label>Perfil:</label>
-        <select
+        <input
+          type="text"
           value={perfil}
-          onChange={e => setPerfil(e.target.value as Perfil)}
+          onChange={e => setPerfil(e.target.value)}
           disabled={!editing}
           style={input}
-        >
-          <option value="Confi">Confi</option>
-          <option value="Cecília">Cecília</option>
-          <option value="Luiza">Luiza</option>
-          <option value="Júlio">Júlio</option>
-        </select>
+        />
 
-        {/* Tipo */}
         <label>Tipo:</label>
-        <select
-          value={tipo}
-          onChange={e => setTipo(e.target.value as any)}
-          disabled={!editing}
-          style={input}
-        >
-          <option value="Interno">Interno</option>
-          <option value="Perfil">Perfil</option>
+        <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={input}>
+          <option value="Evento">Evento</option>
+          <option value="Tarefa">Tarefa</option>
         </select>
 
-        {/* Tarefa */}
         <label>Tarefa:</label>
         <input
           type="text"
@@ -160,8 +138,7 @@ export default function EventModal({
           style={input}
         />
 
-        {/* Responsável Chat */}
-        <label>Responsável Chat:</label>
+        <label>Responsável (ChatId):</label>
         <input
           type="text"
           value={responsavelChatId}
@@ -170,7 +147,6 @@ export default function EventModal({
           style={input}
         />
 
-        {/* Link Drive */}
         <label>Link Drive:</label>
         <input
           type="text"
@@ -180,7 +156,6 @@ export default function EventModal({
           style={input}
         />
 
-        {/* Datas */}
         <label>Início:</label>
         <input
           type="datetime-local"
@@ -199,12 +174,13 @@ export default function EventModal({
           style={input}
         />
 
-        {/* Botões */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-          <button onClick={handleSave}>Salvar</button>
-          <button onClick={onClose}>Fechar</button>
-          {event && <button onClick={handleDelete}>Excluir</button>}
-        </div>
+        <button onClick={handleSave} style={{ marginRight: 10 }}>
+          Salvar
+        </button>
+        <button onClick={onClose} style={{ marginRight: 10 }}>
+          Fechar
+        </button>
+        {event && <button onClick={handleDelete}>Excluir</button>}
       </div>
     </div>
   );
@@ -223,7 +199,7 @@ const overlay: React.CSSProperties = {
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 400,
+  width: 350,
   borderRadius: 8,
 };
 
