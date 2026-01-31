@@ -1,26 +1,12 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth";
+import NextAuth, { JWT } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
 // 🔹 Tipagem customizada
-interface CustomToken {
+interface CustomToken extends JWT {
   perfil?: "Confi" | "Cecília" | "Luiza" | "Júlio";
   responsavelChatId?: string;
   role?: "admin" | "user";
-  email?: string;
-  name?: string;
-  picture?: string;
-}
-
-interface CustomSession {
-  user: {
-    name?: string;
-    email?: string;
-    image?: string;
-    perfil: "Confi" | "Cecília" | "Luiza" | "Júlio";
-    responsavelChatId: string;
-    role: "admin" | "user";
-  };
 }
 
 // 🔹 Configuração do NextAuth
@@ -40,11 +26,12 @@ const handler = NextAuth({
   ],
 
   callbacks: {
+    // 🔑 JWT callback
     async jwt({ token, profile }) {
       const customToken = token as CustomToken;
 
-      if (profile) {
-        const email = profile.email?.toLowerCase();
+      if (profile?.email) {
+        const email = profile.email.toLowerCase();
         switch (email) {
           case "ana.paulinhacarneirosantos@gmail.com":
             customToken.perfil = "Confi";
@@ -73,18 +60,17 @@ const handler = NextAuth({
         }
       }
 
-      return customToken;
+      // 🔹 Retorna sempre um JWT válido
+      return { ...token, ...customToken };
     },
 
+    // 🔑 Session callback
     async session({ session, token }) {
-      const customToken = token as CustomToken;
-      const s = session as unknown as CustomSession;
+      session.user.perfil = (token as CustomToken).perfil || "Confi";
+      session.user.responsavelChatId = (token as CustomToken).responsavelChatId || "";
+      session.user.role = (token as CustomToken).role || "user";
 
-      s.user.perfil = customToken.perfil || "Confi";
-      s.user.responsavelChatId = customToken.responsavelChatId || "";
-      s.user.role = customToken.role || "user";
-
-      return s as unknown as typeof session;
+      return session;
     },
   },
 
@@ -92,5 +78,5 @@ const handler = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
 });
 
-// 🔹 Export para App Router (apenas handler)
+// 🔹 Export para App Router
 export { handler as GET, handler as POST };
