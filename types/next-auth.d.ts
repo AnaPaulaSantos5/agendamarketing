@@ -9,11 +9,13 @@ declare module "next-auth" {
       image?: string;
       perfil: "Confi" | "Cecília" | "Luiza" | "Júlio";
       responsavelChatId: string;
+      role?: "admin" | "user"; // <-- ADICIONADO
     };
   }
 
   interface JWT {
     perfil?: "Confi" | "Cecília" | "Luiza" | "Júlio";
     responsavelChatId?: string;
+    role?: "admin" | "user"; // <-- ADICIONADO
   }
 }
