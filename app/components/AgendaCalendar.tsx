@@ -53,7 +53,6 @@ export default function AgendaCalendar() {
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -66,30 +65,25 @@ export default function AgendaCalendar() {
   const today = new Date().toISOString().slice(0, 10);
 
   // 🔐 BLOQUEIO DE ACESSO
-  if (status === 'loading') {
-    return <p>Carregando agenda...</p>;
-  }
+  if (status === 'loading') return <p>Carregando agenda...</p>;
 
   if (!session) {
     return (
       <div style={{ padding: 32 }}>
         <h2>Acesso restrito</h2>
         <p>Entre com sua conta Google para acessar a agenda.</p>
-        <button onClick={() => signIn('google')}>
-          Entrar com Google
-        </button>
+        <button onClick={() => signIn('google')}>Entrar com Google</button>
       </div>
     );
   }
 
-  const userPerfil = session.user.perfil as Perfil;
-  const userRole = session.user.role as 'admin' | 'user';
+  const userPerfil = (session.user as any).perfil as Perfil;
+  // Todos usuários serão "user" por padrão, admin é definido manualmente no JSON de usuários
+  const userRole = (session.user as any).role ? ((session.user as any).role as 'admin' | 'user') : 'user';
 
   // 🔁 PERFIL AUTOMÁTICO
   useEffect(() => {
-    if (userPerfil) {
-      setFilterProfile(userPerfil);
-    }
+    if (userPerfil) setFilterProfile(userPerfil);
   }, [userPerfil]);
 
   // 📥 CARREGAR EVENTOS
@@ -116,7 +110,6 @@ export default function AgendaCalendar() {
   // 💾 SALVAR EVENTO
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
-
     await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -156,10 +149,7 @@ export default function AgendaCalendar() {
 
   // 👁️ FILTRO DE VISUALIZAÇÃO
   const filteredEvents = events.filter(ev => {
-    if (userRole === 'admin') {
-      return ev.perfil === filterProfile;
-    }
-
+    if (userRole === 'admin') return ev.perfil === filterProfile;
     return ev.perfil === userPerfil || ev.perfil === 'Confi';
   });
 
@@ -206,21 +196,11 @@ export default function AgendaCalendar() {
         }}
         eventDrop={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            saveEvent(
-              { ...ev, start: info.event.startStr, end: info.event.endStr },
-              true
-            );
-          }
+          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
         }}
         eventResize={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            saveEvent(
-              { ...ev, start: info.event.startStr, end: info.event.endStr },
-              true
-            );
-          }
+          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
         }}
       />
 
