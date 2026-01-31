@@ -1,6 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { AgendaEvent } from '../lib/types';
+import React, { useEffect, useState } from 'react';
+import { AgendaEvent, Perfil } from '@/lib/types';
 
 type Props = {
   isOpen: boolean;
@@ -12,199 +12,99 @@ type Props = {
   event?: AgendaEvent | null;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event }: Props) {
-  const [editing, setEditing] = useState(!event);
-  const [title, setTitle] = useState('');
-  const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [perfil, setPerfil] = useState('Confi');
-  const [tipo, setTipo] = useState<'Evento' | 'Tarefa'>('Tarefa');
-  const [tarefaTitle, setTarefaTitle] = useState('');
+const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+
+export default function EventModal({
+  isOpen, onClose, onSave, onDelete, start, end, event
+}: Props) {
+
+  const [titulo, setTitulo] = useState('');
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [cta, setCta] = useState('');
+  const [conteudoSec, setConteudoSec] = useState('');
+
+  const [tarefaTitulo, setTarefaTitulo] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
+
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
   useEffect(() => {
     if (event) {
-      setTitle(event.conteudoPrincipal || '');
-      setConteudoSecundario(event.conteudoSecundario || '');
+      setTitulo(event.conteudoPrincipal || '');
       setPerfil(event.perfil || 'Confi');
-      setTipo(event.tipoEvento === 'Evento' ? 'Evento' : 'Tarefa');
-      setTarefaTitle(event.tarefa?.titulo || '');
-      setResponsavelChatId(event.tarefa?.responsavel || event.perfil || 'Confi');
+      setCta(event.cta || '');
+      setConteudoSec(event.conteudoSecundario || '');
+
+      setTarefaTitulo(event.tarefa?.titulo || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setStartDate(event.dateStart);
-      setEndDate(event.dateEnd || event.dateStart);
-      setEditing(false);
-    } else {
-      setTitle('');
-      setConteudoSecundario('');
-      setPerfil('Confi');
-      setTipo('Tarefa');
-      setTarefaTitle('');
-      setResponsavelChatId('');
-      setLinkDrive('');
-      setStartDate(start);
-      setEndDate(end);
-      setEditing(true);
+
+      setStartDate(event.start);
+      setEndDate(event.end);
     }
   }, [event, start, end]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    if (!title) return alert('Informe o título do evento');
+    if (!titulo) return alert('Informe o título');
 
     const ev: AgendaEvent = {
-      id: event?.id || String(new Date().getTime()),
-      dateStart: startDate,
-      dateEnd: endDate,
-      tipoEvento: tipo,
-      conteudoPrincipal: title,
-      conteudoSecundario,
+      id: event?.id || String(Date.now()),
+      start: startDate,
+      end: endDate,
+      conteudoPrincipal: titulo,
+      conteudoSecundario: conteudoSec,
+      cta,
       perfil,
-      tarefa: tarefaTitle
+      tarefa: tarefaTitulo
         ? {
-            titulo: tarefaTitle,
-            responsavel: responsavelChatId || perfil,
-            status: event?.tarefa?.status || 'Pendente',
+            titulo: tarefaTitulo,
+            responsavel: perfil,
+            responsavelChatId,
+            data: startDate,
+            status: 'Pendente',
             linkDrive,
             notificar: 'Sim',
           }
-        : undefined,
+        : null,
     };
 
     onSave(ev, !!event);
     onClose();
   };
 
-  const handleDelete = () => {
-    if (!event) return;
-    if (confirm('Deseja realmente excluir este evento?')) {
-      onDelete(event.id);
-    }
-  };
-
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h2>{event && !editing ? 'Detalhes do Evento' : 'Novo Evento/Tarefa'}</h2>
+        <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {event && !editing && (
-          <button onClick={() => setEditing(true)} style={{ marginBottom: 10 }}>
-            ✏️ Editar
-          </button>
-        )}
+        <input placeholder="Título" value={titulo} onChange={e => setTitulo(e.target.value)} />
+        <input placeholder="Conteúdo secundário" value={conteudoSec} onChange={e => setConteudoSec(e.target.value)} />
+        <input placeholder="CTA" value={cta} onChange={e => setCta(e.target.value)} />
 
-        <label>Título:</label>
-        <input
-          type="text"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
-
-        <label>Conteúdo Secundário:</label>
-        <input
-          type="text"
-          value={conteudoSecundario}
-          onChange={e => setConteudoSecundario(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
-
-        <label>Perfil:</label>
-        <input
-          type="text"
-          value={perfil}
-          onChange={e => setPerfil(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
-
-        <label>Tipo:</label>
-        <select value={tipo} onChange={e => setTipo(e.target.value as any)} disabled={!editing} style={input}>
-          <option value="Evento">Evento</option>
-          <option value="Tarefa">Tarefa</option>
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+          {perfis.map(p => <option key={p}>{p}</option>)}
         </select>
 
-        <label>Tarefa:</label>
-        <input
-          type="text"
-          value={tarefaTitle}
-          onChange={e => setTarefaTitle(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <hr />
 
-        <label>Responsável (ChatId):</label>
-        <input
-          type="text"
-          value={responsavelChatId}
-          onChange={e => setResponsavelChatId(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <input placeholder="Título da tarefa" value={tarefaTitulo} onChange={e => setTarefaTitulo(e.target.value)} />
+        <input placeholder="ResponsávelChatId" value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} />
+        <input placeholder="Link Drive" value={linkDrive} onChange={e => setLinkDrive(e.target.value)} />
 
-        <label>Link Drive:</label>
-        <input
-          type="text"
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
+        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <label>Início:</label>
-        <input
-          type="datetime-local"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
-
-        <label>Fim:</label>
-        <input
-          type="datetime-local"
-          value={endDate}
-          onChange={e => setEndDate(e.target.value)}
-          disabled={!editing}
-          style={input}
-        />
-
-        <button onClick={handleSave} style={{ marginRight: 10 }}>
-          Salvar
-        </button>
-        <button onClick={onClose} style={{ marginRight: 10 }}>
-          Fechar
-        </button>
-        {event && <button onClick={handleDelete}>Excluir</button>}
+        <button onClick={handleSave}>Salvar</button>
+        {event && <button onClick={() => onDelete(event.id)}>Excluir</button>}
+        <button onClick={onClose}>Fechar</button>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 999,
-};
-
-const modal: React.CSSProperties = {
-  background: '#fff',
-  padding: 20,
-  width: 350,
-  borderRadius: 8,
-};
-
-const input: React.CSSProperties = {
-  width: '100%',
-  marginBottom: 10,
-  padding: 8,
-};
+const overlay = { position:'fixed', inset:0, background:'rgba(0,0,0,.4)', display:'flex', justifyContent:'center', alignItems:'center' };
+const modal = { background:'#fff', padding:20, width:380, borderRadius:8 };
