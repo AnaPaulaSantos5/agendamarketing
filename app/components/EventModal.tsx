@@ -101,7 +101,11 @@ export default function EventModal({
         <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
-
+        <input
+  value={linkDrive}
+  onChange={e => setLinkDrive(e.target.value)}
+  placeholder="Link do Drive"
+/>
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
