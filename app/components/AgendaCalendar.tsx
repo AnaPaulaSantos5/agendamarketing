@@ -14,17 +14,13 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-
   tipoEvento?: string;
   tipo?: string;
-
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-
   perfil?: Perfil;
-
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -34,7 +30,6 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
-
   allDay?: boolean;
 };
 
@@ -54,7 +49,6 @@ export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
-
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({
@@ -67,7 +61,7 @@ export default function AgendaCalendar() {
   // 🔐 BLOQUEIO DE ACESSO
   if (status === 'loading') return <p>Carregando agenda...</p>;
 
-  if (!session) {
+  if (!session || !session.user) {
     return (
       <div style={{ padding: 32 }}>
         <h2>Acesso restrito</h2>
@@ -77,9 +71,9 @@ export default function AgendaCalendar() {
     );
   }
 
-  const userPerfil = (session.user as any).perfil as Perfil;
-  // Todos usuários serão "user" por padrão, admin é definido manualmente no JSON de usuários
-  const userRole = (session.user as any).role ? ((session.user as any).role as 'admin' | 'user') : 'user';
+  // 🔹 Fallback seguro caso role/perfil não estejam definidos
+  const userPerfil = (session.user.perfil ?? 'Confi') as Perfil;
+  const userRole = (session.user.role ?? 'user') as 'admin' | 'user';
 
   // 🔁 PERFIL AUTOMÁTICO
   useEffect(() => {
@@ -99,9 +93,7 @@ export default function AgendaCalendar() {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today && !item.done
-        );
+        const todayTasks = data.filter(item => item.date?.slice(0, 10) === today && !item.done);
         setChecklist(todayTasks);
       })
       .catch(console.error);
@@ -116,11 +108,8 @@ export default function AgendaCalendar() {
       body: JSON.stringify(ev),
     });
 
-    if (isEdit) {
-      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    } else {
-      setEvents(prev => [...prev, ev]);
-    }
+    if (isEdit) setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+    else setEvents(prev => [...prev, ev]);
   };
 
   // ❌ EXCLUIR EVENTO
@@ -159,10 +148,7 @@ export default function AgendaCalendar() {
       {userRole === 'admin' && (
         <label>
           Filtrar por perfil:{' '}
-          <select
-            value={filterProfile}
-            onChange={e => setFilterProfile(e.target.value as Perfil)}
-          >
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
             {profiles.map(p => (
               <option key={p}>{p}</option>
             ))}
