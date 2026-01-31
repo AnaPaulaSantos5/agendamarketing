@@ -1,8 +1,8 @@
+// app/api/auth/[...nextauth]/route.ts
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { NextRequest } from "next/server";
 
-export const authOptions = {
+const handler = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -18,8 +18,7 @@ export const authOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, account, profile }) {
-      // Aqui você define os perfis e roles com base no e-mail
+    async jwt({ token, profile }) {
       if (profile) {
         const email = profile.email?.toLowerCase();
 
@@ -40,7 +39,7 @@ export const authOptions = {
           token.responsavelChatId = "55999999996";
           token.role = "user";
         } else {
-          token.perfil = "Confi"; // default
+          token.perfil = "Confi";
           token.responsavelChatId = "";
           token.role = "user";
         }
@@ -61,14 +60,9 @@ export const authOptions = {
     },
   },
 
-  session: {
-    strategy: "jwt",
-  },
-
+  session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
-};
+});
 
-// Para Next.js App Router (Route Handler)
-const handler = NextAuth(authOptions);
-
+// 🔹 Export para App Router
 export { handler as GET, handler as POST };
