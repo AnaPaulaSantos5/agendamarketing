@@ -1,8 +1,8 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth, { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-// 🔹 Tipagem do token e session customizados
+// 🔹 Tipagem customizada
 interface CustomToken {
   perfil?: "Confi" | "Cecília" | "Luiza" | "Júlio";
   responsavelChatId?: string;
@@ -23,7 +23,8 @@ interface CustomSession {
   };
 }
 
-export const authOptions: NextAuthOptions = {
+// 🔹 Configuração do NextAuth
+const handler = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -89,8 +90,7 @@ export const authOptions: NextAuthOptions = {
 
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
-};
+});
 
-// 🔹 Export compatível com App Router
-const handler = NextAuth(authOptions);
+// 🔹 Export para App Router (apenas handler)
 export { handler as GET, handler as POST };
