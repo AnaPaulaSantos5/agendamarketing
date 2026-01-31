@@ -2,19 +2,16 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-export const authOptions = {
+const handler = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-
   callbacks: {
-    async jwt({ token, account, profile }) {
-      // Aqui podemos adicionar dados ao token na primeira autenticação
+    async jwt({ token, profile }) {
       if (profile) {
-        // Por exemplo, você pode mapear cada usuário para um perfil fixo
         const email = profile.email?.toLowerCase();
         if (email === "ana.paulinhacarneirosantos@gmail.com") {
           token.perfil = "Confi";
@@ -29,7 +26,6 @@ export const authOptions = {
           token.perfil = "Júlio";
           token.responsavelChatId = "55999999996";
         } else {
-          // Usuário desconhecido
           token.perfil = "Confi";
           token.responsavelChatId = "00000000000";
         }
@@ -38,19 +34,16 @@ export const authOptions = {
     },
 
     async session({ session, token }) {
-      // Adiciona dados do token à sessão
-      session.user.perfil = token.perfil as "Confi" | "Luiza" | "Cecília" | "Júlio";
+      session.user.perfil = token.perfil as "Confi" | "Cecília" | "Luiza" | "Júlio";
       session.user.responsavelChatId = token.responsavelChatId as string;
       return session;
     },
   },
-
   session: {
     strategy: "jwt",
   },
-
   secret: process.env.NEXTAUTH_SECRET,
-};
+});
 
-const handler = NextAuth(authOptions);
+// **No App Router precisamos exportar apenas GET e POST**
 export { handler as GET, handler as POST };
