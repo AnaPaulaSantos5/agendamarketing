@@ -1,26 +1,35 @@
 import { AgendaEvent } from '@/lib/types';
 
 export const mapPlanilhaParaEventos = (sheetData: any[]): AgendaEvent[] => {
-  return sheetData.map(row => ({
-    id: row.ID || row.Bloco_ID || String(Math.random()),
+  return sheetData.map((row) => {
+    const dateStart = row.Data_Inicio || row.Data || '';
+    const dateEnd = row.Data_Fim || '';
 
-    dateStart: row.Data_Inicio || row.Data || '',
-    dateEnd: row.Data_Fim || '',
+    return {
+      id: row.ID || row.Bloco_ID || crypto.randomUUID(),
 
-    tipoEvento: row.Tipo || 'Evento',
+      // 🔹 formato de domínio (planilha / modal / WAHA)
+      dateStart,
+      dateEnd,
 
-    tarefa: {
-      titulo: row.Titulo || '',
-      responsavel: row.Responsavel || '',
+      // 🔹 formato que o calendário exige
+      start: dateStart ? new Date(dateStart) : new Date(),
+      end: dateEnd ? new Date(dateEnd) : undefined,
+
+      tipoEvento: row.Tipo_Evento || 'Evento',
+
+      tarefa: {
+        titulo: row.Titulo || '',
+        responsavel: row.Responsavel || '',
+        status: row.Status || 'Pendente',
+        linkDrive: row.Link_Drive || '',
+        notificar: row.Notificar || '',
+      },
+
+      conteudoPrincipal: row.Conteudo_Principal || '',
+      conteudoSecundario: row.Conteudo_Secundario || '',
+      perfil: row.Perfil || '',
       responsavelChatId: row.ResponsavelChatId || '',
-      status: row.Status || 'Pendente',
-      linkDrive: row.LinkDrive || '',
-      notificar: row.Notificar || '',
-      cta: row.CTA || '',
-    },
-
-    conteudoPrincipal: row.Conteudo_Principal || '',
-    conteudoSecundario: row.Conteudo_Secundario || '',
-    perfil: row.Perfil || '',
-  }));
+    };
+  });
 };
