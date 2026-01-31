@@ -5,6 +5,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { useSession, signIn } from 'next-auth/react';
 import EventModal from './EventModal';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
@@ -48,16 +49,50 @@ export type ChecklistItem = {
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
+  const { data: session, status } = useSession();
+
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({
+    start: '',
+    end: '',
+  });
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // 🔐 BLOQUEIO DE ACESSO
+  if (status === 'loading') {
+    return <p>Carregando agenda...</p>;
+  }
+
+  if (!session) {
+    return (
+      <div style={{ padding: 32 }}>
+        <h2>Acesso restrito</h2>
+        <p>Entre com sua conta Google para acessar a agenda.</p>
+        <button onClick={() => signIn('google')}>
+          Entrar com Google
+        </button>
+      </div>
+    );
+  }
+
+  const userPerfil = session.user.perfil as Perfil;
+  const userRole = session.user.role as 'admin' | 'user';
+
+  // 🔁 PERFIL AUTOMÁTICO
+  useEffect(() => {
+    if (userPerfil) {
+      setFilterProfile(userPerfil);
+    }
+  }, [userPerfil]);
+
+  // 📥 CARREGAR EVENTOS
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -65,6 +100,7 @@ export default function AgendaCalendar() {
       .catch(console.error);
   }, []);
 
+  // 📋 CHECKLIST DO DIA
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
@@ -77,6 +113,7 @@ export default function AgendaCalendar() {
       .catch(console.error);
   }, [today]);
 
+  // 💾 SALVAR EVENTO
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
 
@@ -93,6 +130,7 @@ export default function AgendaCalendar() {
     }
   };
 
+  // ❌ EXCLUIR EVENTO
   const deleteEvent = async (id: string) => {
     await fetch('/api/agenda', {
       method: 'DELETE',
@@ -105,6 +143,7 @@ export default function AgendaCalendar() {
     setModalOpen(false);
   };
 
+  // ✅ CONCLUIR CHECKLIST
   const toggleChecklistItem = async (item: ChecklistItem) => {
     setChecklist(prev => prev.filter(c => c.id !== item.id));
 
@@ -115,24 +154,37 @@ export default function AgendaCalendar() {
     });
   };
 
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
+  // 👁️ FILTRO DE VISUALIZAÇÃO
+  const filteredEvents = events.filter(ev => {
+    if (userRole === 'admin') {
+      return ev.perfil === filterProfile;
+    }
+
+    return ev.perfil === userPerfil || ev.perfil === 'Confi';
+  });
 
   return (
     <>
-      <label>
-        Filtrar por perfil:{' '}
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-      </label>
+      {/* 🔽 FILTRO (SÓ ADMIN) */}
+      {userRole === 'admin' && (
+        <label>
+          Filtrar por perfil:{' '}
+          <select
+            value={filterProfile}
+            onChange={e => setFilterProfile(e.target.value as Perfil)}
+          >
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         selectable
-        editable
+        editable={userRole === 'admin'}
         events={filteredEvents.map(ev => ({
           id: ev.id,
           title: ev.conteudoPrincipal,
@@ -154,11 +206,21 @@ export default function AgendaCalendar() {
         }}
         eventDrop={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          if (ev) {
+            saveEvent(
+              { ...ev, start: info.event.startStr, end: info.event.endStr },
+              true
+            );
+          }
         }}
         eventResize={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          if (ev) {
+            saveEvent(
+              { ...ev, start: info.event.startStr, end: info.event.endStr },
+              true
+            );
+          }
         }}
       />
 
