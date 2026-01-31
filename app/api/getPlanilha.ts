@@ -1,4 +1,4 @@
-import { AgendaEvent } from '../lib/types';
+import { AgendaEvent } from '@/lib/types';
 export const mapPlanilhaParaEventos = (sheetData: any[]): AgendaEvent[] => {
   return sheetData.map(row => ({
     id: row.ID || row.Bloco_ID || String(Math.random()),
