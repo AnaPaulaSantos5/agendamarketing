@@ -1,4 +1,3 @@
-// types/next-auth.d.ts
 import NextAuth from "next-auth";
 
 declare module "next-auth" {
@@ -9,13 +8,13 @@ declare module "next-auth" {
       image?: string;
       perfil: "Confi" | "Cecília" | "Luiza" | "Júlio";
       responsavelChatId: string;
-      role?: "admin" | "user"; // <-- ADICIONADO
+      role?: "admin" | "user";
     };
   }
 
   interface JWT {
     perfil?: "Confi" | "Cecília" | "Luiza" | "Júlio";
     responsavelChatId?: string;
-    role?: "admin" | "user"; // <-- ADICIONADO
+    role?: "admin" | "user";
   }
 }
