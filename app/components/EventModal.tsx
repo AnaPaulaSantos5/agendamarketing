@@ -1,206 +1,129 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-import crypto from 'crypto';
+'use client';
 
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+import React, { useEffect, useState } from 'react';
+import { AgendaEvent, Perfil } from './types';
 
-// 🔹 autenticação
-async function accessSpreadsheet() {
-  await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-    private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  });
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
+  onDelete: (id: string) => void;
+  start: string;
+  end: string;
+  event?: AgendaEvent | null;
+};
 
-  await doc.loadInfo();
+export default function EventModal({
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  start,
+  end,
+  event,
+}: Props) {
+  const [editing, setEditing] = useState(!event);
 
-  return {
-    agendaSheet: doc.sheetsByTitle['Agenda'],
-    tarefasSheet: doc.sheetsByTitle['Tarefas'],
+  const [title, setTitle] = useState('');
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
+
+  const [conteudoSecundario, setConteudoSecundario] = useState('');
+  const [cta, setCta] = useState('');
+  const [statusPostagem, setStatusPostagem] = useState('');
+
+  const [tarefaTitle, setTarefaTitle] = useState('');
+  const [linkDrive, setLinkDrive] = useState('');
+  const [responsavelChatId, setResponsavelChatId] = useState('');
+
+  const [startDate, setStartDate] = useState(start);
+  const [endDate, setEndDate] = useState(end);
+
+  useEffect(() => {
+    if (event) {
+      setTitle(event.conteudoPrincipal || '');
+      setPerfil(event.perfil || 'Confi');
+      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
+      setConteudoSecundario(event.conteudoSecundario || '');
+      setCta(event.cta || '');
+      setStatusPostagem(event.statusPostagem || '');
+      setTarefaTitle(event.tarefa?.titulo || '');
+      setLinkDrive(event.tarefa?.linkDrive || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
+      setStartDate(event.start);
+      setEndDate(event.end);
+      setEditing(false);
+    } else {
+      setEditing(true);
+      setStartDate(start);
+      setEndDate(end);
+    }
+  }, [event, start, end]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    const ev: AgendaEvent = {
+      id: event?.id || '', // backend gera Bloco_ID
+      start: startDate,
+      end: endDate,
+      conteudoPrincipal: title,
+      conteudoSecundario,
+      cta,
+      statusPostagem,
+      perfil,
+      tipoEvento: tipo,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: perfil,
+            responsavelChatId,
+            data: startDate,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : null,
+    };
+
+    onSave(ev, !!event);
+    onClose();
   };
+
+  return (
+    <div style={overlay}>
+      <div style={modal}>
+        <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
+
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
+        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
+        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
+        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
+        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
+        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
+        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
+        {event && <button onClick={() => onDelete(event.id)}>Excluir</button>}
+      </div>
+    </div>
+  );
 }
 
-// 🔹 normaliza datas para FullCalendar
-function normalizeDate(dateStr?: string) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
-}
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
 
-// 🔹 formato para planilha
-function formatDateForSheet(dateStr?: string) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// GET - retorna agenda + tarefas
-////////////////////////////////////////////////////////////////////////////////
-export async function GET() {
-  try {
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-    const agendaRows = await agendaSheet.getRows();
-    const tarefasRows = await tarefasSheet.getRows();
-
-    const events = agendaRows.map(row => {
-      const blocoId = row.Bloco_ID;
-      if (!blocoId) {
-        console.warn(`Evento sem Bloco_ID na planilha: linha ${row._rowNumber}`);
-      }
-
-      const tarefa = tarefasRows.find(t => String(t.Bloco_ID) === String(blocoId));
-
-      return {
-        id: blocoId,
-        start: normalizeDate(row.Data_Inicio),
-        end: normalizeDate(row.Data_Fim),
-        tipoEvento: row.Tipo_Evento || '',
-        tipo: row.Tipo || '',
-        conteudoPrincipal: row.Conteudo_Principal || '',
-        conteudoSecundario: row.Conteudo_Secundario || '',
-        cta: row.CTA || '',
-        statusPostagem: row.Status_Postagem || '',
-        perfil: row.Perfil || 'Confi',
-        tarefa: tarefa
-          ? {
-              titulo: tarefa.Titulo || '',
-              responsavel: tarefa.Responsavel || '',
-              responsavelChatId: tarefa.ResponsavelChatId || '',
-              data: normalizeDate(tarefa.Data),
-              status: tarefa.Status || 'Pendente',
-              linkDrive: tarefa.LinkDrive || '',
-              notificar: tarefa.Notificar || 'Sim',
-            }
-          : null,
-      };
-    });
-
-    return NextResponse.json(events);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// POST - cria novo evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
-export async function POST(req: NextRequest) {
-  try {
-    const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-
-    const blocoId = crypto.randomUUID(); // gera ID único
-
-    // Cria evento na agenda
-    const agendaRow = await agendaSheet.addRow({
-      Bloco_ID: blocoId,
-      Data_Inicio: formatDateForSheet(data.start),
-      Data_Fim: formatDateForSheet(data.end),
-      Tipo_Evento: data.tipoEvento || '',
-      Tipo: data.tipo || '',
-      Conteudo_Principal: data.conteudoPrincipal || '',
-      Conteudo_Secundario: data.conteudoSecundario || '',
-      CTA: data.cta || '',
-      Status_Postagem: data.statusPostagem || '',
-      Perfil: data.perfil || '',
-    });
-
-    // Cria tarefa vinculada
-    if (data.tarefa) {
-      await tarefasSheet.addRow({
-        Bloco_ID: blocoId,
-        Titulo: data.tarefa.titulo || '',
-        Responsavel: data.tarefa.responsavel || '',
-        ResponsavelChatId: data.tarefa.responsavelChatId || '',
-        Data: formatDateForSheet(data.tarefa.data),
-        Status: data.tarefa.status || 'Pendente',
-        LinkDrive: data.tarefa.linkDrive || '',
-        Notificar: data.tarefa.notificar || 'Sim',
-      });
-    }
-
-    return NextResponse.json({ ok: true, id: blocoId });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PATCH - atualiza evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
-export async function PATCH(req: NextRequest) {
-  try {
-    const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-
-    const agendaRows = await agendaSheet.getRows();
-    const row = agendaRows.find(r => String(r.Bloco_ID) === data.id);
-    if (!row) throw new Error('Evento não encontrado');
-
-    row.Data_Inicio = formatDateForSheet(data.start);
-    row.Data_Fim = formatDateForSheet(data.end);
-    row.Tipo_Evento = data.tipoEvento || '';
-    row.Tipo = data.tipo || '';
-    row.Conteudo_Principal = data.conteudoPrincipal || '';
-    row.Conteudo_Secundario = data.conteudoSecundario || '';
-    row.CTA = data.cta || '';
-    row.Status_Postagem = data.statusPostagem || '';
-    row.Perfil = data.perfil || '';
-    await row.save();
-
-    if (data.tarefa) {
-      const tarefasRows = await tarefasSheet.getRows();
-      let tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === data.id);
-
-      if (!tarefaRow) {
-        tarefaRow = await tarefasSheet.addRow({ Bloco_ID: data.id });
-      }
-
-      tarefaRow.Titulo = data.tarefa.titulo || '';
-      tarefaRow.Responsavel = data.tarefa.responsavel || '';
-      tarefaRow.ResponsavelChatId = data.tarefa.responsavelChatId || '';
-      tarefaRow.Data = formatDateForSheet(data.tarefa.data);
-      tarefaRow.Status = data.tarefa.status || 'Pendente';
-      tarefaRow.LinkDrive = data.tarefa.linkDrive || '';
-      tarefaRow.Notificar = data.tarefa.notificar || 'Sim';
-      await tarefaRow.save();
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DELETE - remove evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
-export async function DELETE(req: NextRequest) {
-  try {
-    const { id } = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-
-    const agendaRows = await agendaSheet.getRows();
-    const agendaRow = agendaRows.find(r => String(r.Bloco_ID) === id);
-    if (agendaRow) await agendaRow.delete();
-
-    const tarefasRows = await tarefasSheet.getRows();
-    const tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === id);
-    if (tarefaRow) await tarefaRow.delete();
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
+const modal: React.CSSProperties = {
+  background: '#fff',
+  padding: 20,
+  width: 360,
+};
