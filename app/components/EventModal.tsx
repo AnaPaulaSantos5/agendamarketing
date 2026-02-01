@@ -11,6 +11,7 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
+  isAdmin?: boolean; // <- adicionada
 };
 
 export default function EventModal({
@@ -21,6 +22,7 @@ export default function EventModal({
   start,
   end,
   event,
+  isAdmin = false,
 }: Props) {
   const [editing, setEditing] = useState(!event);
 
@@ -96,22 +98,28 @@ export default function EventModal({
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
+        <textarea
+          value={conteudoSecundario}
+          onChange={e => setConteudoSecundario(e.target.value)}
+          placeholder="Conteúdo secundário"
+        />
         <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
         <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
-        <input
-  value={linkDrive}
-  onChange={e => setLinkDrive(e.target.value)}
-  placeholder="Link do Drive"
-/>
+        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
-        {event && <button onClick={() => onDelete(event.id)}>Excluir</button>}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button onClick={handleSave} style={{ flex: 1 }}>Salvar</button>
+          <button onClick={onClose} style={{ flex: 1 }}>Fechar</button>
+          {event && (
+            <button onClick={() => onDelete(event.id)} disabled={!isAdmin} style={{ flex: 1, backgroundColor: isAdmin ? '#e74c3c' : '#ccc' }}>
+              Excluir
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -124,10 +132,16 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
+  zIndex: 9999,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 360,
+  width: 400,
+  borderRadius: 8,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
 };
