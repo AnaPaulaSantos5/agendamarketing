@@ -14,12 +14,10 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-  tipoEvento?: string;
-  tipo?: string;
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
+  tipoEvento?: string;
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -30,15 +28,6 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
-  allDay?: boolean;
-};
-
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -52,7 +41,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const userImage = session?.user?.image || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -61,7 +49,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Map de perfis → chatId + imagem
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
     Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
@@ -71,49 +58,24 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
-  useEffect(() => {
-    fetch('/api/agenda')
-      .then(res => res.json())
-      .then(setEvents)
-      .catch(console.error);
-
-    fetch('/api/checklist')
-      .then(res => res.json())
-      .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(item => item.date.slice(0, 10) === today && !item.done);
-        setChecklist(todayTasks);
-      })
-      .catch(console.error);
-  }, [today]);
-
-  // Salvar alteração de ChatID do perfil
+  // Função para salvar ChatID do perfil
   const savePerfil = async (perfil: Perfil) => {
-    const chatId = perfilMap[perfil].chatId;
-    await fetch('/api/perfil', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ perfil, chatId }),
-    });
-    alert('Responsável ChatID salvo!');
-  };
+    try {
+      const chatId = perfilMap[perfil].chatId;
 
-  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    const method = isEdit ? 'PATCH' : 'POST';
-    await fetch('/api/agenda', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ev),
-    });
+      const res = await fetch('/api/perfil', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perfil, chatId }),
+      });
 
-    if (isEdit) setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    else setEvents(prev => [...prev, ev]);
-  };
+      if (!res.ok) throw new Error('Erro ao salvar');
 
-  const deleteEvent = async (id: string) => {
-    await fetch('/api/agenda', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-    setEvents(prev => prev.filter(e => e.id !== id));
-    setChecklist(prev => prev.filter(c => c.id !== id));
-    setModalOpen(false);
+      alert('Responsável ChatID salvo!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar responsável ChatID');
+    }
   };
 
   const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
@@ -172,8 +134,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }))}
           select={info => { setSelectedEvent(null); setSelectedDate({ start: info.startStr, end: info.endStr }); setModalOpen(true); }}
           eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
-          eventDrop={info => { const ev = events.find(e => e.id === info.event.id); if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true); }}
-          eventResize={info => { const ev = events.find(e => e.id === info.event.id); if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true); }}
           height="auto"
         />
       </div>
@@ -186,13 +146,20 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           start={selectedDate.start}
           end={selectedDate.end}
           event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
+          onSave={(ev) => {
+            setEvents(prev => {
+              const exists = prev.find(e => e.id === ev.id);
+              if (exists) return prev.map(e => e.id === ev.id ? ev : e);
+              return [...prev, ev];
+            });
+          }}
           isAdmin={isUserAdmin}
           userPerfil={userName as Perfil}
+          userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
           perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
+          savePerfil={savePerfil} // ✅ função para salvar ChatID
         />
       )}
     </div>
