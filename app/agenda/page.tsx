@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import AgendaLayout from '../components/AgendaLayout';
 import { AgendaEvent, Perfil } from '../components/types';
-import { getEvents } from '../agendaService';
+import { getEvents } from './agendaService';
 
 export default function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
