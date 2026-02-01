@@ -17,12 +17,12 @@ async function accessSpreadsheet() {
   };
 }
 
-/** Normaliza data para FullCalendar (string ISO yyyy-MM-ddTHH:mm) */
+// Normaliza datas para FullCalendar
 function normalizeDate(dateStr?: string) {
-  if (!dateStr) return new Date().toISOString().slice(0, 16); // default para agora
+  if (!dateStr) return '';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
-  return d.toISOString().slice(0, 16);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
 }
 
 export async function GET() {
@@ -32,15 +32,17 @@ export async function GET() {
     const agendaRows = await agendaSheet.getRows();
     const tarefasRows = await tarefasSheet.getRows();
 
-    const events = agendaRows.map(row => {
-      // Usa ID fixo se existir, senão row._rowNumber
-      const id = row.ID || String(row._rowNumber);
+    const events = agendaRows.map((row, index) => {
+      const blocoId = row.ID || String(row._rowNumber);
 
-      // Procura tarefa pelo mesmo ID
-      const tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === id);
+      // Procura tarefa pelo Bloco_ID ou fallback pelo índice (planilhas antigas)
+      const tarefaRow =
+        tarefasRows.find(t => String(t.Bloco_ID) === blocoId) ||
+        tarefasRows[index] || // fallback simples
+        null;
 
       return {
-        id,
+        id: blocoId,
         start: normalizeDate(row.Data_Inicio),
         end: normalizeDate(row.Data_Fim),
         tipoEvento: row.Tipo_Evento || 'Evento',
@@ -66,7 +68,7 @@ export async function GET() {
 
     return NextResponse.json(events);
   } catch (err) {
-    console.error('Erro GET /agenda:', err);
+    console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
