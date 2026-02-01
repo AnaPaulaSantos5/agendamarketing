@@ -12,9 +12,9 @@ export const mapPlanilhaParaEventos = (sheetData: any[]): AgendaEvent[] => {
       dateStart,
       dateEnd,
 
-      // 🔹 formato que o calendário exige
-      start: dateStart ? new Date(dateStart) : new Date(),
-      end: dateEnd ? new Date(dateEnd) : undefined,
+      // 🔹 formato que o calendário exige (FullCalendar precisa de string ISO)
+      start: dateStart ? new Date(dateStart).toISOString() : new Date().toISOString(),
+      end: dateEnd ? new Date(dateEnd).toISOString() : new Date().toISOString(),
 
       tipoEvento: row.Tipo_Evento || 'Evento',
 
