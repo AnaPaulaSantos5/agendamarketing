@@ -1,37 +1,43 @@
 'use client';
 
+import React from 'react';
 import AgendaCalendar from './AgendaCalendar';
-import SidebarEsquerda from './SidebarEsquerda';
-import RightSidebar from './RightSidebar';
-import { AgendaEvent, ChecklistItem, Perfil } from './types';
+import { Perfil } from './types';
 
-type Props = {
-  events: AgendaEvent[];
-  checklist: ChecklistItem[];
+interface AgendaLayoutProps {
   userPerfil: Perfil;
-  onPerfilChange: (p: Perfil) => void;
-  userName: string;
-  responsavelChatId: string;
-};
+  onPerfilChange?: (p: Perfil) => void;
+  userName?: string;
+}
 
-export default function AgendaLayout(props: Props) {
+export default function AgendaLayout({
+  userPerfil,
+  onPerfilChange,
+  userName,
+}: AgendaLayoutProps) {
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
-      <SidebarEsquerda
-        checklist={props.checklist}
-        filterProfile={props.userPerfil}
-        setFilterProfile={props.onPerfilChange}
-        profiles={['Confi','Cecília','Luiza','Júlio']}
-      />
+      {/* Sidebar */}
+      <aside style={{ width: 220, padding: 16, borderRight: '1px solid #eee' }}>
+        <h3>{userName || 'Agenda'}</h3>
 
+        <label>Perfil ativo:</label>
+        <select
+          value={userPerfil}
+          onChange={e => onPerfilChange?.(e.target.value as Perfil)}
+          style={{ width: '100%', marginTop: 8 }}
+        >
+          <option>Confi</option>
+          <option>Cecília</option>
+          <option>Luiza</option>
+          <option>Júlio</option>
+        </select>
+      </aside>
+
+      {/* Conteúdo */}
       <main style={{ flex: 1, padding: 16 }}>
-        <AgendaCalendar
-          events={props.events.filter(e => e.perfil === props.userPerfil)}
-          userPerfil={props.userPerfil}
-        />
+        <AgendaCalendar />
       </main>
-
-      <RightSidebar />
     </div>
   );
 }
