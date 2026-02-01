@@ -6,7 +6,7 @@ import RightSidebar from './RightSidebar';
 import AgendaCalendar from './AgendaCalendar';
 import EventModal from './EventModal';
 import { Perfil, AgendaEvent } from './types';
-import { getEvents, saveEvent, deleteEvent } from '../../../services/agendaService';
+import { getEvents, saveEvent, deleteEvent } from './services/agendaService';
 
 interface AgendaLayoutProps {
   userName: string;
