@@ -1,32 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import AgendaLayout from '../components/AgendaLayout';
-import { AgendaEvent, ChecklistItem, Perfil } from '../components/types';
-import { getEvents } from './agendaService';
+import AgendaCalendar from '../components/AgendaCalendar';
+import { AgendaEvent, Perfil } from '../components/types';
 
 export default function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
 
   useEffect(() => {
-    getEvents()
-      .then(setEvents)
-      .catch(console.error);
-
-    // provisório até integrar checklist da planilha
-    setChecklist([]);
+    async function loadAgenda() {
+      const res = await fetch('/api/agenda');
+      const data = await res.json();
+      setEvents(data);
+    }
+    loadAgenda();
   }, []);
 
   return (
-    <AgendaLayout
+    <AgendaCalendar
       events={events}
-      checklist={checklist}
-      userPerfil={perfil}
-      onPerfilChange={setPerfil}
-      userName="Equipe Confi"
-      responsavelChatId=""
+      userPerfil={'Confi'}
+      onDateSelect={(start, end) => {
+        console.log('Selecionado:', start, end);
+      }}
+      onEventClick={(ev) => {
+        console.log('Evento clicado:', ev);
+      }}
     />
   );
 }
