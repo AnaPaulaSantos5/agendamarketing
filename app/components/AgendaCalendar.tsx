@@ -7,7 +7,6 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 import { useSession } from 'next-auth/react';
-import UserProfile from './UserProfile';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -40,13 +39,19 @@ export type ChecklistItem = {
   client: string;
   task: string;
   done: boolean;
+  responsavel?: string; // vincula a tarefa ao usuário
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-export default function AgendaCalendar() {
+type Props = {
+  isAdmin?: boolean;
+};
+
+export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
-  const isAdmin = session?.user.role === 'admin';
+  const userPerfil = session?.user?.perfil as Perfil || 'Confi';
+  const userChatId = session?.user?.responsavelChatId || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -58,39 +63,43 @@ export default function AgendaCalendar() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // 🔹 Carrega eventos da API
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then(setEvents)
+      .then((data: AgendaEvent[]) => {
+        // Usuários veem eventos do próprio perfil + Confi
+        const visibleEvents = data.filter(
+          e => e.perfil === userPerfil || e.perfil === 'Confi'
+        );
+        setEvents(visibleEvents);
+      })
       .catch(console.error);
-  }, []);
+  }, [userPerfil]);
 
+  // 🔹 Carrega checklist do usuário logado
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
         const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today && !item.done
+          item =>
+            item.date?.slice(0, 10) === today &&
+            !item.done &&
+            item.responsavel === userPerfil
         );
         setChecklist(todayTasks);
       })
       .catch(console.error);
-  }, [today]);
+  }, [today, userPerfil]);
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    // Preenche responsavelChatId automaticamente se não existir
-    if (!ev.tarefa?.responsavelChatId && session?.user.responsavelChatId) {
-      ev.tarefa = {
-        ...ev.tarefa,
-        responsavelChatId: session.user.responsavelChatId,
-        responsavel: session.user.perfil as Perfil,
-        data: ev.start,
-        status: 'Pendente',
-      };
+    // 🔹 Usuário comum só edita seus próprios eventos
+    if (!isAdmin && isEdit && ev.perfil !== userPerfil) {
+      return alert('Você só pode editar seus próprios eventos');
     }
 
     const method = isEdit ? 'PATCH' : 'POST';
-
     await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -105,6 +114,7 @@ export default function AgendaCalendar() {
   };
 
   const deleteEvent = async (id: string) => {
+    // 🔹 Apenas admin pode excluir
     if (!isAdmin) return alert('Somente admins podem excluir eventos');
 
     await fetch('/api/agenda', {
@@ -128,8 +138,6 @@ export default function AgendaCalendar() {
     });
   };
 
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
   const perfilColors: Record<Perfil, string> = {
     Confi: '#ffce0a',
     Cecília: '#f5886c',
@@ -137,81 +145,86 @@ export default function AgendaCalendar() {
     Júlio: '#00b894',
   };
 
+  const filteredEvents = events.filter(e => e.perfil === filterProfile || filterProfile === 'Todos');
+
   return (
-    <>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <UserProfile />
-        <label>
+    <div style={{ display: 'flex', gap: 24 }}>
+      <div style={{ flex: 1 }}>
+        <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
+            <option value="Todos">Todos</option>
             {profiles.map(p => (
               <option key={p}>{p}</option>
             ))}
           </select>
         </label>
-      </header>
 
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        selectable
-        editable={isAdmin}
-        events={filteredEvents.map(ev => ({
-          id: ev.id,
-          title: ev.conteudoPrincipal,
-          start: ev.start,
-          end: ev.end,
-          backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#999',
-          borderColor: '#000',
-          textColor: '#000',
-        }))}
-        select={info => {
-          setSelectedEvent(null);
-          setSelectedDate({ start: info.startStr, end: info.endStr });
-          setModalOpen(true);
-        }}
-        eventClick={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) {
-            setSelectedEvent(ev);
-            setSelectedDate({ start: ev.start, end: ev.end });
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="timeGridWeek"
+          selectable
+          editable // todos podem editar seus eventos
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.conteudoPrincipal,
+            start: ev.start,
+            end: ev.end,
+            backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#999',
+            borderColor: '#000',
+            textColor: '#000',
+          }))}
+          select={info => {
+            setSelectedEvent(null);
+            setSelectedDate({ start: info.startStr, end: info.endStr });
             setModalOpen(true);
-          }
-        }}
-        eventDrop={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-        eventResize={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-        height="auto"
-      />
+          }}
+          eventClick={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) {
+              setSelectedEvent(ev);
+              setSelectedDate({ start: ev.start, end: ev.end });
+              setModalOpen(true);
+            }
+          }}
+          eventDrop={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
+          eventResize={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          }}
+          height="auto"
+        />
+      </div>
 
-      <h3 style={{ marginTop: 24 }}>Checklist Hoje</h3>
-      {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {checklist.map(item => (
-          <li key={item.id} style={{ marginBottom: 6 }}>
-            {item.task} ({item.client})
-            <button
-              style={{
-                marginLeft: 8,
-                background: '#1260c7',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 4,
-                cursor: 'pointer',
-                padding: '2px 6px',
-              }}
-              onClick={() => toggleChecklistItem(item)}
-            >
-              ✅
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/* 🔹 Checklist lateral */}
+      <div style={{ width: 240 }}>
+        <h3>Checklist Hoje</h3>
+        {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {checklist.map(item => (
+            <li key={item.id} style={{ marginBottom: 6 }}>
+              {item.task} ({item.client})
+              <button
+                style={{
+                  marginLeft: 8,
+                  background: '#1260c7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+                onClick={() => toggleChecklistItem(item)}
+              >
+                ✅
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {modalOpen && (
         <EventModal
@@ -223,8 +236,10 @@ export default function AgendaCalendar() {
           onSave={saveEvent}
           onDelete={deleteEvent}
           isAdmin={isAdmin}
+          userPerfil={userPerfil}          // preenche dados do usuário no modal
+          userChatId={userChatId}
         />
       )}
-    </>
+    </div>
   );
 }
