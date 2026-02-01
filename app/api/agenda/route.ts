@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
-import crypto from 'crypto';
+import { Perfil, AgendaEvent } from './types';
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
-// 🔹 autenticação
 async function accessSpreadsheet() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
-
   await doc.loadInfo();
-
   return {
     agendaSheet: doc.sheetsByTitle['Agenda'],
     tarefasSheet: doc.sheetsByTitle['Tarefas'],
   };
 }
 
-// 🔹 normaliza datas para FullCalendar
 function normalizeDate(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+  return d.toISOString().slice(0, 16);
 }
 
-// 🔹 formato para planilha
 function formatDateForSheet(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -40,22 +35,21 @@ function formatDateForSheet(dateStr?: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// GET - retorna agenda + tarefas
-////////////////////////////////////////////////////////////////////////////////
+// 🔹 GET - Retorna todos os eventos + tarefas
 export async function GET() {
   try {
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
     const agendaRows = await agendaSheet.getRows();
     const tarefasRows = await tarefasSheet.getRows();
 
-    const events = agendaRows.map(row => {
-      const blocoId = row.Bloco_ID;
-      if (!blocoId) {
-        console.warn(`Evento sem Bloco_ID na planilha: linha ${row._rowNumber}`);
+    const events: AgendaEvent[] = agendaRows.map(row => {
+      const blocoId = row.Bloco_ID || String(row._rowNumber);
+      if (!row.Bloco_ID) {
+        row.Bloco_ID = blocoId;
+        row.save();
       }
 
-      const tarefa = tarefasRows.find(t => String(t.Bloco_ID) === String(blocoId));
+      const tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === blocoId);
 
       return {
         id: blocoId,
@@ -67,16 +61,16 @@ export async function GET() {
         conteudoSecundario: row.Conteudo_Secundario || '',
         cta: row.CTA || '',
         statusPostagem: row.Status_Postagem || '',
-        perfil: row.Perfil || 'Confi',
-        tarefa: tarefa
+        perfil: (row.Perfil as Perfil) || 'Confi',
+        tarefa: tarefaRow
           ? {
-              titulo: tarefa.Titulo || '',
-              responsavel: tarefa.Responsavel || '',
-              responsavelChatId: tarefa.ResponsavelChatId || '',
-              data: normalizeDate(tarefa.Data),
-              status: tarefa.Status || 'Pendente',
-              linkDrive: tarefa.LinkDrive || '',
-              notificar: tarefa.Notificar || 'Sim',
+              titulo: tarefaRow.Titulo || '',
+              responsavel: tarefaRow.Responsavel as Perfil || 'Confi',
+              responsavelChatId: tarefaRow.ResponsavelChatId || '',
+              data: normalizeDate(tarefaRow.Data),
+              status: tarefaRow.Status || 'Pendente',
+              linkDrive: tarefaRow.LinkDrive || '',
+              notificar: tarefaRow.Notificar || 'Sim',
             }
           : null,
       };
@@ -89,19 +83,13 @@ export async function GET() {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// POST - cria novo evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
+// 🔹 POST - Cria evento + tarefa
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
+    const data: AgendaEvent = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    const blocoId = crypto.randomUUID(); // gera ID único
-
-    // Cria evento na agenda
     const agendaRow = await agendaSheet.addRow({
-      Bloco_ID: blocoId,
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
       Tipo_Evento: data.tipoEvento || '',
@@ -110,15 +98,20 @@ export async function POST(req: NextRequest) {
       Conteudo_Secundario: data.conteudoSecundario || '',
       CTA: data.cta || '',
       Status_Postagem: data.statusPostagem || '',
-      Perfil: data.perfil || '',
+      Perfil: data.perfil,
     });
 
-    // Cria tarefa vinculada
+    const blocoId = agendaRow.Bloco_ID || String(agendaRow._rowNumber);
+    if (!agendaRow.Bloco_ID) {
+      agendaRow.Bloco_ID = blocoId;
+      await agendaRow.save();
+    }
+
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: blocoId,
-        Titulo: data.tarefa.titulo || '',
-        Responsavel: data.tarefa.responsavel || '',
+        Titulo: data.tarefa.titulo,
+        Responsavel: data.tarefa.responsavel,
         ResponsavelChatId: data.tarefa.responsavelChatId || '',
         Data: formatDateForSheet(data.tarefa.data),
         Status: data.tarefa.status || 'Pendente',
@@ -127,19 +120,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true, id: blocoId });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// PATCH - atualiza evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
+// 🔹 PATCH - Atualiza evento + tarefa
 export async function PATCH(req: NextRequest) {
   try {
-    const data = await req.json();
+    const data: AgendaEvent = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
     const agendaRows = await agendaSheet.getRows();
@@ -148,13 +139,13 @@ export async function PATCH(req: NextRequest) {
 
     row.Data_Inicio = formatDateForSheet(data.start);
     row.Data_Fim = formatDateForSheet(data.end);
-    row.Tipo_Evento = data.tipoEvento || '';
-    row.Tipo = data.tipo || '';
-    row.Conteudo_Principal = data.conteudoPrincipal || '';
-    row.Conteudo_Secundario = data.conteudoSecundario || '';
-    row.CTA = data.cta || '';
-    row.Status_Postagem = data.statusPostagem || '';
-    row.Perfil = data.perfil || '';
+    row.Tipo_Evento = data.tipoEvento;
+    row.Tipo = data.tipo;
+    row.Conteudo_Principal = data.conteudoPrincipal;
+    row.Conteudo_Secundario = data.conteudoSecundario;
+    row.CTA = data.cta;
+    row.Status_Postagem = data.statusPostagem;
+    row.Perfil = data.perfil;
     await row.save();
 
     if (data.tarefa) {
@@ -165,8 +156,8 @@ export async function PATCH(req: NextRequest) {
         tarefaRow = await tarefasSheet.addRow({ Bloco_ID: data.id });
       }
 
-      tarefaRow.Titulo = data.tarefa.titulo || '';
-      tarefaRow.Responsavel = data.tarefa.responsavel || '';
+      tarefaRow.Titulo = data.tarefa.titulo;
+      tarefaRow.Responsavel = data.tarefa.responsavel;
       tarefaRow.ResponsavelChatId = data.tarefa.responsavelChatId || '';
       tarefaRow.Data = formatDateForSheet(data.tarefa.data);
       tarefaRow.Status = data.tarefa.status || 'Pendente';
@@ -182,9 +173,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DELETE - remove evento + tarefa
-////////////////////////////////////////////////////////////////////////////////
+// 🔹 DELETE - Remove evento + tarefa
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json();
