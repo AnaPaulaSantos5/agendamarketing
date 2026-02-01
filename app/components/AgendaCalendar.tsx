@@ -25,6 +25,7 @@ export type AgendaEvent = {
     titulo: string;
     responsavel: Perfil;
     responsavelChatId?: string;
+    userImage?: string;
     data: string;
     status: string;
     linkDrive?: string;
@@ -43,6 +44,14 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
+// Mapeamento perfil → chatId + imagem
+const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
+  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+};
+
 type Props = {
   isAdmin?: boolean;
 };
@@ -60,6 +69,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+
+  const [showProfileInfo, setShowProfileInfo] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -99,8 +110,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   };
 
   const deleteEvent = async (id: string) => {
-    if (!isAdmin) return alert('Somente admins podem excluir eventos');
-
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -122,7 +131,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     });
   };
 
-  // Filtragem por perfil ou todos
   const filteredEvents = events.filter(
     e => filterProfile === 'Todos' || e.perfil === filterProfile
   );
@@ -136,6 +144,27 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
+      {/* Painel esquerdo com foto do usuário */}
+      <div style={{ flex: 0.3, textAlign: 'center' }}>
+        <div
+          style={{ cursor: 'pointer', display: 'inline-block' }}
+          onClick={() => setShowProfileInfo(!showProfileInfo)}
+        >
+          <img
+            src={userImage}
+            alt={userName}
+            style={{ width: 60, height: 60, borderRadius: '50%' }}
+          />
+        </div>
+        {showProfileInfo && (
+          <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
+            <p><strong>Nome:</strong> {userName}</p>
+            <p><strong>E-mail:</strong> {userEmail}</p>
+            <p><strong>Responsável Chat ID:</strong> {perfilMap[userName as Perfil]?.chatId || 'N/A'}</p>
+          </div>
+        )}
+      </div>
+
       {/* Agenda */}
       <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
@@ -155,7 +184,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable // qualquer usuário pode criar/editar
+          editable
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -228,7 +257,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           onSave={saveEvent}
           onDelete={deleteEvent}
           isAdmin={isAdmin}
-          userPerfil={userName as Perfil} // Atenção: nome precisa bater com Perfil
+          userPerfil={userName as Perfil}
           userChatId={userEmail}
           userImage={userImage}
         />
