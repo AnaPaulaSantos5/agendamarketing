@@ -1,81 +1,152 @@
-// AgendaCalendar.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import EventModal from './EventModal';
 import { AgendaEvent, Perfil } from './types';
 
-interface AgendaCalendarProps {
-  events: AgendaEvent[];
-  userPerfil: Perfil;
-  onDateSelect?: (start: string, end: string) => void;
-  onEventClick?: (ev: AgendaEvent) => void;
-}
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-const profileColors: Record<Perfil, string> = {
-  Confi: '#ffce0a',
-  Luiza: '#1260c7',
-  Cecília: '#f5886c',
-  Júlio: '#000000',
-};
+export default function AgendaCalendar() {
+  const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({
+    start: '',
+    end: '',
+  });
 
-export default function AgendaCalendar({
-  events,
-  onDateSelect,
-  onEventClick,
-}: AgendaCalendarProps) {
+  /* =========================
+     BUSCAR EVENTOS DA PLANILHA
+  ========================== */
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  async function fetchEvents() {
+    const res = await fetch('/api/agenda');
+    const data = await res.json();
+    setEvents(data);
+  }
+
+  /* =========================
+     SALVAR / EDITAR EVENTO
+  ========================== */
+  async function saveEvent(ev: AgendaEvent, isEdit = false) {
+    await fetch('/api/agenda', {
+      method: isEdit ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
+    });
+
+    fetchEvents();
+  }
+
+  /* =========================
+     EXCLUIR EVENTO
+  ========================== */
+  async function deleteEvent(id: string) {
+    await fetch('/api/agenda', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+
+    fetchEvents();
+    setModalOpen(false);
+  }
+
+  const filteredEvents = events.filter(e => e.perfil === filterProfile);
+
   return (
-    <FullCalendar
-      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-      initialView="timeGridWeek"
-      selectable
-      editable
-      height="80vh"
+    <div style={{ display: 'flex', gap: 16 }}>
+      {/* ================= CALENDÁRIO ================= */}
+      <div style={{ flex: 1 }}>
+        <label>
+          Perfil:{' '}
+          <select
+            value={filterProfile}
+            onChange={e => setFilterProfile(e.target.value as Perfil)}
+          >
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
 
-      headerToolbar={{
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay',
-      }}
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="timeGridWeek"
+          selectable
+          editable
+          height="80vh"
 
-      /*
-        ⚠️ NÃO espalhar ...ev
-        O FullCalendar só deve receber campos que ele entende
-      */
-      events={events.map(ev => ({
-        id: ev.id,
-        title: ev.conteudoPrincipal || '(Sem título)',
-        start: ev.start,
-        end: ev.end,
-        allDay: ev.allDay ?? false,
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
 
-        backgroundColor: ev.perfil
-          ? profileColors[ev.perfil]
-          : '#cccccc',
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.conteudoPrincipal,
+            start: ev.start,
+            end: ev.end,
+          }))}
 
-        borderColor: ev.perfil
-          ? profileColors[ev.perfil]
-          : '#cccccc',
+          select={info => {
+            setSelectedEvent(null);
+            setSelectedDate({
+              start: info.startStr.slice(0, 16),
+              end: info.endStr.slice(0, 16),
+            });
+            setModalOpen(true);
+          }}
 
-        textColor: '#000000',
-      }))}
+          eventClick={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (!ev) return;
+            setSelectedEvent(ev);
+            setSelectedDate({ start: ev.start, end: ev.end });
+            setModalOpen(true);
+          }}
 
-      select={(info) => {
-        if (!onDateSelect) return;
-        onDateSelect(
-          info.startStr.slice(0, 16),
-          info.endStr.slice(0, 16)
-        );
-      }}
+          eventDrop={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (!ev) return;
+            saveEvent(
+              { ...ev, start: info.event.startStr, end: info.event.endStr },
+              true
+            );
+          }}
 
-      eventClick={(info) => {
-        if (!onEventClick) return;
-        const ev = events.find(e => e.id === info.event.id);
-        if (ev) onEventClick(ev);
-      }}
-    />
+          eventResize={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (!ev) return;
+            saveEvent(
+              { ...ev, start: info.event.startStr, end: info.event.endStr },
+              true
+            );
+          }}
+        />
+      </div>
+
+      {/* ================= MODAL ================= */}
+      {modalOpen && (
+        <EventModal
+          isOpen={modalOpen}
+          start={selectedDate.start}
+          end={selectedDate.end}
+          event={selectedEvent}
+          onClose={() => setModalOpen(false)}
+          onSave={saveEvent}
+          onDelete={deleteEvent}
+        />
+      )}
+    </div>
   );
 }
