@@ -33,11 +33,34 @@ export default function AgendaCalendar({
       initialView="timeGridWeek"
       selectable
       editable
+      height="80vh"
+
+      headerToolbar={{
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay',
+      }}
+
+      /*
+        ⚠️ NÃO espalhar ...ev
+        O FullCalendar só deve receber campos que ele entende
+      */
       events={events.map(ev => ({
-        ...ev,
         id: ev.id,
-        title: ev.conteudoPrincipal || '',
-        color: ev.perfil ? profileColors[ev.perfil] : '#ccc',
+        title: ev.conteudoPrincipal || '(Sem título)',
+        start: ev.start,
+        end: ev.end,
+        allDay: ev.allDay ?? false,
+
+        backgroundColor: ev.perfil
+          ? profileColors[ev.perfil]
+          : '#cccccc',
+
+        borderColor: ev.perfil
+          ? profileColors[ev.perfil]
+          : '#cccccc',
+
+        textColor: '#000000',
       }))}
 
       select={(info) => {
@@ -53,13 +76,6 @@ export default function AgendaCalendar({
         const ev = events.find(e => e.id === info.event.id);
         if (ev) onEventClick(ev);
       }}
-
-      headerToolbar={{
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay',
-      }}
-      height="80vh"
     />
   );
 }
