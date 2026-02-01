@@ -1,56 +1,44 @@
 'use client';
+
 import React, { useState } from 'react';
-import Header from './Header';
 import ProfileSidebar from './ProfileSidebar';
 import RightSidebar from './RightSidebar';
 import AgendaCalendar from './AgendaCalendar';
-import { Perfil, AgendaEvent, ChecklistItem } from './types';
+import { Perfil, AgendaEvent } from './types';
 
 interface AgendaLayoutProps {
   events: AgendaEvent[];
-  checklist: ChecklistItem[];
+  userName: string;
   userPerfil: Perfil;
-  userRole: 'admin' | 'user';
-  onSaveEvent: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDeleteEvent: (id: string) => void;
-  onToggleChecklistItem: (item: ChecklistItem) => void;
+  responsavelChatId: string;
 }
+
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaLayout({
   events,
-  checklist,
+  userName,
   userPerfil,
-  userRole,
-  onSaveEvent,
-  onDeleteEvent,
-  onToggleChecklistItem,
+  responsavelChatId,
 }: AgendaLayoutProps) {
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedPerfil, setSelectedPerfil] = useState<Perfil>(userPerfil);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
 
   return (
-    <div className="agenda-layout" style={{ display: 'flex', height: '100vh' }}>
-      {/* Sidebar esquerda */}
+    <div style={{ display: 'flex', height: '100vh' }}>
       <ProfileSidebar
-        isOpen={profileOpen}
-        onToggle={() => setProfileOpen(!profileOpen)}
-        userPerfil={userPerfil}
-        checklist={checklist}
-        onToggleChecklistItem={onToggleChecklistItem}
+        userName={userName}
+        userPerfil={selectedPerfil}
+        responsavelChatId={responsavelChatId}
+        profiles={profiles}
+        onProfileChange={setSelectedPerfil}
+        onToggleProfilePanel={() => setShowProfilePanel(prev => !prev)}
       />
 
-      {/* Área central */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        <Header />
-        <AgendaCalendar
-          events={events}
-          userPerfil={userPerfil}
-          userRole={userRole}
-          onSave={onSaveEvent}
-          onDelete={onDeleteEvent}
-        />
-      </div>
+      <main style={{ flex: 1, padding: 16 }}>
+        <AgendaCalendar events={events} userPerfil={selectedPerfil} />
+      </main>
 
-      {/* Sidebar direita */}
       <RightSidebar />
     </div>
   );
