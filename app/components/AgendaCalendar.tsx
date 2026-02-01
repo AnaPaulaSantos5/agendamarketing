@@ -6,36 +6,25 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
-import { AgendaEvent, Perfil } from './types';
-
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+import { AgendaEvent } from './types';
 
 export default function AgendaCalendar() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({
-    start: '',
-    end: '',
-  });
+  const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | null>(null);
 
-  /* =========================
-     BUSCAR EVENTOS DA PLANILHA
-  ========================== */
+  // 🔹 BUSCA EVENTOS DA PLANILHA
   useEffect(() => {
-    fetchEvents();
+    async function load() {
+      const res = await fetch('/api/agenda');
+      const data = await res.json();
+      setEvents(data);
+    }
+    load();
   }, []);
 
-  async function fetchEvents() {
-    const res = await fetch('/api/agenda');
-    const data = await res.json();
-    setEvents(data);
-  }
-
-  /* =========================
-     SALVAR / EDITAR EVENTO
-  ========================== */
+  // 🔹 SALVAR (POST / PATCH)
   async function saveEvent(ev: AgendaEvent, isEdit = false) {
     await fetch('/api/agenda', {
       method: isEdit ? 'PATCH' : 'POST',
@@ -43,12 +32,14 @@ export default function AgendaCalendar() {
       body: JSON.stringify(ev),
     });
 
-    fetchEvents();
+    if (isEdit) {
+      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+    } else {
+      setEvents(prev => [...prev, ev]);
+    }
   }
 
-  /* =========================
-     EXCLUIR EVENTO
-  ========================== */
+  // 🔹 DELETE
   async function deleteEvent(id: string) {
     await fetch('/api/agenda', {
       method: 'DELETE',
@@ -56,97 +47,63 @@ export default function AgendaCalendar() {
       body: JSON.stringify({ id }),
     });
 
-    fetchEvents();
+    setEvents(prev => prev.filter(e => e.id !== id));
     setModalOpen(false);
   }
 
-  const filteredEvents = events.filter(e => e.perfil === filterProfile);
-
   return (
-    <div style={{ display: 'flex', gap: 16 }}>
-      {/* ================= CALENDÁRIO ================= */}
-      <div style={{ flex: 1 }}>
-        <label>
-          Perfil:{' '}
-          <select
-            value={filterProfile}
-            onChange={e => setFilterProfile(e.target.value as Perfil)}
-          >
-            {profiles.map(p => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </label>
+    <>
+      <FullCalendar
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        initialView="timeGridWeek"
+        selectable
+        editable
+        height="85vh"
+        events={events.map(ev => ({
+          id: ev.id,
+          title: ev.conteudoPrincipal,
+          start: ev.start,
+          end: ev.end,
+        }))}
 
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          selectable
-          editable
-          height="80vh"
+        select={(info) => {
+          setSelectedEvent(null);
+          setSelectedRange({ start: info.startStr, end: info.endStr });
+          setModalOpen(true);
+        }}
 
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
-          }}
+        eventClick={(info) => {
+          const ev = events.find(e => e.id === info.event.id);
+          if (!ev) return;
+          setSelectedEvent(ev);
+          setSelectedRange({ start: ev.start, end: ev.end });
+          setModalOpen(true);
+        }}
 
-          events={filteredEvents.map(ev => ({
-            id: ev.id,
-            title: ev.conteudoPrincipal,
-            start: ev.start,
-            end: ev.end,
-          }))}
+        eventDrop={(info) => {
+          const ev = events.find(e => e.id === info.event.id);
+          if (!ev) return;
+          saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+        }}
 
-          select={info => {
-            setSelectedEvent(null);
-            setSelectedDate({
-              start: info.startStr.slice(0, 16),
-              end: info.endStr.slice(0, 16),
-            });
-            setModalOpen(true);
-          }}
+        eventResize={(info) => {
+          const ev = events.find(e => e.id === info.event.id);
+          if (!ev) return;
+          saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+        }}
+      />
 
-          eventClick={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (!ev) return;
-            setSelectedEvent(ev);
-            setSelectedDate({ start: ev.start, end: ev.end });
-            setModalOpen(true);
-          }}
-
-          eventDrop={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (!ev) return;
-            saveEvent(
-              { ...ev, start: info.event.startStr, end: info.event.endStr },
-              true
-            );
-          }}
-
-          eventResize={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (!ev) return;
-            saveEvent(
-              { ...ev, start: info.event.startStr, end: info.event.endStr },
-              true
-            );
-          }}
-        />
-      </div>
-
-      {/* ================= MODAL ================= */}
-      {modalOpen && (
+      {modalOpen && selectedRange && (
         <EventModal
           isOpen={modalOpen}
-          start={selectedDate.start}
-          end={selectedDate.end}
           event={selectedEvent}
+          start={selectedRange.start}
+          end={selectedRange.end}
           onClose={() => setModalOpen(false)}
           onSave={saveEvent}
           onDelete={deleteEvent}
         />
       )}
-    </div>
+    </>
   );
 }
