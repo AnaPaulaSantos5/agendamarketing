@@ -13,6 +13,8 @@ type Props = {
   event?: AgendaEvent | null;
 };
 
+const perfis: Perfil[] = ['Confi', 'Cecília', 'Júlio', 'Luiza'];
+
 export default function EventModal({
   isOpen,
   onClose,
@@ -24,32 +26,21 @@ export default function EventModal({
 }: Props) {
   const [editing, setEditing] = useState(!event);
 
-  // ✨ Campos do evento
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>('Confi');
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
+
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
 
-  // ✨ Campos da tarefa
   const [tarefaTitle, setTarefaTitle] = useState('');
-  const [responsavel, setResponsavel] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [responsavel, setResponsavel] = useState<Perfil>('Confi');
   const [linkDrive, setLinkDrive] = useState('');
-  const [tarefaData, setTarefaData] = useState('');
+  const [responsavelChatId, setResponsavelChatId] = useState('');
 
-  // ✨ Datas do evento
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
-
-  // 🔹 Normaliza datas para datetime-local
-  function formatDateLocal(date?: string) {
-    if (!date) return '';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 16);
-  }
 
   useEffect(() => {
     if (event) {
@@ -59,33 +50,23 @@ export default function EventModal({
       setConteudoSecundario(event.conteudoSecundario || '');
       setCta(event.cta || '');
       setStatusPostagem(event.statusPostagem || '');
-      setStartDate(formatDateLocal(event.start));
-      setEndDate(formatDateLocal(event.end));
-
-      // 🔹 Preenche tarefa se existir
       setTarefaTitle(event.tarefa?.titulo || '');
-      setResponsavel(event.tarefa?.responsavel || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
+      setResponsavel(event.tarefa?.responsavel || 'Confi');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setTarefaData(formatDateLocal(event.tarefa?.data));
-
+      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
+      setStartDate(event.start);
+      setEndDate(event.end);
       setEditing(false);
     } else {
       setEditing(true);
-      setStartDate(formatDateLocal(start));
-      setEndDate(formatDateLocal(end));
-      setTarefaTitle('');
-      setResponsavel('');
-      setResponsavelChatId('');
-      setLinkDrive('');
-      setTarefaData(formatDateLocal(start));
+      setStartDate(start);
+      setEndDate(end);
     }
   }, [event, start, end]);
 
   if (!isOpen) return null;
 
-  // 🔹 Função salvar
-  const handleSave = async () => {
+  const handleSave = () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
       start: startDate,
@@ -101,7 +82,7 @@ export default function EventModal({
             titulo: tarefaTitle,
             responsavel,
             responsavelChatId,
-            data: tarefaData || startDate,
+            data: startDate,
             status: 'Pendente',
             linkDrive,
             notificar: 'Sim',
@@ -109,22 +90,8 @@ export default function EventModal({
         : null,
     };
 
-    try {
-      // 🔹 Envia para backend
-      const method = editing ? 'POST' : 'PATCH';
-      const res = await fetch('/api/agenda', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ev),
-      });
-      const json = await res.json();
-      console.log('save response', json);
-
-      onSave(ev, !editing);
-      onClose();
-    } catch (err) {
-      console.error('Erro ao salvar evento:', err);
-    }
+    onSave(ev, !!event);
+    onClose();
   };
 
   return (
@@ -144,15 +111,22 @@ export default function EventModal({
           onChange={e => setStatusPostagem(e.target.value)}
           placeholder="Status postagem"
         />
-
-        <h4>Tarefa</h4>
-        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Título da tarefa" />
-        <input value={responsavel} onChange={e => setResponsavel(e.target.value)} placeholder="Responsável" />
-        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
-        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
-        <input type="datetime-local" value={tarefaData} onChange={e => setTarefaData(e.target.value)} />
-
-        <h4>Datas do Evento</h4>
+        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
+        <select value={responsavel} onChange={e => setResponsavel(e.target.value as Perfil)}>
+          {perfis.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <input
+          value={responsavelChatId}
+          onChange={e => setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+        />
+        <input
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          placeholder="Link do Drive"
+        />
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
@@ -171,14 +145,10 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  zIndex: 9999,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
   width: 360,
-  maxHeight: '90vh',
-  overflowY: 'auto',
-  borderRadius: 8,
 };
