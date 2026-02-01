@@ -18,7 +18,6 @@ export type AgendaEvent = {
   tipo?: string;
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
@@ -43,37 +42,39 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-// Mapeamento perfil → chatId + imagem
+// Perfil → telefone + imagem
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+  Confi: { chatId: '+5511999999999', image: '/images/confi.png' },
+  Cecília: { chatId: '+5511988888888', image: '/images/cecilia.png' },
+  Luiza: { chatId: '+5511977777777', image: '/images/luiza.png' },
+  Júlio: { chatId: '+5511966666666', image: '/images/julio.png' },
 };
 
 type Props = {
-  isAdmin?: boolean;
+  // apenas controle se quiser passar
 };
 
-export default function AgendaCalendar({ isAdmin = false }: Props) {
+export default function AgendaCalendar({}: Props) {
   const { data: session } = useSession();
   const userEmail = session?.user?.email || '';
   const userName = session?.user?.name || '';
   const userImage = session?.user?.image || '';
 
+  const isAdminUser = userEmail === 'ana.paulinhacarneirosantos@gmail.com';
+
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Confi');
+  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+
   const [showProfileInfo, setShowProfileInfo] = useState(false);
-  const [responsavelChatId, setResponsavelChatId] = useState(perfilMap[userName as Perfil]?.chatId || '');
-  const [savingChatId, setSavingChatId] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Carregar eventos
+  // === FETCH AGENDA ===
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -81,67 +82,57 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
-  // Carregar checklist
+  // === FETCH CHECKLIST ===
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
         const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today && !item.done
+          item => item.date?.slice(0, 10) === today
         );
         setChecklist(todayTasks);
       })
       .catch(console.error);
   }, [today]);
 
-  // Salvar alteração de chatId
-  const saveChatId = async () => {
-    setSavingChatId(true);
-    await fetch('/api/perfil', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: userName, chatId: responsavelChatId }),
-    });
-    setSavingChatId(false);
-    alert('Responsável Chat ID atualizado!');
-  };
-
+  // === SAVE EVENT ===
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
-    const res = await fetch('/api/agenda', {
+    await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ev),
     });
 
-    const saved = await res.json();
     if (isEdit) {
-      setEvents(prev => prev.map(e => (e.id === saved.id ? saved : e)));
+      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
     } else {
-      setEvents(prev => [...prev, saved]);
+      setEvents(prev => [...prev, ev]);
     }
   };
 
+  // === DELETE EVENT ===
   const deleteEvent = async (id: string) => {
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
+
     setEvents(prev => prev.filter(e => e.id !== id));
     setChecklist(prev => prev.filter(c => c.id !== id));
     setModalOpen(false);
   };
 
+  // === CHECKLIST MARK DONE ===
   const toggleChecklistItem = async (item: ChecklistItem) => {
-    // Atualiza local
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
-    // Atualiza planilha
+    const updatedItem = { ...item, done: true };
     await fetch('/api/checklist', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id }),
+      body: JSON.stringify(updatedItem),
     });
+    setChecklist(prev => prev.filter(c => c.id !== item.id));
   };
 
   const filteredEvents = events.filter(
@@ -155,9 +146,24 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     Júlio: '#00b894',
   };
 
+  // === SALVAR ALTERAÇÕES DO PERFIL ===
+  const [perfilAtual, setPerfilAtual] = useState<Perfil>('Confi');
+  const [responsavelChatIdAtual, setResponsavelChatIdAtual] = useState('');
+
+  useEffect(() => {
+    const perfilKey = (userName as Perfil) || 'Confi';
+    setPerfilAtual(perfilKey);
+    setResponsavelChatIdAtual(perfilMap[perfilKey]?.chatId || '');
+  }, [userName]);
+
+  const saveProfileChanges = async () => {
+    perfilMap[perfilAtual].chatId = responsavelChatIdAtual;
+    alert('Responsável Chat ID atualizado!');
+  };
+
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Painel esquerdo com foto do usuário */}
+      {/* === PAINEL PERFIL === */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
         <div
           style={{ cursor: 'pointer', display: 'inline-block' }}
@@ -173,23 +179,19 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
-            <p>
-              <strong>Responsável Chat ID:</strong>
-              <input
-                type="text"
-                value={responsavelChatId}
-                onChange={e => setResponsavelChatId(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </p>
-            <button onClick={saveChatId} disabled={savingChatId} style={{ marginTop: 4 }}>
-              {savingChatId ? 'Salvando...' : 'Salvar'}
-            </button>
+            <p><strong>Responsável Chat ID:</strong></p>
+            <input
+              type="text"
+              value={responsavelChatIdAtual}
+              onChange={e => setResponsavelChatIdAtual(e.target.value)}
+              style={{ width: '100%' }}
+            />
+            <button onClick={saveProfileChanges} style={{ marginTop: 4 }}>Salvar</button>
           </div>
         )}
       </div>
 
-      {/* Agenda */}
+      {/* === AGENDA === */}
       <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
@@ -243,7 +245,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         />
       </div>
 
-      {/* Checklist */}
+      {/* === CHECKLIST === */}
       <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
@@ -270,7 +272,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         </ul>
       </div>
 
-      {/* Modal */}
+      {/* === MODAL === */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
@@ -280,9 +282,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           event={selectedEvent}
           onSave={saveEvent}
           onDelete={deleteEvent}
-          isAdmin={isAdmin}
+          isAdmin={isAdminUser}
           userPerfil={userName as Perfil}
-          userChatId={responsavelChatId}
+          userChatId={responsavelChatIdAtual}
           userImage={userImage}
         />
       )}
