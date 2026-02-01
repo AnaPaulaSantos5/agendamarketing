@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
 
-// Mapeamento de perfil → chatId e imagem
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
   Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
   Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
@@ -19,7 +18,6 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
@@ -39,12 +37,9 @@ export default function EventModal({
   userImage,
   isAdmin,
 }: Props) {
-  const [editing, setEditing] = useState(!event);
-
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
-
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
@@ -52,11 +47,9 @@ export default function EventModal({
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
   const [perfilImage, setPerfilImage] = useState(userImage);
-
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
-  // Atualiza os campos se houver evento existente
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -71,17 +64,12 @@ export default function EventModal({
       setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
-      setEditing(false);
     } else {
-      setEditing(true);
-      setStartDate(start);
-      setEndDate(end);
       setResponsavelChatId(perfilMap[perfil].chatId);
       setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userChatId, userImage]);
+  }, [event, start, end, userPerfil, userImage, perfil]);
 
-  // Atualiza automaticamente o responsavelChatId e imagem quando o perfil muda
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
@@ -120,23 +108,12 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Foto do usuário */}
-        {perfilImage && (
-          <img
-            src={perfilImage}
-            alt={perfil}
-            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
-          />
-        )}
-
+        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {/* Select de perfil */}
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
@@ -144,7 +121,7 @@ export default function EventModal({
         <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
         <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
+        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
 
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -152,34 +129,13 @@ export default function EventModal({
 
         <button onClick={handleSave}>Salvar</button>
         <button onClick={onClose}>Fechar</button>
-        {event && (
-          <button
-            onClick={() => {
-              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
-            }}
-            style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
-          >
-            Excluir
-          </button>
-        )}
+        <button onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event?.id!); }} style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}>
+          Excluir
+        </button>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-};
-
-const modal: React.CSSProperties = {
-  background: '#fff',
-  padding: 20,
-  width: 360,
-  borderRadius: 8,
-};
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
