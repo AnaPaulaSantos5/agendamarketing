@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { AgendaEvent, Perfil, profiles } from './AgendaCalendar';
+import { AgendaEvent, Perfil } from './AgendaCalendar';
 
 type Props = {
   isOpen: boolean;
@@ -12,16 +12,25 @@ type Props = {
   end: string;
   event?: AgendaEvent | null;
   userPerfil: Perfil;
-  userChatId: string;
   userImage?: string;
   isAdmin: boolean;
   perfilMap: Record<Perfil, { chatId: string; image?: string }>;
   setPerfilMap: React.Dispatch<React.SetStateAction<Record<Perfil, { chatId: string; image?: string }>>>;
-  profiles: Perfil[];
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  start,
+  end,
+  event,
+  userPerfil,
+  userImage,
+  isAdmin,
+  perfilMap,
+  setPerfilMap,
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
@@ -29,11 +38,12 @@ export default function EventModal({
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
+  const [responsavelChatId, setResponsavelChatId] = useState('');
   const [perfilImage, setPerfilImage] = useState(userImage);
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
+  // Carrega dados do evento ao abrir modal
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -47,12 +57,14 @@ export default function EventModal({
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      setStartDate(start); setEndDate(end);
-      setResponsavelChatId(perfilMap[perfil].chatId);
-      setPerfilImage(perfilMap[perfil].image || userImage);
+      setStartDate(start);
+      setEndDate(end);
+      setResponsavelChatId(perfilMap[userPerfil].chatId);
+      setPerfilImage(perfilMap[userPerfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userImage, perfilMap, perfil]);
+  }, [event, start, end, userPerfil, userImage, perfilMap]);
 
+  // Atualiza ChatID e imagem quando perfil muda
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
@@ -69,16 +81,18 @@ export default function EventModal({
       conteudoSecundario,
       perfil,
       tipoEvento: tipo,
-      tarefa: tarefaTitle ? {
-        titulo: tarefaTitle,
-        responsavel: perfil,
-        responsavelChatId,
-        userImage: perfilImage,
-        data: startDate,
-        status: 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      } : null,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: perfil,
+            responsavelChatId,
+            userImage: perfilImage,
+            data: startDate,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : null,
     };
     onSave(ev, !!event);
     onClose();
@@ -87,12 +101,22 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
+        {perfilImage && (
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
+        )}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          {Object.keys(perfilMap).map(p => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
@@ -104,13 +128,50 @@ export default function EventModal({
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
-        {event && <button onClick={() => { if(confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }} style={{ backgroundColor:'#ff4d4f', color:'#fff', border:'none', padding:'4px 8px', borderRadius:4, marginLeft:8 }}>Excluir</button>}
+        <button onClick={handleSave} style={buttonStyle}>
+          Salvar
+        </button>
+        <button onClick={onClose} style={buttonStyle}>
+          Fechar
+        </button>
+        {event && (
+          <button
+            onClick={() => {
+              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
+            }}
+            style={{ ...buttonStyle, backgroundColor: '#ff4d4f', color: '#fff' }}
+          >
+            Excluir
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+};
+const modal: React.CSSProperties = {
+  background: '#fff',
+  padding: 20,
+  width: 360,
+  borderRadius: 8,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+};
+const buttonStyle: React.CSSProperties = {
+  marginTop: 8,
+  marginRight: 8,
+  padding: '6px 12px',
+  borderRadius: 4,
+  border: 'none',
+  cursor: 'pointer',
+  backgroundColor: '#1260c7',
+  color: '#fff',
+};
