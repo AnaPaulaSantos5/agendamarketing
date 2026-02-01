@@ -41,19 +41,9 @@ export type ChecklistItem = {
   done: boolean;
 };
 
-// Perfis e mapeamento de ChatID e imagem
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
-};
-
-type Props = {
-  isAdmin?: boolean;
-};
+type Props = { isAdmin?: boolean };
 
 export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
@@ -63,17 +53,23 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Confi');
-
+  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-
   const [showProfileInfo, setShowProfileInfo] = useState(false);
-  const [responsavelChatId, setResponsavelChatId] = useState(perfilMap[userName as Perfil]?.chatId || '');
-  const [perfilAtual, setPerfilAtual] = useState<Perfil>(userName as Perfil);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Mapeamento perfil → chatId + imagem
+  const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
+    Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+    Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+    Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+    Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+  });
+
+  const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
   useEffect(() => {
     fetch('/api/agenda')
@@ -84,13 +80,22 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today && !item.done
-        );
+        const todayTasks = data.filter(item => item.date.slice(0, 10) === today && !item.done);
         setChecklist(todayTasks);
       })
       .catch(console.error);
   }, [today]);
+
+  // Salvar alteração de ChatID do perfil
+  const savePerfil = async (perfil: Perfil) => {
+    const chatId = perfilMap[perfil].chatId;
+    await fetch('/api/perfil', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perfil, chatId }),
+    });
+    alert('Responsável ChatID salvo!');
+  };
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
@@ -105,86 +110,45 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   };
 
   const deleteEvent = async (id: string) => {
-    await fetch('/api/agenda', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-
+    await fetch('/api/agenda', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     setEvents(prev => prev.filter(e => e.id !== id));
     setChecklist(prev => prev.filter(c => c.id !== id));
     setModalOpen(false);
   };
 
   const toggleChecklistItem = async (item: ChecklistItem) => {
+    // remove da lista local
     setChecklist(prev => prev.filter(c => c.id !== item.id));
-
-    await fetch('/api/checklist', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id, done: true }),
-    });
+    // salva na planilha
+    await fetch('/api/checklist', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, done: true }) });
   };
 
-  const savePerfil = async () => {
-    try {
-      const res = await fetch('/api/perfil', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ perfil: perfilAtual, responsavelChatId }),
-      });
-      if (!res.ok) throw new Error('Falha ao salvar responsável Chat ID');
-      alert('Responsável Chat ID salvo!');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar responsável Chat ID.');
-    }
-  };
+  const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
 
-  const filteredEvents = events.filter(
-    e => filterProfile === 'Todos' || e.perfil === filterProfile
-  );
-
-  const perfilColors: Record<Perfil, string> = {
-    Confi: '#ffce0a',
-    Cecília: '#f5886c',
-    Luiza: '#1260c7',
-    Júlio: '#00b894',
-  };
+  const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Painel esquerdo com foto e perfil */}
+      {/* Painel esquerdo */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div
-          style={{ cursor: 'pointer', display: 'inline-block' }}
-          onClick={() => setShowProfileInfo(!showProfileInfo)}
-        >
-          <img
-            src={userImage}
-            alt={userName}
-            style={{ width: 60, height: 60, borderRadius: '50%' }}
-          />
+        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
+          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
-
         {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
-            <p>
-              <strong>Perfil:</strong>
-              <select value={perfilAtual} onChange={e => setPerfilAtual(e.target.value as Perfil)}>
-                {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </p>
-            <p>
-              <strong>Responsável Chat ID:</strong>
-              <input
-                value={responsavelChatId}
-                onChange={e => setResponsavelChatId(e.target.value)}
-              />
-            </p>
-            <button onClick={savePerfil} style={{ marginTop: 6 }}>Salvar</button>
+            <p><strong>Responsável Chat ID:</strong> {perfilMap[userName as Perfil]?.chatId || 'N/A'}</p>
+            {isUserAdmin && (
+              <div>
+                <label>Atualizar Chat ID:</label>
+                <input
+                  value={perfilMap[userName as Perfil]?.chatId || ''}
+                  onChange={e => setPerfilMap({ ...perfilMap, [userName as Perfil]: { ...perfilMap[userName as Perfil], chatId: e.target.value } })}
+                />
+                <button onClick={() => savePerfil(userName as Perfil)}>Salvar</button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -193,14 +157,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
-          <select
-            value={filterProfile}
-            onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}
-          >
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
             <option value="Todos">Todos</option>
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {profiles.map(p => (<option key={p} value={p}>{p}</option>))}
           </select>
         </label>
 
@@ -218,27 +177,10 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             borderColor: '#000',
             textColor: '#000',
           }))}
-          select={info => {
-            setSelectedEvent(null);
-            setSelectedDate({ start: info.startStr, end: info.endStr });
-            setModalOpen(true);
-          }}
-          eventClick={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) {
-              setSelectedEvent(ev);
-              setSelectedDate({ start: ev.start, end: ev.end });
-              setModalOpen(true);
-            }
-          }}
-          eventDrop={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
-          eventResize={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
+          select={info => { setSelectedEvent(null); setSelectedDate({ start: info.startStr, end: info.endStr }); setModalOpen(true); }}
+          eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
+          eventDrop={info => { const ev = events.find(e => e.id === info.event.id); if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true); }}
+          eventResize={info => { const ev = events.find(e => e.id === info.event.id); if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true); }}
           height="auto"
         />
       </div>
@@ -252,25 +194,15 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             <li key={item.id} style={{ marginBottom: 6 }}>
               {item.task} ({item.client})
               <button
-                style={{
-                  marginLeft: 8,
-                  background: '#1260c7',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  padding: '2px 6px',
-                }}
+                style={{ marginLeft: 8, background: '#1260c7', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '2px 6px' }}
                 onClick={() => toggleChecklistItem(item)}
-              >
-                ✅
-              </button>
+              >✅</button>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Modal */}
+      {/* Modal de eventos */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
@@ -280,10 +212,12 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           event={selectedEvent}
           onSave={saveEvent}
           onDelete={deleteEvent}
-          isAdmin={isAdmin}
-          userPerfil={perfilAtual}
-          userChatId={responsavelChatId}
-          userImage={perfilMap[perfilAtual]?.image || userImage}
+          isAdmin={isUserAdmin}
+          userPerfil={userName as Perfil}
+          userChatId={perfilMap[userName as Perfil]?.chatId || ''}
+          userImage={userImage}
+          perfilMap={perfilMap} // envia para modal
+          setPerfilMap={setPerfilMap}
         />
       )}
     </div>
