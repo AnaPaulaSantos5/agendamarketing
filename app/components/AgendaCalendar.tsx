@@ -85,9 +85,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today && !item.done
-        );
+        const todayTasks = data.filter(item => item.date?.slice(0, 10) === today && !item.done);
         setChecklist(todayTasks);
       })
       .catch(console.error);
@@ -102,11 +100,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       body: JSON.stringify(ev),
     });
 
-    if (isEdit) {
-      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    } else {
-      setEvents(prev => [...prev, ev]);
-    }
+    if (isEdit) setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+    else setEvents(prev => [...prev, ev]);
   };
 
   const deleteEvent = async (id: string) => {
@@ -123,7 +118,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const toggleChecklistItem = async (item: ChecklistItem) => {
     setChecklist(prev => prev.filter(c => c.id !== item.id));
-
     await fetch('/api/checklist', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -146,15 +140,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     <div style={{ display: 'flex', gap: 24 }}>
       {/* Painel esquerdo com foto do usuário */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div
-          style={{ cursor: 'pointer', display: 'inline-block' }}
-          onClick={() => setShowProfileInfo(!showProfileInfo)}
-        >
-          <img
-            src={userImage}
-            alt={userName}
-            style={{ width: 60, height: 60, borderRadius: '50%' }}
-          />
+        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
+          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
         {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
@@ -169,14 +156,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
-          <select
-            value={filterProfile}
-            onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}
-          >
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
             <option value="Todos">Todos</option>
-            {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </label>
 
@@ -228,15 +210,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             <li key={item.id} style={{ marginBottom: 6 }}>
               {item.task} ({item.client})
               <button
-                style={{
-                  marginLeft: 8,
-                  background: '#1260c7',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  padding: '2px 6px',
-                }}
+                style={{ marginLeft: 8, background: '#1260c7', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '2px 6px' }}
                 onClick={() => toggleChecklistItem(item)}
               >
                 ✅
