@@ -18,6 +18,7 @@ export type AgendaEvent = {
   tipo?: string;
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
+  statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
@@ -42,25 +43,23 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-// Perfil → telefone + imagem
+// Map perfil -> chatId e imagem
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: '+5511999999999', image: '/images/confi.png' },
-  Cecília: { chatId: '+5511988888888', image: '/images/cecilia.png' },
-  Luiza: { chatId: '+5511977777777', image: '/images/luiza.png' },
-  Júlio: { chatId: '+5511966666666', image: '/images/julio.png' },
+  Confi: { chatId: '11999999999', image: '/images/confi.png' },
+  Cecília: { chatId: '11988888888', image: '/images/cecilia.png' },
+  Luiza: { chatId: '11977777777', image: '/images/luiza.png' },
+  Júlio: { chatId: '11966666666', image: '/images/julio.png' },
 };
 
 type Props = {
-  // apenas controle se quiser passar
+  isAdmin?: boolean;
 };
 
-export default function AgendaCalendar({}: Props) {
+export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
   const userEmail = session?.user?.email || '';
   const userName = session?.user?.name || '';
   const userImage = session?.user?.image || '';
-
-  const isAdminUser = userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -69,12 +68,13 @@ export default function AgendaCalendar({}: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-
   const [showProfileInfo, setShowProfileInfo] = useState(false);
+  const [responsavelChatId, setResponsavelChatId] = useState(perfilMap[userName as Perfil]?.chatId || '');
+  const [perfilAtual, setPerfilAtual] = useState<Perfil>(userName as Perfil);
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // === FETCH AGENDA ===
+  // Fetch agenda
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -82,57 +82,61 @@ export default function AgendaCalendar({}: Props) {
       .catch(console.error);
   }, []);
 
-  // === FETCH CHECKLIST ===
+  // Fetch checklist
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
         const todayTasks = data.filter(
-          item => item.date?.slice(0, 10) === today
+          item => item.date?.slice(0, 10) === today && !item.done
         );
         setChecklist(todayTasks);
       })
       .catch(console.error);
   }, [today]);
 
-  // === SAVE EVENT ===
+  // Salvar alterações do responsávelChatId no perfil
+  const savePerfil = async () => {
+    await fetch('/api/perfil', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perfil: perfilAtual, responsavelChatId }),
+    });
+    alert('Responsável Chat ID salvo!');
+  };
+
+  // Salvar checklist ao marcar
+  const toggleChecklistItem = async (item: ChecklistItem) => {
+    setChecklist(prev => prev.filter(c => c.id !== item.id));
+
+    await fetch('/api/checklist', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, done: true }),
+    });
+  };
+
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
+
     await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ev),
     });
 
-    if (isEdit) {
-      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    } else {
-      setEvents(prev => [...prev, ev]);
-    }
+    if (isEdit) setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
+    else setEvents(prev => [...prev, ev]);
   };
 
-  // === DELETE EVENT ===
   const deleteEvent = async (id: string) => {
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-
     setEvents(prev => prev.filter(e => e.id !== id));
-    setChecklist(prev => prev.filter(c => c.id !== id));
     setModalOpen(false);
-  };
-
-  // === CHECKLIST MARK DONE ===
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    const updatedItem = { ...item, done: true };
-    await fetch('/api/checklist', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedItem),
-    });
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
   };
 
   const filteredEvents = events.filter(
@@ -146,52 +150,35 @@ export default function AgendaCalendar({}: Props) {
     Júlio: '#00b894',
   };
 
-  // === SALVAR ALTERAÇÕES DO PERFIL ===
-  const [perfilAtual, setPerfilAtual] = useState<Perfil>('Confi');
-  const [responsavelChatIdAtual, setResponsavelChatIdAtual] = useState('');
-
-  useEffect(() => {
-    const perfilKey = (userName as Perfil) || 'Confi';
-    setPerfilAtual(perfilKey);
-    setResponsavelChatIdAtual(perfilMap[perfilKey]?.chatId || '');
-  }, [userName]);
-
-  const saveProfileChanges = async () => {
-    perfilMap[perfilAtual].chatId = responsavelChatIdAtual;
-    alert('Responsável Chat ID atualizado!');
-  };
-
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* === PAINEL PERFIL === */}
+      {/* Painel de perfil */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div
-          style={{ cursor: 'pointer', display: 'inline-block' }}
-          onClick={() => setShowProfileInfo(!showProfileInfo)}
-        >
-          <img
-            src={userImage}
-            alt={userName}
-            style={{ width: 60, height: 60, borderRadius: '50%' }}
-          />
+        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
+          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
         {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
-            <p><strong>Responsável Chat ID:</strong></p>
+            <label><strong>Responsável Chat ID:</strong></label>
             <input
-              type="text"
-              value={responsavelChatIdAtual}
-              onChange={e => setResponsavelChatIdAtual(e.target.value)}
-              style={{ width: '100%' }}
+              value={responsavelChatId}
+              onChange={e => setResponsavelChatId(e.target.value)}
+              placeholder="Responsável Chat ID"
             />
-            <button onClick={saveProfileChanges} style={{ marginTop: 4 }}>Salvar</button>
+            <label><strong>Perfil:</strong></label>
+            <select value={perfilAtual} onChange={e => setPerfilAtual(e.target.value as Perfil)}>
+              {profiles.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <button onClick={savePerfil} style={{ marginTop: 8 }}>Salvar</button>
           </div>
         )}
       </div>
 
-      {/* === AGENDA === */}
+      {/* Agenda */}
       <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
@@ -245,7 +232,7 @@ export default function AgendaCalendar({}: Props) {
         />
       </div>
 
-      {/* === CHECKLIST === */}
+      {/* Checklist */}
       <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
@@ -272,7 +259,7 @@ export default function AgendaCalendar({}: Props) {
         </ul>
       </div>
 
-      {/* === MODAL === */}
+      {/* Modal */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
@@ -282,9 +269,9 @@ export default function AgendaCalendar({}: Props) {
           event={selectedEvent}
           onSave={saveEvent}
           onDelete={deleteEvent}
-          isAdmin={isAdminUser}
-          userPerfil={userName as Perfil}
-          userChatId={responsavelChatIdAtual}
+          isAdmin={true} // Ana é admin
+          userPerfil={perfilAtual}
+          userChatId={responsavelChatId}
           userImage={userImage}
         />
       )}
