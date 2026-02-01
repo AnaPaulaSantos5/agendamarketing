@@ -43,7 +43,15 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-// Mapeamento perfil → chatId + imagem
+// Map email do usuário → perfil
+const userMap: Record<string, Perfil> = {
+  'confi@email.com': 'Confi',
+  'cecilia@email.com': 'Cecília',
+  'luiza@email.com': 'Luiza',
+  'julio@email.com': 'Júlio',
+};
+
+// Map perfil → chatId e imagem
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
   Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
   Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
@@ -61,10 +69,11 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const userName = session?.user?.name || '';
   const userImage = session?.user?.image || '';
 
+  const userPerfil = userMap[userEmail] || 'Confi';
+
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>(isAdmin ? 'Todos' : (userName as Perfil));
-  const [profilesState, setProfilesState] = useState(perfilMap);
+  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>(userPerfil);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -73,7 +82,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // --- FETCH EVENTS ---
+  // Carrega eventos
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -81,18 +90,19 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
-  // --- FETCH CHECKLIST ---
+  // Carrega checklist do usuário
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(item => item.date?.slice(0, 10) === today && !item.done);
+        const todayTasks = data.filter(
+          item => item.date?.slice(0, 10) === today && !item.done
+        );
         setChecklist(todayTasks);
       })
       .catch(console.error);
   }, [today]);
 
-  // --- SAVE EVENT ---
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
     await fetch('/api/agenda', {
@@ -103,7 +113,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     setEvents(prev => (isEdit ? prev.map(e => (e.id === ev.id ? ev : e)) : [...prev, ev]));
   };
 
-  // --- DELETE EVENT ---
   const deleteEvent = async (id: string) => {
     await fetch('/api/agenda', {
       method: 'DELETE',
@@ -111,10 +120,10 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       body: JSON.stringify({ id }),
     });
     setEvents(prev => prev.filter(e => e.id !== id));
+    setChecklist(prev => prev.filter(c => c.id !== id));
     setModalOpen(false);
   };
 
-  // --- TOGGLE CHECKLIST ---
   const toggleChecklistItem = async (item: ChecklistItem) => {
     await fetch('/api/checklist', {
       method: 'PATCH',
@@ -124,17 +133,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     setChecklist(prev => prev.filter(c => c.id !== item.id));
   };
 
-  // --- UPDATE CHATID (admin) ---
-  const updateChatId = async (perfil: Perfil, chatId: string) => {
-    await fetch('/api/perfis', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ perfil, chatId }),
-    });
-    setProfilesState(prev => ({ ...prev, [perfil]: { ...prev[perfil], chatId } }));
-  };
-
-  // --- FILTERED EVENTS ---
   const filteredEvents = events.filter(
     e => filterProfile === 'Todos' || e.perfil === filterProfile
   );
@@ -148,45 +146,40 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* --- PAINEL PERFIL --- */}
+      {/* Painel esquerdo com foto do usuário */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
         <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
-          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
+          <img src={userImage || perfilMap[userPerfil].image} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
         {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
-            <p><strong>Responsável Chat ID:</strong></p>
-            {isAdmin ? (
+            <p>
+              <strong>Responsável Chat ID:</strong>{' '}
               <input
                 type="text"
-                value={profilesState[userName as Perfil]?.chatId || ''}
-                onChange={e => updateChatId(userName as Perfil, e.target.value)}
+                value={perfilMap[userPerfil].chatId}
+                onChange={e => perfilMap[userPerfil].chatId = e.target.value}
+                style={{ width: '100%' }}
+                disabled={!isAdmin}
               />
-            ) : (
-              <span>{profilesState[userName as Perfil]?.chatId || 'N/A'}</span>
-            )}
+            </p>
           </div>
         )}
       </div>
 
-      {/* --- CALENDÁRIO --- */}
+      {/* Agenda */}
       <div style={{ flex: 3 }}>
-        {isAdmin && (
-          <label style={{ marginBottom: 12, display: 'block' }}>
-            Filtrar por perfil:{' '}
-            <select
-              value={filterProfile}
-              onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}
-            >
-              <option value="Todos">Todos</option>
-              {profiles.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        <label style={{ marginBottom: 12, display: 'block' }}>
+          Filtrar por perfil:{' '}
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
+            <option value="Todos">Todos</option>
+            {profiles.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </label>
 
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -227,7 +220,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         />
       </div>
 
-      {/* --- CHECKLIST --- */}
+      {/* Checklist */}
       <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
@@ -254,7 +247,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         </ul>
       </div>
 
-      {/* --- MODAL --- */}
+      {/* Modal */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
@@ -265,10 +258,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           onSave={saveEvent}
           onDelete={deleteEvent}
           isAdmin={isAdmin}
-          userPerfil={userName as Perfil}
-          userChatId={profilesState[userName as Perfil]?.chatId || ''}
-          userImage={userImage}
-          profilesState={profilesState}
+          userPerfil={userPerfil}
+          userChatId={perfilMap[userPerfil].chatId}
+          userImage={userImage || perfilMap[userPerfil].image}
         />
       )}
     </div>
