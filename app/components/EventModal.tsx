@@ -5,6 +5,13 @@ import { AgendaEvent, Perfil } from './AgendaCalendar';
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
+const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
+  Confi: { chatId: '11999999999', image: '/images/confi.png' },
+  Cecília: { chatId: '11988888888', image: '/images/cecilia.png' },
+  Luiza: { chatId: '11977777777', image: '/images/luiza.png' },
+  Júlio: { chatId: '11966666666', image: '/images/julio.png' },
+};
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -13,19 +20,10 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
   isAdmin: boolean;
-};
-
-// Perfil → telefone + imagem
-const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: '+5511999999999', image: '/images/confi.png' },
-  Cecília: { chatId: '+5511988888888', image: '/images/cecilia.png' },
-  Luiza: { chatId: '+5511977777777', image: '/images/luiza.png' },
-  Júlio: { chatId: '+5511966666666', image: '/images/julio.png' },
 };
 
 export default function EventModal({
@@ -65,12 +63,7 @@ export default function EventModal({
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      setTitle('');
       setPerfil(userPerfil);
-      setTipo('Perfil');
-      setConteudoSecundario('');
-      setTarefaTitle('');
-      setLinkDrive('');
       setResponsavelChatId(userChatId);
       setPerfilImage(userImage);
       setStartDate(start);
@@ -78,7 +71,7 @@ export default function EventModal({
     }
   }, [event, start, end, userPerfil, userChatId, userImage]);
 
-  // Atualiza responsavelChatId e imagem ao mudar perfil
+  // Atualiza responsávelChatId e imagem ao trocar o perfil
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
@@ -118,14 +111,11 @@ export default function EventModal({
         {perfilImage && (
           <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />
         )}
-
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
