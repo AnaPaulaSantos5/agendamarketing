@@ -3,6 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
 
+// Mapeamento de perfil → chatId e imagem
+const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
+  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+};
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -40,14 +48,15 @@ export default function EventModal({
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
-
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
+  const [perfilImage, setPerfilImage] = useState(userImage);
 
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
+  // Atualiza os campos se houver evento existente
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -58,7 +67,8 @@ export default function EventModal({
       setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || userChatId);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
       setEditing(false);
@@ -66,8 +76,16 @@ export default function EventModal({
       setEditing(true);
       setStartDate(start);
       setEndDate(end);
+      setResponsavelChatId(perfilMap[perfil].chatId);
+      setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userChatId]);
+  }, [event, start, end, userPerfil, userChatId, userImage]);
+
+  // Atualiza automaticamente o responsavelChatId e imagem quando o perfil muda
+  useEffect(() => {
+    setResponsavelChatId(perfilMap[perfil].chatId);
+    setPerfilImage(perfilMap[perfil].image || userImage);
+  }, [perfil, userImage]);
 
   if (!isOpen) return null;
 
@@ -87,6 +105,7 @@ export default function EventModal({
             titulo: tarefaTitle,
             responsavel: perfil,
             responsavelChatId,
+            userImage: perfilImage,
             data: startDate,
             status: 'Pendente',
             linkDrive,
@@ -94,7 +113,6 @@ export default function EventModal({
           }
         : null,
     };
-
     onSave(ev, !!event);
     onClose();
   };
@@ -102,88 +120,48 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Cabeçalho com foto e nome */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          {userImage && (
-            <img
-              src={userImage}
-              alt={userPerfil}
-              style={{
-                width: 50,
-                height: 50,
-                borderRadius: '50%',
-                marginRight: 12,
-                objectFit: 'cover',
-              }}
-            />
-          )}
-          <div>
-            <strong>{userPerfil}</strong>
-            <div style={{ fontSize: 12, color: '#555' }}>{userChatId}</div>
-          </div>
-        </div>
+        {/* Foto do usuário */}
+        {perfilImage && (
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
+        )}
 
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        <input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="Título"
-          style={inputStyle}
-        />
+        {/* Select de perfil */}
+        <label>Perfil responsável:</label>
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
 
-        <textarea
-          value={conteudoSecundario}
-          onChange={e => setConteudoSecundario(e.target.value)}
-          placeholder="Conteúdo secundário"
-          style={inputStyle}
-        />
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
+        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
+        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
+        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
+        <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
+        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
 
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" style={inputStyle} />
-        <input
-          value={statusPostagem}
-          onChange={e => setStatusPostagem(e.target.value)}
-          placeholder="Status postagem"
-          style={inputStyle}
-        />
-        <input
-          value={tarefaTitle}
-          onChange={e => setTarefaTitle(e.target.value)}
-          placeholder="Tarefa"
-          style={inputStyle}
-        />
-        <input
-          value={responsavelChatId}
-          onChange={e => setResponsavelChatId(e.target.value)}
-          placeholder="Responsável Chat ID"
-          disabled={!isAdmin}
-          style={inputStyle}
-        />
-        <input
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
-          placeholder="Link do Drive"
-          style={inputStyle}
-        />
+        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <input
-          type="datetime-local"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          style={inputStyle}
-        />
-        <input
-          type="datetime-local"
-          value={endDate}
-          onChange={e => setEndDate(e.target.value)}
-          style={inputStyle}
-        />
-
-        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <button onClick={handleSave}>Salvar</button>
-          <button onClick={onClose}>Fechar</button>
-          {event && isAdmin && <button onClick={() => onDelete(event.id)}>Excluir</button>}
-        </div>
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
+        {event && (
+          <button
+            onClick={() => {
+              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
+            }}
+            style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
+          >
+            Excluir
+          </button>
+        )}
       </div>
     </div>
   );
@@ -203,14 +181,5 @@ const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
   width: 360,
-  maxHeight: '90vh',
-  overflowY: 'auto',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  marginBottom: 8,
-  padding: 6,
-  borderRadius: 4,
-  border: '1px solid #ccc',
+  borderRadius: 8,
 };
