@@ -1,0 +1,27 @@
+import { AgendaEvent } from '../components/types'; // ajuste o caminho
+
+export async function getEvents(): Promise<AgendaEvent[]> {
+  const res = await fetch('/api/agenda');
+  if (!res.ok) throw new Error('Erro ao buscar eventos');
+  return res.json();
+}
+
+export async function saveEvent(event: AgendaEvent, isEdit?: boolean) {
+  const res = await fetch('/api/agenda', {
+    method: isEdit ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+  if (!res.ok) throw new Error('Erro ao salvar evento');
+  return res.json();
+}
+
+export async function deleteEvent(id: string) {
+  const res = await fetch('/api/agenda', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) throw new Error('Erro ao deletar evento');
+  return res.json();
+}
