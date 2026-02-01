@@ -14,13 +14,17 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
+
   tipoEvento?: string;
   tipo?: string;
+
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
+
   perfil?: Perfil;
+
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -30,6 +34,7 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
+
   allDay?: boolean;
 };
 
@@ -49,12 +54,13 @@ type Props = {
 
 export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
-  const userPerfil = session?.user?.perfil as Perfil;
-  const userChatId = session?.user?.responsavelChatId || '';
+  const userEmail = session?.user?.email || '';
+  const userName = session?.user?.name || '';
+  const userImage = session?.user?.image || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Confi');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -83,6 +89,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
+
     await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -98,6 +105,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const deleteEvent = async (id: string) => {
     if (!isAdmin) return alert('Somente admins podem excluir eventos');
+
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -111,12 +119,18 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const toggleChecklistItem = async (item: ChecklistItem) => {
     setChecklist(prev => prev.filter(c => c.id !== item.id));
+
     await fetch('/api/checklist', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id }),
     });
   };
+
+  // Filtragem de eventos por perfil ou todos
+  const filteredEvents = events.filter(
+    e => filterProfile === 'Todos' || e.perfil === filterProfile
+  );
 
   const perfilColors: Record<Perfil, string> = {
     Confi: '#ffce0a',
@@ -125,15 +139,16 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     Júlio: '#00b894',
   };
 
-  const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
-
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Calendário */}
-      <div style={{ flex: 1 }}>
+      {/* Agenda */}
+      <div style={{ flex: 3 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
+          <select
+            value={filterProfile}
+            onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}
+          >
             <option value="Todos">Todos</option>
             {profiles.map(p => (
               <option key={p} value={p}>{p}</option>
@@ -145,7 +160,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable // todos podem criar/editar
+          editable // qualquer usuário pode criar/editar eventos
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -170,33 +185,18 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }}
           eventDrop={info => {
             const ev = events.find(e => e.id === info.event.id);
-            if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
           }}
           eventResize={info => {
             const ev = events.find(e => e.id === info.event.id);
-            if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
           }}
           height="auto"
         />
-
-        {modalOpen && (
-          <EventModal
-            isOpen={modalOpen}
-            onClose={() => setModalOpen(false)}
-            start={selectedDate.start}
-            end={selectedDate.end}
-            event={selectedEvent}
-            onSave={saveEvent}
-            onDelete={deleteEvent}
-            isAdmin={isAdmin}
-            userPerfil={userPerfil}      // NOVO
-            userChatId={userChatId}      // NOVO
-          />
-        )}
       </div>
 
-      {/* Checklist do dia */}
-      <aside style={{ width: 250 }}>
+      {/* Checklist do usuário */}
+      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -220,7 +220,24 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             </li>
           ))}
         </ul>
-      </aside>
+      </div>
+
+      {/* Modal de evento */}
+      {modalOpen && (
+        <EventModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          start={selectedDate.start}
+          end={selectedDate.end}
+          event={selectedEvent}
+          onSave={saveEvent}
+          onDelete={deleteEvent}
+          isAdmin={isAdmin}
+          userPerfil={userName as Perfil}
+          userChatId={userEmail}
+          userImage={userImage}
+        />
+      )}
     </div>
   );
 }
