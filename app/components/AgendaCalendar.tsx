@@ -1,6 +1,7 @@
+// AgendaCalendar.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -10,22 +11,22 @@ import { AgendaEvent, Perfil } from './types';
 interface AgendaCalendarProps {
   events: AgendaEvent[];
   userPerfil: Perfil;
+  onDateSelect: (start: string, end: string) => void;
+  onEventClick: (ev: AgendaEvent) => void;
 }
 
-export default function AgendaCalendar({ events, userPerfil }: AgendaCalendarProps) {
-  const getEventColor = (perfil?: Perfil) => {
-    switch (perfil) {
-      case 'Confi':
-        return '#ffce0a';
-      case 'Luiza':
-        return '#1260c7';
-      case 'Cecília':
-        return '#f5886c';
-      default:
-        return '#999';
-    }
-  };
+const profileColors: Record<Perfil, string> = {
+  Confi: '#ffce0a',
+  Luiza: '#1260c7',
+  Cecília: '#f5886c',
+  Júlio: '#000000',
+};
 
+export default function AgendaCalendar({
+  events,
+  onDateSelect,
+  onEventClick,
+}: AgendaCalendarProps) {
   return (
     <FullCalendar
       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -35,13 +36,21 @@ export default function AgendaCalendar({ events, userPerfil }: AgendaCalendarPro
       events={events.map(ev => ({
         ...ev,
         title: ev.conteudoPrincipal,
-        color: getEventColor(ev.perfil),
+        color: ev.perfil ? profileColors[ev.perfil] : '#ccc',
       }))}
+      select={(info) => {
+        onDateSelect(info.startStr.slice(0, 16), info.endStr.slice(0, 16));
+      }}
+      eventClick={(info) => {
+        const ev = events.find(e => e.id === info.event.id);
+        if (ev) onEventClick(ev);
+      }}
       headerToolbar={{
         left: 'prev,next today',
         center: 'title',
         right: 'dayGridMonth,timeGridWeek,timeGridDay',
       }}
+      height="80vh"
     />
   );
 }
