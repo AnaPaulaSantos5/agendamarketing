@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
 
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -18,12 +20,12 @@ type Props = {
   isAdmin: boolean;
 };
 
-// Perfil → chatId + imagem
+// Perfil → telefone + imagem
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+  Confi: { chatId: '+5511999999999', image: '/images/confi.png' },
+  Cecília: { chatId: '+5511988888888', image: '/images/cecilia.png' },
+  Luiza: { chatId: '+5511977777777', image: '/images/luiza.png' },
+  Júlio: { chatId: '+5511966666666', image: '/images/julio.png' },
 };
 
 export default function EventModal({
