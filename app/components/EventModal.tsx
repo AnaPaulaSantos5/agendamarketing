@@ -6,10 +6,10 @@ import { AgendaEvent, Perfil } from './AgendaCalendar';
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: '11999999999', image: '/images/confi.png' },
-  Cecília: { chatId: '11988888888', image: '/images/cecilia.png' },
-  Luiza: { chatId: '11977777777', image: '/images/luiza.png' },
-  Júlio: { chatId: '11966666666', image: '/images/julio.png' },
+  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
 };
 
 type Props = {
@@ -43,6 +43,7 @@ export default function EventModal({
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
+  const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
@@ -56,6 +57,7 @@ export default function EventModal({
       setPerfil(event.perfil || userPerfil);
       setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
+      setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
       setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
@@ -63,15 +65,13 @@ export default function EventModal({
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      setPerfil(userPerfil);
-      setResponsavelChatId(userChatId);
-      setPerfilImage(userImage);
       setStartDate(start);
       setEndDate(end);
+      setResponsavelChatId(perfilMap[perfil].chatId);
+      setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userChatId, userImage]);
+  }, [event, start, end, userPerfil, userImage]);
 
-  // Atualiza responsávelChatId e imagem ao trocar o perfil
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
@@ -86,6 +86,7 @@ export default function EventModal({
       end: endDate,
       conteudoPrincipal: title,
       conteudoSecundario,
+      statusPostagem,
       perfil,
       tipoEvento: tipo,
       tarefa: tarefaTitle
@@ -109,8 +110,13 @@ export default function EventModal({
     <div style={overlay}>
       <div style={modal}>
         {perfilImage && (
-          <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
         )}
+
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
@@ -120,6 +126,7 @@ export default function EventModal({
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
         <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
+        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
@@ -131,7 +138,9 @@ export default function EventModal({
         <button onClick={onClose}>Fechar</button>
         {event && (
           <button
-            onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }}
+            onClick={() => {
+              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
+            }}
             style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
           >
             Excluir
