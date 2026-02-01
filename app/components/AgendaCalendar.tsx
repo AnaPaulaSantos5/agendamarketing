@@ -1,54 +1,44 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
-import { AgendaEvent } from './types';
+import { AgendaEvent, Perfil } from './types';
 
-export default function AgendaCalendar() {
+export default function AgendaCalendar({ userPerfil }: { userPerfil: Perfil }) {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedRange, setSelectedRange] = useState<{ start: string; end: string } | null>(null);
+  const [selected, setSelected] = useState<AgendaEvent | null>(null);
+  const [range, setRange] = useState<{ start: string; end: string } | null>(null);
 
-  // 🔹 BUSCA EVENTOS DA PLANILHA
   useEffect(() => {
-    async function load() {
-      const res = await fetch('/api/agenda');
-      const data = await res.json();
-      setEvents(data);
-    }
-    load();
+    fetch('/api/agenda')
+      .then(r => r.json())
+      .then(setEvents);
   }, []);
 
-  // 🔹 SALVAR (POST / PATCH)
-  async function saveEvent(ev: AgendaEvent, isEdit = false) {
-    await fetch('/api/agenda', {
-      method: isEdit ? 'PATCH' : 'POST',
+  async function save(ev: AgendaEvent, edit = false) {
+    const res = await fetch('/api/agenda', {
+      method: edit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ev),
     });
 
-    if (isEdit) {
-      setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    } else {
-      setEvents(prev => [...prev, ev]);
-    }
+    const data = await res.json();
+
+    if (!edit) setEvents(prev => [...prev, data]);
+    else setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
   }
 
-  // 🔹 DELETE
-  async function deleteEvent(id: string) {
+  async function remove(id: string) {
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-
     setEvents(prev => prev.filter(e => e.id !== id));
-    setModalOpen(false);
   }
 
   return (
@@ -59,49 +49,38 @@ export default function AgendaCalendar() {
         selectable
         editable
         height="85vh"
-        events={events.map(ev => ({
-          id: ev.id,
-          title: ev.conteudoPrincipal,
-          start: ev.start,
-          end: ev.end,
-        }))}
+        events={events
+          .filter(e => e.perfil === userPerfil)
+          .map(e => ({
+            id: e.id,
+            title: e.conteudoPrincipal,
+            start: e.start,
+            end: e.end,
+          }))}
 
-        select={(info) => {
-          setSelectedEvent(null);
-          setSelectedRange({ start: info.startStr, end: info.endStr });
-          setModalOpen(true);
+        select={info => {
+          setSelected(null);
+          setRange({ start: info.startStr, end: info.endStr });
         }}
 
-        eventClick={(info) => {
+        eventClick={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (!ev) return;
-          setSelectedEvent(ev);
-          setSelectedRange({ start: ev.start, end: ev.end });
-          setModalOpen(true);
-        }}
-
-        eventDrop={(info) => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (!ev) return;
-          saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-        }}
-
-        eventResize={(info) => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (!ev) return;
-          saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          if (ev) {
+            setSelected(ev);
+            setRange({ start: ev.start, end: ev.end });
+          }
         }}
       />
 
-      {modalOpen && selectedRange && (
+      {range && (
         <EventModal
-          isOpen={modalOpen}
-          event={selectedEvent}
-          start={selectedRange.start}
-          end={selectedRange.end}
-          onClose={() => setModalOpen(false)}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
+          event={selected}
+          start={range.start}
+          end={range.end}
+          perfil={userPerfil}
+          onSave={save}
+          onDelete={remove}
+          onClose={() => setRange(null)}
         />
       )}
     </>
