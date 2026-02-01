@@ -4,13 +4,12 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
+  conteudoPrincipal: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-  perfil?: Perfil;
+  perfil: Perfil;
+  tipoEvento?: 'Interno' | 'Perfil';
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -18,7 +17,6 @@ export type AgendaEvent = {
     data: string;
     status: string;
     linkDrive?: string;
-    notificar?: string;
   } | null;
   allDay?: boolean;
 };
