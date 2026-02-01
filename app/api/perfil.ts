@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { google } from 'googleapis';
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '';
-const SHEET_NAME = 'Tarefas'; // Aba onde estão os perfis
+const SHEET_NAME = 'Tarefas';
 
 const auth = new google.auth.GoogleAuth({
   credentials: {
@@ -14,12 +14,10 @@ const auth = new google.auth.GoogleAuth({
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
+    const sheets = google.sheets({ version: 'v4', auth });
 
     if (req.method === 'PATCH') {
       const { perfil, chatId } = req.body;
-
       if (!perfil || !chatId) return res.status(400).json({ error: 'perfil ou chatId ausente' });
 
       // Lê todos os dados da aba
