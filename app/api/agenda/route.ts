@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
-import { AgendaEvent, Perfil } from '@/app/components/types';
 import { randomUUID } from 'crypto';
+import { AgendaEvent, Perfil } from '@/app/components/types';
 
 const auth = new JWT({
   email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -13,52 +13,78 @@ const auth = new JWT({
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
 const SHEET_NAME = 'Agenda';
 
-/* =========================
-   GET – LISTAR EVENTOS
-========================= */
+/* ========= GET ========= */
 export async function GET() {
   await doc.loadInfo();
   const sheet = doc.sheetsByTitle[SHEET_NAME];
   const rows = await sheet.getRows();
 
-  const events: AgendaEvent[] = rows
-    .filter(r => r.Data_Inicio && r.Data_Fim)
-    .map((r) => ({
-      id: r.ID || randomUUID(),
-      start: new Date(r.Data_Inicio).toISOString(),
-      end: new Date(r.Data_Fim).toISOString(),
-      conteudoPrincipal: r.Conteudo_Principal || '',
-      conteudoSecundario: r.Conteudo_Secundario || '',
-      cta: r.CTA || '',
-      statusPostagem: r.Status || '',
-      perfil: (r.Perfil as Perfil) || 'Confi',
-      tipoEvento: r.Tipo || 'Perfil',
-      allDay: false,
-    }));
+  const events: AgendaEvent[] = rows.map(r => ({
+    id: r.ID,
+    start: r.Data_Inicio,
+    end: r.Data_Fim,
+    conteudoPrincipal: r.Conteudo_Principal,
+    conteudoSecundario: r.Conteudo_Secundario,
+    cta: r.CTA,
+    statusPostagem: r.Status,
+    perfil: r.Perfil as Perfil,
+    tipoEvento: r.Tipo,
+  }));
 
   return NextResponse.json(events);
 }
 
-/* =========================
-   POST – CRIAR EVENTO
-========================= */
+/* ========= POST ========= */
 export async function POST(req: Request) {
   const body = await req.json();
 
   const row = {
     ID: randomUUID(),
-    Data_Inicio: new Date(body.start).toISOString(),
-    Data_Fim: new Date(body.end).toISOString(),
-    Conteudo_Principal: body.conteudoPrincipal ?? '',
+    Data_Inicio: body.start,
+    Data_Fim: body.end,
+    Conteudo_Principal: body.conteudoPrincipal,
     Conteudo_Secundario: body.conteudoSecundario ?? '',
     CTA: body.cta ?? '',
     Status: body.statusPostagem ?? 'Pendente',
-    Perfil: body.perfil ?? 'Confi',
+    Perfil: body.perfil,
     Tipo: body.tipoEvento ?? 'Perfil',
   };
 
   await doc.loadInfo();
   await doc.sheetsByTitle[SHEET_NAME].addRow(row);
 
-  return NextResponse.json({ ok: true, row });
+  return NextResponse.json(row);
+}
+
+/* ========= PATCH ========= */
+export async function PATCH(req: Request) {
+  const body = await req.json();
+  await doc.loadInfo();
+
+  const sheet = doc.sheetsByTitle[SHEET_NAME];
+  const rows = await sheet.getRows();
+  const row = rows.find(r => r.ID === body.id);
+
+  if (!row) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+
+  row.Data_Inicio = body.start;
+  row.Data_Fim = body.end;
+  row.Conteudo_Principal = body.conteudoPrincipal;
+  row.Perfil = body.perfil;
+
+  await row.save();
+  return NextResponse.json({ ok: true });
+}
+
+/* ========= DELETE ========= */
+export async function DELETE(req: Request) {
+  const { id } = await req.json();
+  await doc.loadInfo();
+
+  const sheet = doc.sheetsByTitle[SHEET_NAME];
+  const rows = await sheet.getRows();
+  const row = rows.find(r => r.ID === id);
+
+  if (row) await row.delete();
+  return NextResponse.json({ ok: true });
 }
