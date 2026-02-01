@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import AgendaLayout from '@/app/components/AgendaLayout';
-import { AgendaEvent, Perfil } from '@/app/components/types';
-import { getEvents } from '@/app/services/agendaService';
+import AgendaLayout from '../components/AgendaLayout';
+import { AgendaEvent, Perfil } from '../components/types';
+import { getEvents } from '../services/agendaService';
 
 export default function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
