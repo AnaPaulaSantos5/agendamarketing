@@ -12,7 +12,6 @@ type Props = {
   end: string;
   event?: AgendaEvent | null;
 
-  // Novos props para usuário atual
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
@@ -103,47 +102,88 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Foto do usuário */}
-        {userImage && (
-          <img
-            src={userImage}
-            alt={userPerfil}
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: '50%',
-              float: 'left',
-              marginRight: 12,
-            }}
-          />
-        )}
+        {/* Cabeçalho com foto e nome */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          {userImage && (
+            <img
+              src={userImage}
+              alt={userPerfil}
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: '50%',
+                marginRight: 12,
+                objectFit: 'cover',
+              }}
+            />
+          )}
+          <div>
+            <strong>{userPerfil}</strong>
+            <div style={{ fontSize: 12, color: '#555' }}>{userChatId}</div>
+          </div>
+        </div>
 
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Título"
+          style={inputStyle}
+        />
 
         <textarea
           value={conteudoSecundario}
           onChange={e => setConteudoSecundario(e.target.value)}
           placeholder="Conteúdo secundário"
+          style={inputStyle}
         />
 
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
-        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" disabled={!isAdmin} />
+        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" style={inputStyle} />
+        <input
+          value={statusPostagem}
+          onChange={e => setStatusPostagem(e.target.value)}
+          placeholder="Status postagem"
+          style={inputStyle}
+        />
+        <input
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+          placeholder="Tarefa"
+          style={inputStyle}
+        />
+        <input
+          value={responsavelChatId}
+          onChange={e => setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+          disabled={!isAdmin}
+          style={inputStyle}
+        />
         <input
           value={linkDrive}
           onChange={e => setLinkDrive(e.target.value)}
           placeholder="Link do Drive"
+          style={inputStyle}
         />
 
-        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        <input
+          type="datetime-local"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          style={inputStyle}
+        />
+        <input
+          type="datetime-local"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+          style={inputStyle}
+        />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
-        {event && isAdmin && <button onClick={() => onDelete(event.id)}>Excluir</button>}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button onClick={handleSave}>Salvar</button>
+          <button onClick={onClose}>Fechar</button>
+          {event && isAdmin && <button onClick={() => onDelete(event.id)}>Excluir</button>}
+        </div>
       </div>
     </div>
   );
@@ -156,10 +196,21 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
+  zIndex: 1000,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
   width: 360,
+  maxHeight: '90vh',
+  overflowY: 'auto',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  marginBottom: 8,
+  padding: 6,
+  borderRadius: 4,
+  border: '1px solid #ccc',
 };
