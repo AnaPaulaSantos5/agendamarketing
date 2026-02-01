@@ -3,16 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio', 'Ana Paula Dos Santos'];
-
-const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
-  'Ana Paula Dos Santos': { chatId: 'ana.paulinhacarneirosantos@gmail.com', image: '/images/ana.png' },
-};
-
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -21,18 +11,38 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
+
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
   isAdmin: boolean;
 };
 
-export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin }: Props) {
+// Perfil → chatId + imagem
+const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
+  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+};
+
+export default function EventModal({
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  start,
+  end,
+  event,
+  userPerfil,
+  userChatId,
+  userImage,
+  isAdmin,
+}: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
@@ -40,14 +50,12 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
-  // Inicializa modal com dados do evento ou defaults
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || userPerfil);
       setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
-      setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
       setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
@@ -59,7 +67,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       setPerfil(userPerfil);
       setTipo('Perfil');
       setConteudoSecundario('');
-      setStatusPostagem('');
       setTarefaTitle('');
       setLinkDrive('');
       setResponsavelChatId(userChatId);
@@ -71,9 +78,9 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 
   // Atualiza responsavelChatId e imagem ao mudar perfil
   useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil]?.chatId || '');
-    setPerfilImage(perfilMap[perfil]?.image || '');
-  }, [perfil]);
+    setResponsavelChatId(perfilMap[perfil].chatId);
+    setPerfilImage(perfilMap[perfil].image || userImage);
+  }, [perfil, userImage]);
 
   if (!isOpen) return null;
 
@@ -84,7 +91,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
       end: endDate,
       conteudoPrincipal: title,
       conteudoSecundario,
-      statusPostagem,
       perfil,
       tipoEvento: tipo,
       tarefa: tarefaTitle
@@ -107,7 +113,10 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   return (
     <div style={overlay}>
       <div style={modal}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
+        {perfilImage && (
+          <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />
+        )}
+
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
@@ -119,7 +128,6 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
         <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
@@ -142,5 +150,19 @@ export default function EventModal({ isOpen, onClose, onSave, onDelete, start, e
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+};
+
+const modal: React.CSSProperties = {
+  background: '#fff',
+  padding: 20,
+  width: 360,
+  borderRadius: 8,
+};
