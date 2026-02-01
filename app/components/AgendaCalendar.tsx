@@ -7,6 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 import { useSession } from 'next-auth/react';
+import UserProfile from './UserProfile';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -14,17 +15,13 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-
   tipoEvento?: string;
   tipo?: string;
-
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-
   perfil?: Perfil;
-
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -34,7 +31,6 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
-
   allDay?: boolean;
 };
 
@@ -48,12 +44,9 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-type Props = {
-  isAdmin?: boolean;
-};
-
-export default function AgendaCalendar({ isAdmin = false }: Props) {
+export default function AgendaCalendar() {
   const { data: session } = useSession();
+  const isAdmin = session?.user.role === 'admin';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -85,6 +78,17 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   }, [today]);
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
+    // Preenche responsavelChatId automaticamente se não existir
+    if (!ev.tarefa?.responsavelChatId && session?.user.responsavelChatId) {
+      ev.tarefa = {
+        ...ev.tarefa,
+        responsavelChatId: session.user.responsavelChatId,
+        responsavel: session.user.perfil as Perfil,
+        data: ev.start,
+        status: 'Pendente',
+      };
+    }
+
     const method = isEdit ? 'PATCH' : 'POST';
 
     await fetch('/api/agenda', {
@@ -135,20 +139,23 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   return (
     <>
-      <label style={{ marginBottom: 12, display: 'block' }}>
-        Filtrar por perfil:{' '}
-        <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-      </label>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <UserProfile />
+        <label>
+          Filtrar por perfil:{' '}
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+            {profiles.map(p => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+      </header>
 
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         selectable
-        editable={isAdmin} // só admin pode arrastar/redimensionar
+        editable={isAdmin}
         events={filteredEvents.map(ev => ({
           id: ev.id,
           title: ev.conteudoPrincipal,
