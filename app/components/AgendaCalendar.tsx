@@ -11,8 +11,8 @@ import { AgendaEvent, Perfil } from './types';
 interface AgendaCalendarProps {
   events: AgendaEvent[];
   userPerfil: Perfil;
-  onDateSelect: (start: string, end: string) => void;
-  onEventClick: (ev: AgendaEvent) => void;
+  onDateSelect?: (start: string, end: string) => void;
+  onEventClick?: (ev: AgendaEvent) => void;
 }
 
 const profileColors: Record<Perfil, string> = {
@@ -35,16 +35,25 @@ export default function AgendaCalendar({
       editable
       events={events.map(ev => ({
         ...ev,
-        title: ev.conteudoPrincipal,
+        id: ev.id,
+        title: ev.conteudoPrincipal || '',
         color: ev.perfil ? profileColors[ev.perfil] : '#ccc',
       }))}
+
       select={(info) => {
-        onDateSelect(info.startStr.slice(0, 16), info.endStr.slice(0, 16));
+        if (!onDateSelect) return;
+        onDateSelect(
+          info.startStr.slice(0, 16),
+          info.endStr.slice(0, 16)
+        );
       }}
+
       eventClick={(info) => {
+        if (!onEventClick) return;
         const ev = events.find(e => e.id === info.event.id);
         if (ev) onEventClick(ev);
       }}
+
       headerToolbar={{
         left: 'prev,next today',
         center: 'title',
