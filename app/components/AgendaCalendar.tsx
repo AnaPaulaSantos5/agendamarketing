@@ -14,17 +14,13 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-
   tipoEvento?: string;
   tipo?: string;
-
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-
   perfil?: Perfil;
-
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -34,7 +30,6 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
-
   allDay?: boolean;
 };
 
@@ -127,7 +122,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     });
   };
 
-  // Filtragem de eventos por perfil ou todos
+  // Filtragem por perfil ou todos
   const filteredEvents = events.filter(
     e => filterProfile === 'Todos' || e.perfil === filterProfile
   );
@@ -160,7 +155,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable // qualquer usuário pode criar/editar eventos
+          editable // qualquer usuário pode criar/editar
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -233,7 +228,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           onSave={saveEvent}
           onDelete={deleteEvent}
           isAdmin={isAdmin}
-          userPerfil={userName as Perfil}
+          userPerfil={userName as Perfil} // Atenção: nome precisa bater com Perfil
           userChatId={userEmail}
           userImage={userImage}
         />
