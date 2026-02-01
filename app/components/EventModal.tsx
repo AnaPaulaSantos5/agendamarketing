@@ -11,8 +11,12 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
+
+  userPerfil: Perfil;
+  userChatId: string;
+  userImage?: string;
   isAdmin: boolean;
-  perfilMap: Record<Perfil, { chatId: string; image?: string }>;
+  profilesState: Record<Perfil, { chatId: string; image?: string }>;
 };
 
 export default function EventModal({
@@ -23,49 +27,44 @@ export default function EventModal({
   start,
   end,
   event,
+  userPerfil,
+  userChatId,
+  userImage,
   isAdmin,
-  perfilMap,
+  profilesState,
 }: Props) {
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [cta, setCta] = useState('');
-  const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState('');
-  const [perfilImage, setPerfilImage] = useState<string | undefined>(undefined);
+  const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
+  const [perfilImage, setPerfilImage] = useState(userImage);
+
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || 'Confi');
+      setPerfil(event.perfil || userPerfil);
       setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
-      setCta(event.cta || '');
-      setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || 'Confi'].chatId);
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || 'Confi'].image);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || userChatId);
+      setPerfilImage(event.tarefa?.userImage || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      setPerfil('Confi');
-      setResponsavelChatId(perfilMap['Confi'].chatId);
-      setPerfilImage(perfilMap['Confi'].image);
       setStartDate(start);
       setEndDate(end);
+      setPerfil(perfil);
+      setResponsavelChatId(userChatId);
+      setPerfilImage(userImage);
     }
-  }, [event, start, end, perfilMap]);
-
-  useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil].chatId);
-    setPerfilImage(perfilMap[perfil].image);
-  }, [perfil, perfilMap]);
+  }, [event, start, end, userPerfil, userChatId, userImage]);
 
   if (!isOpen) return null;
 
@@ -76,8 +75,6 @@ export default function EventModal({
       end: endDate,
       conteudoPrincipal: title,
       conteudoSecundario,
-      cta,
-      statusPostagem,
       perfil,
       tipoEvento: tipo,
       tarefa: tarefaTitle
@@ -100,6 +97,7 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
+        {/* Foto do perfil */}
         {perfilImage && (
           <img
             src={perfilImage}
@@ -110,17 +108,22 @@ export default function EventModal({
 
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        <label>Perfil responsável:</label>
-        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
+        {/* Perfil responsável (admin só) */}
+        {isAdmin ? (
+          <label>
+            Perfil responsável:
+            <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+              {Object.keys(profilesState).map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p><strong>Perfil:</strong> {perfil}</p>
+        )}
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
         <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
@@ -132,9 +135,7 @@ export default function EventModal({
         <button onClick={onClose}>Fechar</button>
         {event && (
           <button
-            onClick={() => {
-              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
-            }}
+            onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }}
             style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
           >
             Excluir
