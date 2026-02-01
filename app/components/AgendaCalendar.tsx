@@ -41,7 +41,7 @@ export type ChecklistItem = {
   done: boolean;
 };
 
-export const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 type Props = { isAdmin?: boolean };
 
@@ -61,6 +61,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Map de perfis → chatId + imagem
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
     Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
@@ -70,7 +71,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
-  // Carrega agenda e checklist
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -116,16 +116,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     setModalOpen(false);
   };
 
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
-    await fetch('/api/checklist', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id, done: true }),
-    });
-  };
-
   const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
+
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
 
   return (
@@ -186,23 +178,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         />
       </div>
 
-      {/* Checklist */}
-      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
-        <h3>Checklist Hoje</h3>
-        {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {checklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 6 }}>
-              {item.task} ({item.client})
-              <button
-                style={{ marginLeft: 8, background: '#1260c7', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '2px 6px' }}
-                onClick={() => toggleChecklistItem(item)}
-              >✅</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
       {/* Modal de eventos */}
       {modalOpen && (
         <EventModal
@@ -215,11 +190,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           onDelete={deleteEvent}
           isAdmin={isUserAdmin}
           userPerfil={userName as Perfil}
-          userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
           perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
-          profiles={profiles}
         />
       )}
     </div>
