@@ -10,5 +10,14 @@ export type AgendaEvent = {
   statusPostagem?: string;
   perfil: Perfil;
   tipoEvento?: 'Interno' | 'Perfil';
+  tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
+    responsavelChatId?: string;
+    data: string;
+    status: string;
+    linkDrive?: string;
+    notificar?: 'Sim' | 'Não';
+  } | null;
   allDay?: boolean;
 };
