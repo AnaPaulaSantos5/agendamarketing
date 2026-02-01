@@ -1,4 +1,3 @@
-// EventModal.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -14,7 +13,7 @@ type Props = {
   event?: AgendaEvent | null;
 };
 
-const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const perfis: Perfil[] = ['Confi', 'Cecília', 'Júlio', 'Luiza'];
 
 export default function EventModal({
   isOpen,
@@ -27,13 +26,14 @@ export default function EventModal({
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [responsavel, setResponsavel] = useState<Perfil>('Confi');
-  const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [linkDrive, setLinkDrive] = useState('');
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
@@ -41,6 +41,7 @@ export default function EventModal({
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || 'Confi');
+      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
       setCta(event.cta || '');
       setStatusPostagem(event.statusPostagem || '');
@@ -53,15 +54,6 @@ export default function EventModal({
     } else {
       setStartDate(start);
       setEndDate(end);
-      setTitle('');
-      setPerfil('Confi');
-      setConteudoSecundario('');
-      setCta('');
-      setStatusPostagem('');
-      setTarefaTitle('');
-      setResponsavel('Confi');
-      setLinkDrive('');
-      setResponsavelChatId('');
     }
   }, [event, start, end]);
 
@@ -77,8 +69,17 @@ export default function EventModal({
       cta,
       statusPostagem,
       perfil,
+      tipoEvento: tipo,
       tarefa: tarefaTitle
-        ? { titulo: tarefaTitle, responsavel, responsavelChatId, data: startDate, status: 'Pendente', linkDrive, notificar: 'Sim' }
+        ? {
+            titulo: tarefaTitle,
+            responsavel,
+            responsavelChatId,
+            data: startDate,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
         : null,
     };
     onSave(ev, !!event);
@@ -95,14 +96,11 @@ export default function EventModal({
         <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
         <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-
         <select value={responsavel} onChange={e => setResponsavel(e.target.value as Perfil)}>
           {perfis.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
-
         <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
-
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
