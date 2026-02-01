@@ -41,7 +41,7 @@ export type ChecklistItem = {
   done: boolean;
 };
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+export const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 type Props = { isAdmin?: boolean };
 
@@ -61,7 +61,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Mapeamento perfil → chatId + imagem
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
     Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
@@ -71,6 +70,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
+  // Carrega agenda e checklist
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -117,14 +117,15 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   };
 
   const toggleChecklistItem = async (item: ChecklistItem) => {
-    // remove da lista local
     setChecklist(prev => prev.filter(c => c.id !== item.id));
-    // salva na planilha
-    await fetch('/api/checklist', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, done: true }) });
+    await fetch('/api/checklist', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, done: true }),
+    });
   };
 
   const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
-
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
 
   return (
@@ -216,8 +217,9 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           userPerfil={userName as Perfil}
           userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
-          perfilMap={perfilMap} // envia para modal
+          perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
+          profiles={profiles}
         />
       )}
     </div>
