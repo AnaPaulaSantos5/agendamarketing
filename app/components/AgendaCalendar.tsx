@@ -6,6 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
+import { useSession } from 'next-auth/react';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -47,7 +48,13 @@ export type ChecklistItem = {
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-export default function AgendaCalendar() {
+type Props = {
+  isAdmin?: boolean;
+};
+
+export default function AgendaCalendar({ isAdmin = false }: Props) {
+  const { data: session } = useSession();
+
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
@@ -94,6 +101,8 @@ export default function AgendaCalendar() {
   };
 
   const deleteEvent = async (id: string) => {
+    if (!isAdmin) return alert('Somente admins podem excluir eventos');
+
     await fetch('/api/agenda', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -117,9 +126,16 @@ export default function AgendaCalendar() {
 
   const filteredEvents = events.filter(e => e.perfil === filterProfile);
 
+  const perfilColors: Record<Perfil, string> = {
+    Confi: '#ffce0a',
+    Cecília: '#f5886c',
+    Luiza: '#1260c7',
+    Júlio: '#00b894',
+  };
+
   return (
     <>
-      <label>
+      <label style={{ marginBottom: 12, display: 'block' }}>
         Filtrar por perfil:{' '}
         <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
           {profiles.map(p => (
@@ -132,12 +148,15 @@ export default function AgendaCalendar() {
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         selectable
-        editable
+        editable={isAdmin} // só admin pode arrastar/redimensionar
         events={filteredEvents.map(ev => ({
           id: ev.id,
           title: ev.conteudoPrincipal,
           start: ev.start,
           end: ev.end,
+          backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#999',
+          borderColor: '#000',
+          textColor: '#000',
         }))}
         select={info => {
           setSelectedEvent(null);
@@ -154,21 +173,35 @@ export default function AgendaCalendar() {
         }}
         eventDrop={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
         }}
         eventResize={info => {
           const ev = events.find(e => e.id === info.event.id);
-          if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+          if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
         }}
+        height="auto"
       />
 
-      <h3>Checklist Hoje</h3>
+      <h3 style={{ marginTop: 24 }}>Checklist Hoje</h3>
       {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
-      <ul>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
         {checklist.map(item => (
-          <li key={item.id}>
+          <li key={item.id} style={{ marginBottom: 6 }}>
             {item.task} ({item.client})
-            <button onClick={() => toggleChecklistItem(item)}>✅</button>
+            <button
+              style={{
+                marginLeft: 8,
+                background: '#1260c7',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+                padding: '2px 6px',
+              }}
+              onClick={() => toggleChecklistItem(item)}
+            >
+              ✅
+            </button>
           </li>
         ))}
       </ul>
@@ -182,6 +215,7 @@ export default function AgendaCalendar() {
           event={selectedEvent}
           onSave={saveEvent}
           onDelete={deleteEvent}
+          isAdmin={isAdmin}
         />
       )}
     </>
