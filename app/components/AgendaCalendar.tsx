@@ -14,13 +14,17 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
+
   tipoEvento?: string;
   tipo?: string;
+
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
+
   perfil?: Perfil;
+
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -30,6 +34,7 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
+
   allDay?: boolean;
 };
 
@@ -39,10 +44,12 @@ export type ChecklistItem = {
   client: string;
   task: string;
   done: boolean;
-  responsavel?: string; // vincula a tarefa ao usuário
+  responsavel: Perfil;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+
+type FilterProfile = Perfil | 'Todos';
 
 type Props = {
   isAdmin?: boolean;
@@ -50,12 +57,10 @@ type Props = {
 
 export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
-  const userPerfil = session?.user?.perfil as Perfil || 'Confi';
-  const userChatId = session?.user?.responsavelChatId || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil>('Confi');
+  const [filterProfile, setFilterProfile] = useState<FilterProfile>('Todos');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -63,21 +68,15 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // 🔹 Carrega eventos da API
+  const userPerfil = session?.user.perfil as Perfil;
+
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then((data: AgendaEvent[]) => {
-        // Usuários veem eventos do próprio perfil + Confi
-        const visibleEvents = data.filter(
-          e => e.perfil === userPerfil || e.perfil === 'Confi'
-        );
-        setEvents(visibleEvents);
-      })
+      .then(setEvents)
       .catch(console.error);
-  }, [userPerfil]);
+  }, []);
 
-  // 🔹 Carrega checklist do usuário logado
   useEffect(() => {
     fetch('/api/checklist')
       .then(res => res.json())
@@ -94,12 +93,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   }, [today, userPerfil]);
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    // 🔹 Usuário comum só edita seus próprios eventos
-    if (!isAdmin && isEdit && ev.perfil !== userPerfil) {
-      return alert('Você só pode editar seus próprios eventos');
-    }
-
     const method = isEdit ? 'PATCH' : 'POST';
+
     await fetch('/api/agenda', {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -114,7 +109,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   };
 
   const deleteEvent = async (id: string) => {
-    // 🔹 Apenas admin pode excluir
     if (!isAdmin) return alert('Somente admins podem excluir eventos');
 
     await fetch('/api/agenda', {
@@ -138,6 +132,11 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     });
   };
 
+  const filteredEvents =
+    filterProfile === 'Todos'
+      ? events
+      : events.filter(e => e.perfil === filterProfile);
+
   const perfilColors: Record<Perfil, string> = {
     Confi: '#ffce0a',
     Cecília: '#f5886c',
@@ -145,26 +144,48 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     Júlio: '#00b894',
   };
 
-  const filteredEvents = events.filter(e => e.perfil === filterProfile || filterProfile === 'Todos');
-
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      <div style={{ flex: 1 }}>
-        <label style={{ marginBottom: 12, display: 'block' }}>
-          Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
-            <option value="Todos">Todos</option>
-            {profiles.map(p => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </label>
+      {/* Lateral perfil */}
+      <div style={{ width: 200, padding: 16, borderRight: '1px solid #ccc' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img
+            src={`https://ui-avatars.com/api/?name=${userPerfil}&background=0D8ABC&color=fff&rounded=true`}
+            alt="Foto do usuário"
+            style={{ width: 50, height: 50, borderRadius: '50%' }}
+          />
+          <div>
+            <strong>{userPerfil}</strong>
+            <p style={{ fontSize: 12, margin: 0 }}>Chat ID: {session?.user.responsavelChatId}</p>
+            {isAdmin && <p style={{ fontSize: 12, margin: 0 }}>Admin</p>}
+          </div>
+        </div>
 
+        <div style={{ marginTop: 24 }}>
+          <label>
+            Filtrar por perfil:{' '}
+            <select
+              value={filterProfile}
+              onChange={e => setFilterProfile(e.target.value as FilterProfile)}
+            >
+              <option value="Todos">Todos</option>
+              {profiles.map(p => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {/* Calendário e checklist */}
+      <div style={{ flex: 1 }}>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable // todos podem editar seus eventos
+          editable // todos podem criar/editar
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -197,11 +218,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }}
           height="auto"
         />
-      </div>
 
-      {/* 🔹 Checklist lateral */}
-      <div style={{ width: 240 }}>
-        <h3>Checklist Hoje</h3>
+        <h3 style={{ marginTop: 24 }}>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {checklist.map(item => (
@@ -224,22 +242,20 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             </li>
           ))}
         </ul>
-      </div>
 
-      {modalOpen && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
-          event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
-          isAdmin={isAdmin}
-          userPerfil={userPerfil}          // preenche dados do usuário no modal
-          userChatId={userChatId}
-        />
-      )}
+        {modalOpen && (
+          <EventModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            start={selectedDate.start}
+            end={selectedDate.end}
+            event={selectedEvent}
+            onSave={saveEvent}
+            onDelete={deleteEvent}
+            isAdmin={isAdmin}
+          />
+        )}
+      </div>
     </div>
   );
 }
