@@ -11,7 +11,7 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-  isAdmin: boolean;
+  isAdmin?: boolean;
   userPerfil: Perfil;
   userChatId: string;
 };
@@ -24,14 +24,14 @@ export default function EventModal({
   start,
   end,
   event,
-  isAdmin,
+  isAdmin = false,
   userPerfil,
   userChatId,
 }: Props) {
   const [editing, setEditing] = useState(!event);
 
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
 
   const [conteudoSecundario, setConteudoSecundario] = useState('');
@@ -61,10 +61,10 @@ export default function EventModal({
       setEditing(false);
     } else {
       setEditing(true);
-      setStartDate(start);
-      setEndDate(end);
       setPerfil(userPerfil);
       setResponsavelChatId(userChatId);
+      setStartDate(start);
+      setEndDate(end);
     }
   }, [event, start, end, userPerfil, userChatId]);
 
@@ -101,33 +101,35 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* 🔹 Cabeçalho com foto do usuário */}
+        {/* Avatar + perfil */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <img
-            src={`https://ui-avatars.com/api/?name=${userPerfil}&background=1260c7&color=fff&rounded=true`}
-            alt={userPerfil}
-            style={{ width: 48, height: 48, borderRadius: '50%', marginRight: 12 }}
-          />
-          <div>
+          <div style={avatar}>{userPerfil[0]}</div>
+          <div style={{ marginLeft: 12 }}>
             <strong>{userPerfil}</strong>
-            <div style={{ fontSize: 12, color: '#555' }}>ID: {responsavelChatId}</div>
+            <p style={{ margin: 0, fontSize: 12, color: '#666' }}>Chat ID: {userChatId}</p>
           </div>
         </div>
 
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {/* 🔹 Campos editáveis por todos */}
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="Título"
         />
+
         <textarea
           value={conteudoSecundario}
           onChange={e => setConteudoSecundario(e.target.value)}
           placeholder="Conteúdo secundário"
         />
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
+
+        <input
+          value={cta}
+          onChange={e => setCta(e.target.value)}
+          placeholder="CTA"
+        />
+
         <input
           value={statusPostagem}
           onChange={e => setStatusPostagem(e.target.value)}
@@ -139,19 +141,7 @@ export default function EventModal({
           onChange={e => setTarefaTitle(e.target.value)}
           placeholder="Tarefa"
         />
-        <input
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
-          placeholder="Link do Drive"
-        />
 
-        {/* 🔹 Campos bloqueados para usuários não-admin */}
-        <input
-          value={perfil}
-          onChange={e => isAdmin && setPerfil(e.target.value as Perfil)}
-          placeholder="Perfil"
-          disabled={!isAdmin}
-        />
         <input
           value={responsavelChatId}
           onChange={e => isAdmin && setResponsavelChatId(e.target.value)}
@@ -160,10 +150,17 @@ export default function EventModal({
         />
 
         <input
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          placeholder="Link do Drive"
+        />
+
+        <input
           type="datetime-local"
           value={startDate}
           onChange={e => setStartDate(e.target.value)}
         />
+
         <input
           type="datetime-local"
           value={endDate}
@@ -175,8 +172,8 @@ export default function EventModal({
           <button onClick={onClose}>Fechar</button>
           {event && isAdmin && (
             <button
-              onClick={() => onDelete(event.id)}
               style={{ background: '#ff4d4f', color: '#fff' }}
+              onClick={() => onDelete(event.id)}
             >
               Excluir
             </button>
@@ -194,14 +191,27 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  zIndex: 1000,
+  zIndex: 999,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 400,
+  width: 360,
   borderRadius: 8,
   maxHeight: '90vh',
   overflowY: 'auto',
+};
+
+const avatar: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: '50%',
+  background: '#1260c7',
+  color: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontWeight: 'bold',
+  fontSize: 18,
 };
