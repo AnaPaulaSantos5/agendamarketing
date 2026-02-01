@@ -3,6 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
 
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+
+// Map perfil → chatId e imagem
+const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
+  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
+  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
+  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
+  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
+};
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -11,37 +21,20 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
   isAdmin: boolean;
-  profilesState: Record<Perfil, { chatId: string; image?: string }>;
 };
 
-export default function EventModal({
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-  start,
-  end,
-  event,
-  userPerfil,
-  userChatId,
-  userImage,
-  isAdmin,
-  profilesState,
-}: Props) {
+export default function EventModal({ isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
-  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
   const [perfilImage, setPerfilImage] = useState(userImage);
-
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
@@ -49,22 +42,25 @@ export default function EventModal({
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || userPerfil);
-      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || userChatId);
-      setPerfilImage(event.tarefa?.userImage || userImage);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
       setStartDate(start);
       setEndDate(end);
-      setPerfil(perfil);
-      setResponsavelChatId(userChatId);
-      setPerfilImage(userImage);
+      setResponsavelChatId(perfilMap[perfil].chatId);
+      setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userChatId, userImage]);
+  }, [event, start, end, userPerfil, userImage]);
+
+  useEffect(() => {
+    setResponsavelChatId(perfilMap[perfil].chatId);
+    setPerfilImage(perfilMap[perfil].image || userImage);
+  }, [perfil, userImage]);
 
   if (!isOpen) return null;
 
@@ -76,7 +72,6 @@ export default function EventModal({
       conteudoPrincipal: title,
       conteudoSecundario,
       perfil,
-      tipoEvento: tipo,
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
@@ -97,30 +92,13 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Foto do perfil */}
-        {perfilImage && (
-          <img
-            src={perfilImage}
-            alt={perfil}
-            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
-          />
-        )}
-
+        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {/* Perfil responsável (admin só) */}
-        {isAdmin ? (
-          <label>
-            Perfil responsável:
-            <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-              {Object.keys(profilesState).map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <p><strong>Perfil:</strong> {perfil}</p>
-        )}
+        <label>Perfil responsável:</label>
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
         <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
@@ -134,10 +112,7 @@ export default function EventModal({
         <button onClick={handleSave}>Salvar</button>
         <button onClick={onClose}>Fechar</button>
         {event && (
-          <button
-            onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }}
-            style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
-          >
+          <button onClick={() => { if(confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }} style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}>
             Excluir
           </button>
         )}
@@ -146,19 +121,5 @@ export default function EventModal({
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-};
-
-const modal: React.CSSProperties = {
-  background: '#fff',
-  padding: 20,
-  width: 360,
-  borderRadius: 8,
-};
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
