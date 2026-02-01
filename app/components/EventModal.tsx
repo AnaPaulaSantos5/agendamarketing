@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
+import { useSession } from 'next-auth/react';
 
 type Props = {
   isOpen: boolean;
@@ -11,7 +12,7 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-  isAdmin?: boolean; // <- adicionada
+  isAdmin: boolean;
 };
 
 export default function EventModal({
@@ -22,8 +23,10 @@ export default function EventModal({
   start,
   end,
   event,
-  isAdmin = false,
+  isAdmin,
 }: Props) {
+  const { data: session } = useSession();
+
   const [editing, setEditing] = useState(!event);
 
   const [title, setTitle] = useState('');
@@ -36,7 +39,7 @@ export default function EventModal({
 
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [responsavelChatId, setResponsavelChatId] = useState(session?.user?.responsavelChatId || '');
 
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
@@ -51,7 +54,7 @@ export default function EventModal({
       setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || session?.user?.responsavelChatId || '');
       setStartDate(event.start);
       setEndDate(event.end);
       setEditing(false);
@@ -59,8 +62,9 @@ export default function EventModal({
       setEditing(true);
       setStartDate(start);
       setEndDate(end);
+      setResponsavelChatId(session?.user?.responsavelChatId || '');
     }
-  }, [event, start, end]);
+  }, [event, start, end, session?.user?.responsavelChatId]);
 
   if (!isOpen) return null;
 
@@ -79,7 +83,7 @@ export default function EventModal({
         ? {
             titulo: tarefaTitle,
             responsavel: perfil,
-            responsavelChatId,
+            responsavelChatId: responsavelChatId || session?.user?.responsavelChatId || '',
             data: startDate,
             status: 'Pendente',
             linkDrive,
@@ -97,29 +101,75 @@ export default function EventModal({
       <div style={modal}>
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+        {/* Avatar e dados do usuário */}
+        {session?.user && (
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+            <img
+              src={session.user.image || '/default-avatar.png'}
+              alt={session.user.name || 'Usuário'}
+              style={{ width: 40, height: 40, borderRadius: '50%', marginRight: 12 }}
+            />
+            <div>
+              <p style={{ margin: 0 }}>{session.user.name}</p>
+              <small>{session.user.email}</small>
+            </div>
+          </div>
+        )}
+
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Título"
+        />
         <textarea
           value={conteudoSecundario}
           onChange={e => setConteudoSecundario(e.target.value)}
           placeholder="Conteúdo secundário"
         />
         <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
-        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
-        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
-        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        <input
+          value={statusPostagem}
+          onChange={e => setStatusPostagem(e.target.value)}
+          placeholder="Status postagem"
+        />
+        <input
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+          placeholder="Tarefa"
+        />
+        <input
+          value={responsavelChatId || session?.user?.responsavelChatId || ''}
+          onChange={e => isAdmin && setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+          readOnly={!isAdmin}
+        />
+        <input
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          placeholder="Link do Drive"
+        />
+        <input
+          type="datetime-local"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+        />
+        <input
+          type="datetime-local"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+        />
 
-        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <button onClick={handleSave} style={{ flex: 1 }}>Salvar</button>
-          <button onClick={onClose} style={{ flex: 1 }}>Fechar</button>
-          {event && (
-            <button onClick={() => onDelete(event.id)} disabled={!isAdmin} style={{ flex: 1, backgroundColor: isAdmin ? '#e74c3c' : '#ccc' }}>
-              Excluir
-            </button>
-          )}
-        </div>
+        <button onClick={handleSave} style={btnStyle}>
+          Salvar
+        </button>
+        <button onClick={onClose} style={{ ...btnStyle, background: '#ccc', marginLeft: 6 }}>
+          Fechar
+        </button>
+        {event && isAdmin && (
+          <button onClick={() => onDelete(event.id)} style={{ ...btnStyle, background: '#f44336', marginLeft: 6 }}>
+            Excluir
+          </button>
+        )}
       </div>
     </div>
   );
@@ -132,16 +182,24 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  zIndex: 9999,
+  zIndex: 1000,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 400,
+  width: 360,
   borderRadius: 8,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
+};
+
+const btnStyle: React.CSSProperties = {
+  padding: '6px 12px',
+  border: 'none',
+  borderRadius: 4,
+  cursor: 'pointer',
+  background: '#1260c7',
+  color: '#fff',
 };
