@@ -17,6 +17,7 @@ export type AgendaEvent = {
     data: string;
     status: string;
     linkDrive?: string;
+    notificar?: 'Sim' | 'Não';
   } | null;
   allDay?: boolean;
 };
