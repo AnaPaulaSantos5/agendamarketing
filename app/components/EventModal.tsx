@@ -6,21 +6,21 @@ import { AgendaEvent, Perfil } from './types';
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDelete: (id: string) => void;
+  event?: AgendaEvent | null;
+  onSave: (ev: AgendaEvent, isEdit?: boolean) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   start: string;
   end: string;
-  event?: AgendaEvent | null;
 };
 
 export default function EventModal({
   isOpen,
   onClose,
+  event,
   onSave,
   onDelete,
   start,
   end,
-  event,
 }: Props) {
   const [editing, setEditing] = useState(!event);
 
@@ -62,11 +62,12 @@ export default function EventModal({
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  // 🔹 handleSave atualizado
+  const handleSave = async () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
-      start: startDate,
-      end: endDate,
+      start: new Date(startDate).toISOString(),
+      end: endDate ? new Date(endDate).toISOString() : undefined,
       conteudoPrincipal: title,
       conteudoSecundario,
       cta,
@@ -78,7 +79,7 @@ export default function EventModal({
             titulo: tarefaTitle,
             responsavel: perfil,
             responsavelChatId,
-            data: startDate,
+            data: new Date(startDate).toISOString(),
             status: 'Pendente',
             linkDrive,
             notificar: 'Sim',
@@ -86,8 +87,13 @@ export default function EventModal({
         : null,
     };
 
-    onSave(ev, !!event);
-    onClose();
+    try {
+      await onSave(ev, !!event); // envia para o backend
+      onClose();
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err);
+      alert('Não foi possível salvar o evento. Veja o console.');
+    }
   };
 
   return (
@@ -95,19 +101,47 @@ export default function EventModal({
       <div style={modal}>
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
-        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
         <input
-  value={linkDrive}
-  onChange={e => setLinkDrive(e.target.value)}
-  placeholder="Link do Drive"
-/>
-        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Título"
+        />
+        <textarea
+          value={conteudoSecundario}
+          onChange={e => setConteudoSecundario(e.target.value)}
+          placeholder="Conteúdo secundário"
+        />
+        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
+        <input
+          value={statusPostagem}
+          onChange={e => setStatusPostagem(e.target.value)}
+          placeholder="Status postagem"
+        />
+        <input
+          value={tarefaTitle}
+          onChange={e => setTarefaTitle(e.target.value)}
+          placeholder="Tarefa"
+        />
+        <input
+          value={responsavelChatId}
+          onChange={e => setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+        />
+        <input
+          value={linkDrive}
+          onChange={e => setLinkDrive(e.target.value)}
+          placeholder="Link do Drive"
+        />
+        <input
+          type="datetime-local"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+        />
+        <input
+          type="datetime-local"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+        />
 
         <button onClick={handleSave}>Salvar</button>
         <button onClick={onClose}>Fechar</button>
