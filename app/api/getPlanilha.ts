@@ -3,7 +3,7 @@ import { GoogleSpreadsheet } from 'google-spreadsheet';
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
-// 🔹 Função de autenticação
+// 🔹 Autenticação
 async function accessSpreadsheet() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
@@ -26,7 +26,7 @@ function normalizeDate(dateStr?: string) {
   return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
 }
 
-// 🔹 Formato para planilha
+// 🔹 Formata datas para Google Sheets
 function formatDateForSheet(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -39,24 +39,29 @@ function formatDateForSheet(dateStr?: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-// 🔹 GET - retorna agenda + tarefas
+////////////////////////////////////////////////////////////////////////////////
+// GET - retorna agenda + tarefas
+////////////////////////////////////////////////////////////////////////////////
 export async function GET() {
   try {
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
     const agendaRows = await agendaSheet.getRows();
     const tarefasRows = await tarefasSheet.getRows();
 
-    const events = agendaRows.map(row => {
-      // Garante Bloco_ID consistente
+    const events = [];
+
+    for (const row of agendaRows) {
+      // 🔹 Garante Bloco_ID consistente
       const blocoId = row.Bloco_ID || String(row._rowNumber);
       if (!row.Bloco_ID) {
         row.Bloco_ID = blocoId;
-        row.save();
+        await row.save();
       }
 
+      // 🔹 Busca tarefa vinculada
       const tarefa = tarefasRows.find(t => String(t.Bloco_ID) === blocoId);
 
-      return {
+      events.push({
         id: blocoId,
         start: normalizeDate(row.Data_Inicio),
         end: normalizeDate(row.Data_Fim),
@@ -78,8 +83,8 @@ export async function GET() {
               notificar: tarefa.Notificar || 'Sim',
             }
           : null,
-      };
-    });
+      });
+    }
 
     return NextResponse.json(events);
   } catch (err) {
@@ -88,13 +93,15 @@ export async function GET() {
   }
 }
 
-// 🔹 POST - cria novo evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
+// POST - cria evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
 
-    // Cria linha na agenda
+    // 🔹 Cria evento na agenda
     const agendaRow = await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
       Data_Fim: formatDateForSheet(data.end),
@@ -107,14 +114,14 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil || '',
     });
 
-    // Adiciona Bloco_ID se não existir
+    // 🔹 Define Bloco_ID
     const blocoId = agendaRow.Bloco_ID || String(agendaRow._rowNumber);
     if (!agendaRow.Bloco_ID) {
       agendaRow.Bloco_ID = blocoId;
       await agendaRow.save();
     }
 
-    // Cria tarefa vinculada
+    // 🔹 Cria tarefa vinculada
     if (data.tarefa) {
       await tarefasSheet.addRow({
         Bloco_ID: blocoId,
@@ -135,7 +142,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// 🔹 PATCH - atualiza evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
+// PATCH - atualiza evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json();
@@ -171,6 +180,7 @@ export async function PATCH(req: NextRequest) {
       tarefaRow.Status = data.tarefa.status || 'Pendente';
       tarefaRow.LinkDrive = data.tarefa.linkDrive || '';
       tarefaRow.Notificar = data.tarefa.notificar || 'Sim';
+
       await tarefaRow.save();
     }
 
@@ -181,7 +191,9 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// 🔹 DELETE - remove evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
+// DELETE - remove evento + tarefa
+////////////////////////////////////////////////////////////////////////////////
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json();
