@@ -11,7 +11,7 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-  isAdmin?: boolean;
+  isAdmin: boolean;
   userPerfil: Perfil;
   userChatId: string;
 };
@@ -24,14 +24,14 @@ export default function EventModal({
   start,
   end,
   event,
-  isAdmin = false,
+  isAdmin,
   userPerfil,
   userChatId,
 }: Props) {
   const [editing, setEditing] = useState(!event);
 
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
 
   const [conteudoSecundario, setConteudoSecundario] = useState('');
@@ -61,8 +61,6 @@ export default function EventModal({
       setEditing(false);
     } else {
       setEditing(true);
-      setPerfil(userPerfil);
-      setResponsavelChatId(userChatId);
       setStartDate(start);
       setEndDate(end);
     }
@@ -101,16 +99,15 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Avatar + perfil */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <div style={avatar}>{userPerfil[0]}</div>
-          <div style={{ marginLeft: 12 }}>
-            <strong>{userPerfil}</strong>
-            <p style={{ margin: 0, fontSize: 12, color: '#666' }}>Chat ID: {userChatId}</p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <img
+            src={`https://ui-avatars.com/api/?name=${userPerfil}&background=1260c7&color=fff&rounded=true`}
+            alt={userPerfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', marginRight: 12, cursor: 'pointer' }}
+            title={`Perfil: ${userPerfil}`}
+          />
+          <h3 style={{ margin: 0 }}>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
         </div>
-
-        <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <input
           value={title}
@@ -128,12 +125,14 @@ export default function EventModal({
           value={cta}
           onChange={e => setCta(e.target.value)}
           placeholder="CTA"
+          disabled={!isAdmin} // só admin altera
         />
 
         <input
           value={statusPostagem}
           onChange={e => setStatusPostagem(e.target.value)}
           placeholder="Status postagem"
+          disabled={!isAdmin} // só admin altera
         />
 
         <input
@@ -144,9 +143,9 @@ export default function EventModal({
 
         <input
           value={responsavelChatId}
-          onChange={e => isAdmin && setResponsavelChatId(e.target.value)}
+          onChange={e => setResponsavelChatId(e.target.value)}
           placeholder="Responsável Chat ID"
-          disabled={!isAdmin}
+          disabled // sempre bloqueado para o usuário
         />
 
         <input
@@ -160,7 +159,6 @@ export default function EventModal({
           value={startDate}
           onChange={e => setStartDate(e.target.value)}
         />
-
         <input
           type="datetime-local"
           value={endDate}
@@ -170,14 +168,7 @@ export default function EventModal({
         <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
           <button onClick={handleSave}>Salvar</button>
           <button onClick={onClose}>Fechar</button>
-          {event && isAdmin && (
-            <button
-              style={{ background: '#ff4d4f', color: '#fff' }}
-              onClick={() => onDelete(event.id)}
-            >
-              Excluir
-            </button>
-          )}
+          {event && isAdmin && <button onClick={() => onDelete(event.id)}>Excluir</button>}
         </div>
       </div>
     </div>
@@ -191,27 +182,12 @@ const overlay: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  zIndex: 999,
 };
 
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 360,
-  borderRadius: 8,
+  width: 380,
   maxHeight: '90vh',
   overflowY: 'auto',
-};
-
-const avatar: React.CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: '50%',
-  background: '#1260c7',
-  color: '#fff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: 'bold',
-  fontSize: 18,
 };
