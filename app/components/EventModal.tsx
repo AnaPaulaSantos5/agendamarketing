@@ -28,44 +28,42 @@ export default function EventModal({
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
+  const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [perfilImage, setPerfilImage] = useState<string | undefined>(undefined);
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
-  const [perfilImage, setPerfilImage] = useState<string>();
 
-  // Inicializa campos se houver evento existente
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || 'Confi');
+      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
       setCta(event.cta || '');
       setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || 'Confi'].chatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || 'Confi'].image);
       setStartDate(event.start);
       setEndDate(event.end);
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || 'Confi'].image);
     } else {
-      setTitle('');
       setPerfil('Confi');
-      setConteudoSecundario('');
-      setCta('');
-      setStatusPostagem('');
-      setTarefaTitle('');
-      setLinkDrive('');
+      setResponsavelChatId(perfilMap['Confi'].chatId);
+      setPerfilImage(perfilMap['Confi'].image);
       setStartDate(start);
       setEndDate(end);
-      setPerfilImage(perfilMap['Confi'].image);
     }
   }, [event, start, end, perfilMap]);
 
-  // Atualiza a foto automaticamente quando muda o perfil
   useEffect(() => {
+    setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image);
   }, [perfil, perfilMap]);
 
@@ -81,11 +79,12 @@ export default function EventModal({
       cta,
       statusPostagem,
       perfil,
+      tipoEvento: tipo,
       tarefa: tarefaTitle
         ? {
             titulo: tarefaTitle,
             responsavel: perfil,
-            responsavelChatId: perfilMap[perfil].chatId,
+            responsavelChatId,
             userImage: perfilImage,
             data: startDate,
             status: 'Pendente',
@@ -101,7 +100,6 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
-        {/* Foto do perfil */}
         {perfilImage && (
           <img
             src={perfilImage}
@@ -112,10 +110,9 @@ export default function EventModal({
 
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {/* Select de perfil */}
         <label>Perfil responsável:</label>
-        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)} style={{ marginBottom: 8 }}>
-          {Object.keys(perfilMap).map(p => (
+        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
@@ -125,22 +122,24 @@ export default function EventModal({
         <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
         <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={perfilMap[perfil].chatId} placeholder="Responsável Chat ID" disabled />
+        <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
 
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <div style={{ marginTop: 12 }}>
-          <button onClick={handleSave}>Salvar</button>
-          <button onClick={onClose} style={{ marginLeft: 8 }}>Fechar</button>
+        <button onClick={handleSave}>Salvar</button>
+        <button onClick={onClose}>Fechar</button>
+        {event && (
           <button
-            onClick={() => { if (event && confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }}
-            style={{ marginLeft: 8, backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4 }}
+            onClick={() => {
+              if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
+            }}
+            style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
           >
             Excluir
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
