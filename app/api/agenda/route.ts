@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
-import { Perfil, AgendaEvent } from '../../../types';
+import { Perfil, AgendaEvent } from '././types';
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
 
