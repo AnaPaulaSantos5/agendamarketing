@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { AgendaEvent, Perfil } from './AgendaCalendar';
-import { useSession } from 'next-auth/react';
 
 type Props = {
   isOpen: boolean;
@@ -13,6 +12,8 @@ type Props = {
   end: string;
   event?: AgendaEvent | null;
   isAdmin: boolean;
+  userPerfil: Perfil;
+  userChatId: string;
 };
 
 export default function EventModal({
@@ -24,13 +25,13 @@ export default function EventModal({
   end,
   event,
   isAdmin,
+  userPerfil,
+  userChatId,
 }: Props) {
-  const { data: session } = useSession();
-
   const [editing, setEditing] = useState(!event);
 
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
+  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
 
   const [conteudoSecundario, setConteudoSecundario] = useState('');
@@ -39,7 +40,7 @@ export default function EventModal({
 
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState(session?.user?.responsavelChatId || '');
+  const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
 
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
@@ -47,14 +48,14 @@ export default function EventModal({
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || 'Confi');
+      setPerfil(event.perfil || userPerfil);
       setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
       setConteudoSecundario(event.conteudoSecundario || '');
       setCta(event.cta || '');
       setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || session?.user?.responsavelChatId || '');
+      setResponsavelChatId(event.tarefa?.responsavelChatId || userChatId);
       setStartDate(event.start);
       setEndDate(event.end);
       setEditing(false);
@@ -62,9 +63,10 @@ export default function EventModal({
       setEditing(true);
       setStartDate(start);
       setEndDate(end);
-      setResponsavelChatId(session?.user?.responsavelChatId || '');
+      setPerfil(userPerfil);
+      setResponsavelChatId(userChatId);
     }
-  }, [event, start, end, session?.user?.responsavelChatId]);
+  }, [event, start, end, userPerfil, userChatId]);
 
   if (!isOpen) return null;
 
@@ -83,7 +85,7 @@ export default function EventModal({
         ? {
             titulo: tarefaTitle,
             responsavel: perfil,
-            responsavelChatId: responsavelChatId || session?.user?.responsavelChatId || '',
+            responsavelChatId,
             data: startDate,
             status: 'Pendente',
             linkDrive,
@@ -99,23 +101,22 @@ export default function EventModal({
   return (
     <div style={overlay}>
       <div style={modal}>
+        {/* 🔹 Cabeçalho com foto do usuário */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <img
+            src={`https://ui-avatars.com/api/?name=${userPerfil}&background=1260c7&color=fff&rounded=true`}
+            alt={userPerfil}
+            style={{ width: 48, height: 48, borderRadius: '50%', marginRight: 12 }}
+          />
+          <div>
+            <strong>{userPerfil}</strong>
+            <div style={{ fontSize: 12, color: '#555' }}>ID: {responsavelChatId}</div>
+          </div>
+        </div>
+
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
-        {/* Avatar e dados do usuário */}
-        {session?.user && (
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-            <img
-              src={session.user.image || '/default-avatar.png'}
-              alt={session.user.name || 'Usuário'}
-              style={{ width: 40, height: 40, borderRadius: '50%', marginRight: 12 }}
-            />
-            <div>
-              <p style={{ margin: 0 }}>{session.user.name}</p>
-              <small>{session.user.email}</small>
-            </div>
-          </div>
-        )}
-
+        {/* 🔹 Campos editáveis por todos */}
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
@@ -132,22 +133,32 @@ export default function EventModal({
           onChange={e => setStatusPostagem(e.target.value)}
           placeholder="Status postagem"
         />
+
         <input
           value={tarefaTitle}
           onChange={e => setTarefaTitle(e.target.value)}
           placeholder="Tarefa"
         />
         <input
-          value={responsavelChatId || session?.user?.responsavelChatId || ''}
-          onChange={e => isAdmin && setResponsavelChatId(e.target.value)}
-          placeholder="Responsável Chat ID"
-          readOnly={!isAdmin}
-        />
-        <input
           value={linkDrive}
           onChange={e => setLinkDrive(e.target.value)}
           placeholder="Link do Drive"
         />
+
+        {/* 🔹 Campos bloqueados para usuários não-admin */}
+        <input
+          value={perfil}
+          onChange={e => isAdmin && setPerfil(e.target.value as Perfil)}
+          placeholder="Perfil"
+          disabled={!isAdmin}
+        />
+        <input
+          value={responsavelChatId}
+          onChange={e => isAdmin && setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+          disabled={!isAdmin}
+        />
+
         <input
           type="datetime-local"
           value={startDate}
@@ -159,17 +170,18 @@ export default function EventModal({
           onChange={e => setEndDate(e.target.value)}
         />
 
-        <button onClick={handleSave} style={btnStyle}>
-          Salvar
-        </button>
-        <button onClick={onClose} style={{ ...btnStyle, background: '#ccc', marginLeft: 6 }}>
-          Fechar
-        </button>
-        {event && isAdmin && (
-          <button onClick={() => onDelete(event.id)} style={{ ...btnStyle, background: '#f44336', marginLeft: 6 }}>
-            Excluir
-          </button>
-        )}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button onClick={handleSave}>Salvar</button>
+          <button onClick={onClose}>Fechar</button>
+          {event && isAdmin && (
+            <button
+              onClick={() => onDelete(event.id)}
+              style={{ background: '#ff4d4f', color: '#fff' }}
+            >
+              Excluir
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -188,18 +200,8 @@ const overlay: React.CSSProperties = {
 const modal: React.CSSProperties = {
   background: '#fff',
   padding: 20,
-  width: 360,
+  width: 400,
   borderRadius: 8,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-};
-
-const btnStyle: React.CSSProperties = {
-  padding: '6px 12px',
-  border: 'none',
-  borderRadius: 4,
-  cursor: 'pointer',
-  background: '#1260c7',
-  color: '#fff',
+  maxHeight: '90vh',
+  overflowY: 'auto',
 };
