@@ -1,5 +1,4 @@
-// app/services/agendaService.ts
-import { AgendaEvent } from '../components/types';
+import { AgendaEvent } from '../components/types'; // ajuste o caminho
 
 export async function getEvents(): Promise<AgendaEvent[]> {
   const res = await fetch('/api/agenda');
