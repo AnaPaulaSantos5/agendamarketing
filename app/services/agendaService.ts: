@@ -1,4 +1,4 @@
-import { AgendaEvent } from '../components/types'; // ajuste o caminho
+import { AgendaEvent, ChecklistItem } from '../components/types';
 
 export async function getEvents(): Promise<AgendaEvent[]> {
   const res = await fetch('/api/agenda');
@@ -23,5 +23,10 @@ export async function deleteEvent(id: string) {
     body: JSON.stringify({ id }),
   });
   if (!res.ok) throw new Error('Erro ao deletar evento');
+}
+
+export async function getChecklist(): Promise<ChecklistItem[]> {
+  const res = await fetch('/api/checklist');
+  if (!res.ok) throw new Error('Erro ao buscar checklist');
   return res.json();
 }
