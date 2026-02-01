@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Perfil, ChecklistItem } from './CalendarioCentral';
+import { Perfil, ChecklistItem } from './types';
 
 type SidebarEsquerdaProps = {
   checklist: ChecklistItem[];
