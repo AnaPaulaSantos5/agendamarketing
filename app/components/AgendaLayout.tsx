@@ -1,4 +1,3 @@
-// AgendaLayout.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -7,6 +6,7 @@ import RightSidebar from './RightSidebar';
 import AgendaCalendar from './AgendaCalendar';
 import EventModal from './EventModal';
 import { Perfil, AgendaEvent } from './types';
+import { getEvents, saveEvent, deleteEvent } from '../services/agendaService';
 
 interface AgendaLayoutProps {
   userName: string;
@@ -14,7 +14,7 @@ interface AgendaLayoutProps {
   responsavelChatId: string;
 }
 
-const perfis: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaLayout({
   userName,
@@ -23,67 +23,42 @@ export default function AgendaLayout({
 }: AgendaLayoutProps) {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [selectedPerfil, setSelectedPerfil] = useState<Perfil>(userPerfil);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-
-  // 🔹 Carrega eventos do Google Sheets
-  const fetchEvents = async () => {
-    try {
-      const res = await fetch('/api/agenda');
-      const data: AgendaEvent[] = await res.json();
-      setEvents(data);
-    } catch (err) {
-      console.error('Erro ao carregar eventos:', err);
-    }
-  };
+  const [modalEvent, setModalEvent] = useState<AgendaEvent | null>(null);
+  const [modalStart, setModalStart] = useState('');
+  const [modalEnd, setModalEnd] = useState('');
 
   useEffect(() => {
     fetchEvents();
   }, []);
 
-  // 🔹 Salvar ou atualizar evento
-  const handleSave = async (ev: AgendaEvent, isEdit?: boolean) => {
+  async function fetchEvents() {
     try {
-      const method = isEdit ? 'PATCH' : 'POST';
-      await fetch('/api/agenda', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ev),
-      });
-
-      setEvents(prev =>
-        isEdit ? prev.map(e => (e.id === ev.id ? ev : e)) : [...prev, ev]
-      );
+      const data = await getEvents();
+      setEvents(data);
     } catch (err) {
-      console.error('Erro ao salvar evento:', err);
+      console.error(err);
     }
-  };
+  }
 
-  // 🔹 Deletar evento
-  const handleDelete = async (id: string) => {
+  async function handleSave(event: AgendaEvent, isEdit?: boolean) {
     try {
-      await fetch('/api/agenda', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      setEvents(prev => prev.filter(e => e.id !== id));
+      await saveEvent(event, isEdit);
+      fetchEvents();
     } catch (err) {
-      console.error('Erro ao deletar evento:', err);
+      console.error(err);
     }
-  };
+  }
 
-  // 🔹 Abrir modal para novo evento
-  const handleSelect = (start: string, end: string) => {
-    setSelectedEvent(null);
-    setModalOpen(true);
-  };
-
-  // 🔹 Abrir modal ao clicar no evento existente
-  const handleEventClick = (ev: AgendaEvent) => {
-    setSelectedEvent(ev);
-    setModalOpen(true);
-  };
+  async function handleDelete(id: string) {
+    try {
+      await deleteEvent(id);
+      fetchEvents();
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
@@ -91,31 +66,42 @@ export default function AgendaLayout({
         userName={userName}
         userPerfil={selectedPerfil}
         responsavelChatId={responsavelChatId}
-        profiles={perfis}
+        profiles={profiles}
         onProfileChange={setSelectedPerfil}
-        onToggleProfilePanel={() => {}}
+        onToggleProfilePanel={() => setShowProfilePanel(prev => !prev)}
       />
 
       <main style={{ flex: 1, padding: 16 }}>
         <AgendaCalendar
-          events={events.filter(e => e.perfil === selectedPerfil)}
+          events={events.filter(ev => !selectedPerfil || ev.perfil === selectedPerfil)}
           userPerfil={selectedPerfil}
-          onDateSelect={handleSelect}
-          onEventClick={handleEventClick}
         />
+        <button
+          style={{ marginTop: 16 }}
+          onClick={() => {
+            setModalStart(new Date().toISOString().slice(0, 16));
+            setModalEnd(new Date().toISOString().slice(0, 16));
+            setModalEvent(null);
+            setModalOpen(true);
+          }}
+        >
+          Novo Evento
+        </button>
       </main>
 
       <RightSidebar />
 
-      <EventModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        start={selectedEvent?.start || new Date().toISOString().slice(0, 16)}
-        end={selectedEvent?.end || new Date().toISOString().slice(0, 16)}
-        event={selectedEvent}
-      />
+      {modalOpen && (
+        <EventModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          start={modalStart}
+          end={modalEnd}
+          event={modalEvent}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 }
