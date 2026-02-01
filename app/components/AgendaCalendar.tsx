@@ -49,6 +49,8 @@ type Props = {
 
 export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
+  const userPerfil = session?.user?.perfil as Perfil;
+  const userChatId = session?.user?.responsavelChatId || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -71,15 +73,13 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     fetch('/api/checklist')
       .then(res => res.json())
       .then((data: ChecklistItem[]) => {
-        const userChecklist = data.filter(
-          item =>
-            item.date?.slice(0, 10) === today &&
-            item.client === session?.user.name // checklist só do usuário logado
+        const todayTasks = data.filter(
+          item => item.date?.slice(0, 10) === today && !item.done
         );
-        setChecklist(userChecklist);
+        setChecklist(todayTasks);
       })
       .catch(console.error);
-  }, [today, session?.user.name]);
+  }, [today]);
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     const method = isEdit ? 'PATCH' : 'POST';
@@ -88,6 +88,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ev),
     });
+
     if (isEdit) {
       setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
     } else {
@@ -102,6 +103,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
+
     setEvents(prev => prev.filter(e => e.id !== id));
     setChecklist(prev => prev.filter(c => c.id !== id));
     setModalOpen(false);
@@ -116,13 +118,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     });
   };
 
-  // Filtra eventos: usuários podem ver eventos próprios e do Confi
-  const filteredEvents = events.filter(ev => {
-    if (!session?.user) return false;
-    const userPerfil = session.user.name as Perfil;
-    return ev.perfil === 'Confi' || ev.perfil === userPerfil;
-  });
-
   const perfilColors: Record<Perfil, string> = {
     Confi: '#ffce0a',
     Cecília: '#f5886c',
@@ -130,14 +125,18 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     Júlio: '#00b894',
   };
 
+  const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
+
   return (
     <div style={{ display: 'flex', gap: 24 }}>
+      {/* Calendário */}
       <div style={{ flex: 1 }}>
         <label style={{ marginBottom: 12, display: 'block' }}>
           Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil)}>
+          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
+            <option value="Todos">Todos</option>
             {profiles.map(p => (
-              <option key={p}>{p}</option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
         </label>
@@ -146,7 +145,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable // todos podem editar
+          editable // todos podem criar/editar
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -171,18 +170,33 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }}
           eventDrop={info => {
             const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+            if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
           }}
           eventResize={info => {
             const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
+            if (ev && isAdmin) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
           }}
           height="auto"
         />
+
+        {modalOpen && (
+          <EventModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            start={selectedDate.start}
+            end={selectedDate.end}
+            event={selectedEvent}
+            onSave={saveEvent}
+            onDelete={deleteEvent}
+            isAdmin={isAdmin}
+            userPerfil={userPerfil}      // NOVO
+            userChatId={userChatId}      // NOVO
+          />
+        )}
       </div>
 
-      {/* Checklist lateral direita */}
-      <div style={{ width: 300 }}>
+      {/* Checklist do dia */}
+      <aside style={{ width: 250 }}>
         <h3>Checklist Hoje</h3>
         {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -206,22 +220,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             </li>
           ))}
         </ul>
-      </div>
-
-      {modalOpen && session?.user && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
-          event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
-          isAdmin={isAdmin}
-          userPerfil={session.user.name as Perfil}
-          userChatId={session.user.email || ''}
-        />
-      )}
+      </aside>
     </div>
   );
 }
