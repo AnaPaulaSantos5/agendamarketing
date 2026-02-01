@@ -1,19 +1,18 @@
-import './globals.css'
-
-export const metadata = {
-  title: 'Marketing Agenda',
-  description: 'Agenda de marketing e checklist',
-}
+import './globals.css';
+import Providers from './providers';
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
     </html>
-  )
+  );
 }
-
