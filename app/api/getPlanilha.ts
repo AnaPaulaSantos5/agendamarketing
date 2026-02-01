@@ -1,4 +1,4 @@
-import { AgendaEvent } from '@/types';
+import { AgendaEvent } from '../components/types';
 
 export const mapPlanilhaParaEventos = (sheetData: any[]): AgendaEvent[] => {
   return sheetData.map((row) => {
