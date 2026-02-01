@@ -14,10 +14,12 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
+  tipoEvento?: string;
+  tipo?: string;
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
+  statusPostagem?: string;
   perfil?: Perfil;
-  tipoEvento?: string;
   tarefa?: {
     titulo: string;
     responsavel: Perfil;
@@ -28,6 +30,15 @@ export type AgendaEvent = {
     linkDrive?: string;
     notificar?: string;
   } | null;
+  allDay?: boolean;
+};
+
+export type ChecklistItem = {
+  id: string;
+  date: string;
+  client: string;
+  task: string;
+  done: boolean;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -41,6 +52,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const userImage = session?.user?.image || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -58,23 +70,27 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
-  // Função para salvar ChatID do perfil
+  useEffect(() => {
+    fetch('/api/agenda')
+      .then(res => res.json())
+      .then(setEvents)
+      .catch(console.error);
+  }, []);
+
   const savePerfil = async (perfil: Perfil) => {
     try {
       const chatId = perfilMap[perfil].chatId;
-
       const res = await fetch('/api/perfil', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ perfil, chatId }),
       });
 
-      if (!res.ok) throw new Error('Erro ao salvar');
-
+      if (!res.ok) throw new Error('Erro ao salvar ChatID');
       alert('Responsável ChatID salvo!');
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar responsável ChatID');
+      alert('Erro ao salvar ChatID');
     }
   };
 
@@ -134,6 +150,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }))}
           select={info => { setSelectedEvent(null); setSelectedDate({ start: info.startStr, end: info.endStr }); setModalOpen(true); }}
           eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
+          eventDrop={info => { const ev = events.find(e => e.id === info.event.id); if (ev) {} }}
+          eventResize={info => { const ev = events.find(e => e.id === info.event.id); if (ev) {} }}
           height="auto"
         />
       </div>
@@ -146,20 +164,15 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           start={selectedDate.start}
           end={selectedDate.end}
           event={selectedEvent}
-          onSave={(ev) => {
-            setEvents(prev => {
-              const exists = prev.find(e => e.id === ev.id);
-              if (exists) return prev.map(e => e.id === ev.id ? ev : e);
-              return [...prev, ev];
-            });
-          }}
+          onSave={() => {}}
+          onDelete={() => {}}
           isAdmin={isUserAdmin}
           userPerfil={userName as Perfil}
           userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
           perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
-          savePerfil={savePerfil} // ✅ função para salvar ChatID
+          profiles={profiles} // necessário para o select
         />
       )}
     </div>
