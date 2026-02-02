@@ -1,22 +1,25 @@
-'use client';
-import React from 'react';
+"use client";
+import React from "react";
+import "./TopProfiles.css";
 
-const profiles = ['Confi', 'Luiza', 'Júlio', 'Cecília'];
+const profiles = [
+  { name: "Confi", img: "/profiles/confi.png" },
+  { name: "Luiza", img: "/profiles/luiza.png" },
+  { name: "Júlio", img: "/profiles/julio.png" },
+  { name: "Cecília", img: "/profiles/cecilia.png" },
+];
 
-export default function TopProfiles() {
+const TopProfiles: React.FC = () => {
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-      {profiles.map(name => (
-        <div key={name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%', background: '#ccc',
-            display: 'flex', justifyContent: 'center', alignItems: 'center'
-          }}>
-            {name[0]}
-          </div>
-          <span style={{ fontSize: 12 }}>{name}</span>
+    <div className="top-profiles">
+      {profiles.map((p) => (
+        <div key={p.name} className="profile">
+          <img src={p.img} alt={p.name} />
+          <span>{p.name}</span>
         </div>
       ))}
     </div>
   );
-}
+};
+
+export default TopProfiles;
