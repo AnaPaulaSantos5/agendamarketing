@@ -25,7 +25,6 @@ export default function EventModal({
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
-  const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
@@ -35,28 +34,25 @@ export default function EventModal({
 
   useEffect(() => {
     if (event) {
-      const perfilKey = event.perfil || userPerfil;
       setTitle(event.conteudoPrincipal || '');
-      setPerfil(perfilKey);
-      setConteudoSecundario(event.conteudoSecundario || '');
+      setPerfil(event.perfil || userPerfil);
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[perfilKey]?.chatId || '');
-      setPerfilImage(event.tarefa?.userImage || perfilMap[perfilKey]?.image || userImage);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      const perfilKey = perfil;
       setStartDate(start);
       setEndDate(end);
-      setResponsavelChatId(perfilMap[perfilKey]?.chatId || '');
-      setPerfilImage(perfilMap[perfilKey]?.image || userImage);
+      setResponsavelChatId(perfilMap[perfil].chatId);
+      setPerfilImage(perfilMap[perfil].image || userImage);
     }
   }, [event, start, end, userPerfil, userImage, perfilMap, perfil]);
 
   useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil]?.chatId || '');
-    setPerfilImage(perfilMap[perfil]?.image || userImage);
+    setResponsavelChatId(perfilMap[perfil].chatId);
+    setPerfilImage(perfilMap[perfil].image || userImage);
   }, [perfil, userImage, perfilMap]);
 
   if (!isOpen) return null;
@@ -67,7 +63,6 @@ export default function EventModal({
       start: startDate,
       end: endDate,
       conteudoPrincipal: title,
-      conteudoSecundario,
       perfil,
       tarefa: tarefaTitle ? {
         titulo: tarefaTitle,
@@ -96,7 +91,6 @@ export default function EventModal({
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
