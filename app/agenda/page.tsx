@@ -1,3 +1,5 @@
+'use client'; // <- ESSENCIAL para usar useState e hooks
+
 import React, { useState } from 'react';
 import TopProfiles from '@/app/components/TopProfiles';
 import ClientCard from '@/app/components/ClientCard';
