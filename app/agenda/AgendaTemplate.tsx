@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import TopProfiles from "../components/TopProfiles";
+import TopProfiles, { Profile } from "../components/TopProfiles";
 import ClientCard from "../components/ClientCard";
 import CalendarGrid from "../components/CalendarGrid";
 import EventModal from "../components/EventModal";
@@ -10,7 +10,15 @@ import WhatsAppNotifications from "../components/WhatsAppNotifications";
 const AgendaTemplate: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Exemplo de perfil de clientes (apenas visual)
+  // Perfis simulados para visual
+  const profiles: Profile[] = [
+    { name: "Confi", avatarUrl: "/avatars/confi.png" },
+    { name: "Luiza", avatarUrl: "/avatars/luiza.png" },
+    { name: "Júlio", avatarUrl: "/avatars/julio.png" },
+    { name: "Cecília", avatarUrl: "/avatars/cecilia.png" }
+  ];
+
+  // Cliente de exemplo
   const client = {
     name: "Nome Cliente",
     email: "cliente@email.com",
@@ -22,12 +30,12 @@ const AgendaTemplate: React.FC = () => {
     <div className="agenda-container">
       {/* Topo com perfis */}
       <header className="agenda-header">
-        <TopProfiles profiles={["Confi", "Luiza", "Júlio", "Cecília"]} />
+        <TopProfiles profiles={profiles} />
       </header>
 
       {/* Corpo da agenda */}
       <div className="agenda-body">
-        {/* Lateral esquerda: foto do cliente, dados e checklist */}
+        {/* Lateral esquerda */}
         <aside className="agenda-sidebar">
           <ClientCard client={client} />
           <button onClick={() => setModalOpen(true)}>+ Adicionar Evento</button>
@@ -38,7 +46,7 @@ const AgendaTemplate: React.FC = () => {
           <CalendarGrid />
         </main>
 
-        {/* Lateral direita: Spotify e notificações */}
+        {/* Lateral direita */}
         <aside className="agenda-right">
           <SpotifyWidget playlistUrl="https://open.spotify.com/playlist/..." />
           <WhatsAppNotifications />
