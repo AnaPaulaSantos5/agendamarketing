@@ -1,103 +1,65 @@
+// app/components/EventModal.tsx
 'use client';
-
 import { useEffect, useState } from 'react';
-import { AgendaEvent, Perfil } from './AgendaCalendar';
 
-interface Props {
-  event: AgendaEvent | null;
-  date: string | null;
-  perfis: Perfil[];
-  onSave: (data: AgendaEvent) => void;
+interface EventModalProps {
+  event: any;
+  perfis: { nome: string; foto: string; chatId: string }[];
+  onSave: (data: any) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
 
-export default function EventModal({ event, date, perfis, onSave, onDelete, onClose }: Props) {
+export default function EventModal({ event, perfis, onSave, onDelete, onClose }: EventModalProps) {
   const [title, setTitle] = useState('');
-  const [start, setStart] = useState('');
-  const [perfil, setPerfil] = useState('');
-  const [driveLink, setDriveLink] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [perfil, setPerfil] = useState(perfis[0]?.nome || '');
+  const [dataHora, setDataHora] = useState(event.start || '');
 
   useEffect(() => {
     if (event) {
-      setTitle(event.title);
-      setStart(event.start);
-      setPerfil(event.perfil || '');
-      setDriveLink(event.driveLink || '');
-    } else if (date) {
-      setTitle('');
-      setStart(date);
-      setPerfil('');
-      setDriveLink('');
+      setTitle(event.title || '');
+      setDescricao(event.descricao || '');
+      setPerfil(event.perfil || perfis[0]?.nome);
+      setDataHora(event.start || '');
     }
-  }, [event, date]);
+  }, [event, perfis]);
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h2>{event ? 'Editar evento' : 'Novo evento'}</h2>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+      <div style={{ background: '#fff', padding: 20, borderRadius: 8, width: 400 }}>
+        <h2>{event.id ? 'Editar Evento' : 'Novo Evento'}</h2>
 
-        <input
-          className="w-full border p-2 rounded"
-          placeholder="Título"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-        />
+        <div style={{ marginBottom: 10 }}>
+          <label>Título</label>
+          <input className="w-full border p-2 rounded" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
 
-        <input
-          type="datetime-local"
-          className="w-full border p-2 rounded mt-2"
-          value={start}
-          onChange={e => setStart(e.target.value)}
-        />
+        <div style={{ marginBottom: 10 }}>
+          <label>Descrição</label>
+          <textarea className="w-full border p-2 rounded" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+        </div>
 
-        <select
-          className="w-full border p-2 rounded mt-2"
-          value={perfil}
-          onChange={e => setPerfil(e.target.value)}
-        >
-          <option value="">Selecione o perfil</option>
-          {perfis.map(p => (
-            <option key={p.chatId} value={p.chatId}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
+        <div style={{ marginBottom: 10 }}>
+          <label>Perfil</label>
+          <select className="w-full border p-2 rounded" value={perfil} onChange={(e) => setPerfil(e.target.value)}>
+            {perfis.map(p => (
+              <option key={p.nome} value={p.nome}>{p.nome} - {p.chatId}</option>
+            ))}
+          </select>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Link do Drive"
-          className="w-full border p-2 rounded mt-2"
-          value={driveLink}
-          onChange={e => setDriveLink(e.target.value)}
-        />
+        <div style={{ marginBottom: 10 }}>
+          <label>Data e Hora</label>
+          <input type="datetime-local" className="w-full border p-2 rounded" value={dataHora} onChange={(e) => setDataHora(e.target.value)} />
+        </div>
 
-        <div className="mt-4 flex justify-end">
-          {event && (
-            <button
-              className="mr-2 text-red-600"
-              onClick={() => onDelete(event.id)}
-            >
-              Excluir
-            </button>
-          )}
-
-          <button
-            className="mr-2 bg-blue-600 text-white px-4 py-2 rounded"
-            onClick={() =>
-              onSave({
-                id: event?.id || '',
-                title,
-                start,
-                perfil,
-                driveLink,
-              })
-            }
-          >
-            Salvar
-          </button>
-
-          <button onClick={onClose}>Cancelar</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+          {event.id && <button style={{ color: 'red' }} onClick={() => onDelete(event.id)}>Excluir</button>}
+          <div>
+            <button style={{ marginRight: 8 }} onClick={onClose}>Cancelar</button>
+            <button onClick={() => onSave({ ...event, title, descricao, perfil, start: dataHora })}>Salvar</button>
+          </div>
         </div>
       </div>
     </div>
