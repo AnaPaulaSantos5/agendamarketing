@@ -11,55 +11,53 @@ type Props = {
   start: string;
   end: string;
   event?: AgendaEvent | null;
-  userPerfil: Perfil;
-  userChatId: string;
+  perfilConfig: Record<Perfil, { chatId: string }>;
   isAdmin: boolean;
-  perfilConfig: Record<Perfil, { chatId: string; image: string }>;
 };
 
 export default function EventModal({
   isOpen,
   onClose,
   onSave,
-  onDelete,
   start,
   end,
   event,
-  userPerfil,
-  userChatId,
   perfilConfig,
 }: Props) {
+  const [perfil, setPerfil] = useState<Perfil>('Confi');
   const [titulo, setTitulo] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
-  const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
+  const [conteudoSecundario, setConteudoSecundario] = useState('');
+  const [linkDrive, setLinkDrive] = useState('');
+  const [startDate, setStartDate] = useState(start);
+  const [endDate, setEndDate] = useState(end);
 
   useEffect(() => {
     if (event) {
+      setPerfil(event.perfil || 'Confi');
       setTitulo(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || userPerfil);
-      setResponsavelChatId(
-        event.tarefa?.responsavelChatId || perfilConfig[event.perfil || userPerfil].chatId
-      );
-    } else {
-      setResponsavelChatId(perfilConfig[perfil].chatId);
+      setConteudoSecundario(event.conteudoSecundario || '');
+      setLinkDrive(event.tarefa?.linkDrive || '');
+      setStartDate(event.start);
+      setEndDate(event.end);
     }
-  }, [event, perfil, perfilConfig, userPerfil]);
-
-  if (!isOpen) return null;
+  }, [event, start, end]);
 
   const handleSave = () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
-      start,
-      end,
-      conteudoPrincipal: titulo,
+      start: startDate,
+      end: endDate,
       perfil,
+      conteudoPrincipal: titulo,
+      conteudoSecundario,
       tarefa: {
         titulo,
         responsavel: perfil,
-        responsavelChatId,
-        data: start,
+        responsavelChatId: perfilConfig[perfil]?.chatId || '',
+        data: startDate,
         status: 'Pendente',
+        linkDrive,
+        notificar: 'Sim',
       },
     };
 
@@ -67,9 +65,17 @@ export default function EventModal({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div style={{ background: '#fff', padding: 20, border: '1px solid #ccc' }}>
+    <div className="modal">
       <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
+
+      <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
+        {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
+          <option key={p}>{p}</option>
+        ))}
+      </select>
 
       <input
         placeholder="Título"
@@ -77,20 +83,24 @@ export default function EventModal({
         onChange={e => setTitulo(e.target.value)}
       />
 
-      <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-        {(['Confi', 'Cecília', 'Luiza', 'Júlio'] as Perfil[]).map(p => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-
-      <input
-        placeholder="ChatId responsável"
-        value={responsavelChatId}
-        onChange={e => setResponsavelChatId(e.target.value)}
+      <textarea
+        placeholder="Conteúdo alternativo"
+        value={conteudoSecundario}
+        onChange={e => setConteudoSecundario(e.target.value)}
       />
 
+      <input
+        placeholder="Link do Drive"
+        value={linkDrive}
+        onChange={e => setLinkDrive(e.target.value)}
+      />
+
+      <p>
+        <strong>ChatID:</strong>{' '}
+        {perfilConfig[perfil]?.chatId || 'NÃO DEFINIDO'}
+      </p>
+
       <button onClick={handleSave}>Salvar</button>
-      {event && <button onClick={() => onDelete(event.id)}>Excluir</button>}
       <button onClick={onClose}>Cancelar</button>
     </div>
   );
