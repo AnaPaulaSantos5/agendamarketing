@@ -1,104 +1,84 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { useEffect, useState } from 'react';
-import AgendaModal from './AgendaModal';
+import EventModal from './EventModal';
+import { useSession } from 'next-auth/react';
 
-export type Perfil = 'Confi' | 'Luiza' | 'Cecília' | 'Júlio';
-
-export type AgendaEvent = {
-  id: string; // ⚠️ string (FullCalendar exige)
+export interface AgendaEvent {
+  id: string;
   title: string;
   start: string;
-  end?: string;
-  perfil?: Perfil;
+  end: string;
+  perfil?: string;
+  tipoEvento?: string;
+  conteudoPrincipal?: string;
+  conteudoSecundario?: string;
+  cta?: string;
+  statusPostagem?: string;
   tarefa?: {
+    titulo?: string;
     responsavelChatId?: string;
+    linkDrive?: string;
     userImage?: string;
   };
-};
+}
 
-type PerfilConfig = {
-  chatId: string;
-  image: string;
-};
-
-export default function AgendaCalendar({ isAdmin }: { isAdmin: boolean }) {
+export default function AgendaCalendar() {
+  const { data: session } = useSession();
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [perfilMap, setPerfilMap] = useState<Record<Perfil, PerfilConfig>>({} as any);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  // 🔹 Carregar eventos
+  const isAdmin = session?.user?.role === 'admin';
+
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then(data =>
-        setEvents(
-          data.map((e: any) => ({
-            ...e,
-            id: String(e.id), // 🔥 garante compatibilidade
-          }))
-        )
-      );
+      .then(data => setEvents(data))
+      .catch(err => console.error(err));
   }, []);
-
-  // 🔹 Carregar perfis
-  useEffect(() => {
-    fetch('/api/perfil')
-      .then(res => res.json())
-      .then(data => {
-        const map: any = {};
-        data.forEach((p: any) => {
-          map[p.perfil] = { chatId: p.chatId, image: p.image };
-        });
-        setPerfilMap(map);
-      });
-  }, []);
-
-  function getPerfilConfig(perfil?: Perfil): PerfilConfig {
-    return perfil && perfilMap[perfil]
-      ? perfilMap[perfil]
-      : { chatId: '', image: '' };
-  }
 
   return (
     <>
+      <div style={{ marginBottom: 12 }}>
+        <strong>Responsável Chat ID:</strong>{' '}
+        {session?.user?.responsavelChatId || '—'}
+      </div>
+
       <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay',
-        }}
         events={events}
-        selectable
-        eventClick={info => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (ev) setSelectedEvent(ev);
+        eventClick={(info) => {
+          const ev = events.find(
+            e => String(e.id) === String(info.event.id)
+          );
+          if (!ev) return;
+          setSelectedEvent(ev);
+          setModalOpen(true);
         }}
       />
 
-      {selectedEvent && (
-        <AgendaModal
-          event={selectedEvent}
-          perfilConfig={getPerfilConfig(selectedEvent.perfil)}
-          perfilMap={perfilMap}
-          isAdmin={isAdmin}
-          onClose={() => setSelectedEvent(null)}
-          onSaved={() => {
-            setSelectedEvent(null);
-            fetch('/api/agenda')
-              .then(res => res.json())
-              .then(data =>
-                setEvents(data.map((e: any) => ({ ...e, id: String(e.id) })))
-              );
-          }}
-        />
-      )}
+      <EventModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedEvent(null);
+        }}
+        event={selectedEvent}
+        isAdmin={isAdmin}
+        userChatId={session?.user?.responsavelChatId || ''}
+        userPerfil={session?.user?.perfil || ''}
+        userImage={session?.user?.image || ''}
+        onSaved={() => {
+          fetch('/api/agenda')
+            .then(res => res.json())
+            .then(data => setEvents(data));
+        }}
+      />
     </>
   );
 }
