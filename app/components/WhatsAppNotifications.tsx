@@ -1,20 +1,17 @@
+'use client';
 import React from 'react';
-import { motion } from 'framer-motion';
 
 export default function WhatsAppNotifications() {
-  const notifications = ['Mensagem recebida', 'Mensagem enviada'];
   return (
-    <div className="fixed top-4 right-4 flex flex-col gap-2">
-      {notifications.map((msg, idx) => (
-        <motion.div
-          key={idx}
-          className="bg-green-500 text-white p-2 rounded shadow"
-          initial={{ x: 100, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-        >
-          {msg}
-        </motion.div>
-      ))}
+    <div style={{ position: 'relative', flex: 1 }}>
+      <div style={{ position: 'absolute', top: 0, right: 0 }}>
+        <div style={{ background: '#25D366', color: '#fff', padding: 8, borderRadius: 4, marginBottom: 4 }}>
+          Mensagem recebida
+        </div>
+        <div style={{ background: '#34B7F1', color: '#fff', padding: 8, borderRadius: 4 }}>
+          Mensagem enviada
+        </div>
+      </div>
     </div>
   );
 }
