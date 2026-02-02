@@ -7,7 +7,6 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDelete: (id: string) => void;
   start: string;
   end: string;
   event?: AgendaEvent | null;
@@ -21,10 +20,11 @@ type Props = {
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
+  isOpen, onClose, onSave, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
+  const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
@@ -36,6 +36,7 @@ export default function EventModal({
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || userPerfil);
+      setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
       setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
@@ -48,12 +49,12 @@ export default function EventModal({
       setResponsavelChatId(perfilMap[perfil].chatId);
       setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userImage, perfilMap, perfil]);
+  }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
 
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
-  }, [perfil, userImage, perfilMap]);
+  }, [perfil, perfilMap, userImage]);
 
   if (!isOpen) return null;
 
@@ -63,17 +64,20 @@ export default function EventModal({
       start: startDate,
       end: endDate,
       conteudoPrincipal: title,
+      conteudoSecundario,
       perfil,
-      tarefa: tarefaTitle ? {
-        titulo: tarefaTitle,
-        responsavel: perfil,
-        responsavelChatId,
-        userImage: perfilImage,
-        data: startDate,
-        status: 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      } : null,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: perfil,
+            responsavelChatId,
+            userImage: perfilImage,
+            data: startDate,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : null,
     };
     onSave(ev, !!event);
     onClose();
@@ -91,6 +95,7 @@ export default function EventModal({
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
+        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
         <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
@@ -100,14 +105,10 @@ export default function EventModal({
 
         <button onClick={handleSave}>Salvar</button>
         <button onClick={onClose}>Fechar</button>
-        <button
-          onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event?.id || ''); }}
-          style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
-        >Excluir</button>
       </div>
     </div>
   );
 }
 
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
+const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 400, borderRadius: 8 };
