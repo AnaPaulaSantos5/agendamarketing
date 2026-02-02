@@ -1,4 +1,3 @@
-// app/components/AgendaCalendar.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -16,10 +15,7 @@ export type AgendaEvent = {
   start: string;
   end: string;
   tipoEvento?: string;
-  tipo?: string;
   conteudoPrincipal?: string;
-  conteudoSecundario?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
@@ -32,14 +28,6 @@ export type AgendaEvent = {
     notificar?: string;
   } | null;
   allDay?: boolean;
-};
-
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
 };
 
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
@@ -75,60 +63,52 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
-  // Salvar chatId na planilha
   const savePerfil = async (perfil: Perfil) => {
     try {
       const chatId = perfilMap[perfil].chatId;
-      if (!chatId) { alert('ChatID não pode estar vazio'); return; }
-
       const res = await fetch('/api/perfil', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ perfil, chatId }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data?.error || 'Erro ao salvar ChatID');
-      }
-
-      alert(`ChatID de ${perfil} salvo com sucesso!`);
-    } catch (err: any) {
+      if (!res.ok) throw new Error('Erro ao salvar ChatID');
+      alert('Responsável ChatID salvo!');
+    } catch (err) {
       console.error(err);
-      alert(`Erro ao salvar ChatID: ${err.message}`);
+      alert('Erro ao salvar ChatID');
     }
   };
 
-  // Eventos filtrados por perfil
   const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
 
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
 
   return (
-    <div style={{ display: 'flex', gap: 24 }}>
+    <div style={{ display: 'flex', gap: 24, padding: 12 }}>
       {/* Painel esquerdo */}
-      <div style={{ flex: 0.3 }}>
+      <div style={{ flex: 0.3, textAlign: 'center' }}>
         <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
           <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
-
         {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
             <p><strong>Responsável Chat ID:</strong> {perfilMap[userName as Perfil]?.chatId || 'N/A'}</p>
-
-            {/* Admin pode alterar todos os chatIds */}
             {isUserAdmin && (
-              <div style={{ marginTop: 16, borderTop: '1px solid #ccc', paddingTop: 12 }}>
-                <h4>Atualizar ChatID de perfis</h4>
+              <div>
+                <label>Atualizar Chat IDs de todos perfis:</label>
                 {profiles.map(p => (
-                  <div key={p} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                    <strong>{p}</strong>
+                  <div key={p} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                    <span>{p}:</span>
                     <input
-                      type="text"
                       value={perfilMap[p]?.chatId || ''}
-                      onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
+                      onChange={e => setPerfilMap({
+                        ...perfilMap,
+                        [p]: { ...perfilMap[p], chatId: e.target.value },
+                      })}
+                      style={{ flex: 1 }}
                     />
                     <button onClick={() => savePerfil(p)}>Salvar</button>
                   </div>
@@ -145,7 +125,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           Filtrar por perfil:{' '}
           <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
             <option value="Todos">Todos</option>
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+            {profiles.map(p => (<option key={p} value={p}>{p}</option>))}
           </select>
         </label>
 
@@ -154,6 +134,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           initialView="timeGridWeek"
           selectable
           editable
+          slotDuration="00:30:00" // blocos de 30min
           events={filteredEvents.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
@@ -163,16 +144,10 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             borderColor: '#000',
             textColor: '#000',
           }))}
-          select={info => {
-            setSelectedEvent(null);
-            setSelectedDate({ start: info.startStr, end: info.endStr });
-            setModalOpen(true);
-          }}
-          eventClick={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); }
-          }}
+          select={info => { setSelectedEvent(null); setSelectedDate({ start: info.startStr, end: info.endStr }); setModalOpen(true); }}
+          eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
           height="auto"
+          allDaySlot={false}
         />
       </div>
 
