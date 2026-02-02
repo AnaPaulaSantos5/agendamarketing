@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     Bloco_ID: body.Bloco_ID,
     Titulo: body.Titulo,
     Responsavel: body.Responsavel,
-    ResponsavelChatID: body.ResponsavelChatID || '', // ✅ ajuste
+    ResponsavelChatId: body.ResponsavelChatId || '', // ✅ ajuste
     Data: body.Data,
     Status: 'Pendente',
     LinkDrive: body.LinkDrive || '',
