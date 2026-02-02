@@ -78,11 +78,24 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     }
   };
 
-  const handleEventSave = (ev: AgendaEvent, isEdit?: boolean) => {
-    setEvents(prev => {
-      if (isEdit) return prev.map(e => (e.id === ev.id ? ev : e));
-      return [...prev, ev];
-    });
+  const handleEventSave = async (ev: AgendaEvent, isEdit?: boolean) => {
+    try {
+      const method = isEdit ? 'PATCH' : 'POST';
+      const body = isEdit ? { ...ev, id: ev.id } : ev;
+
+      const res = await fetch('/api/agenda', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error('Erro ao salvar evento');
+
+      setEvents(prev => isEdit ? prev.map(e => e.id === ev.id ? ev : e) : [...prev, ev]);
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err);
+      alert('Erro ao salvar evento');
+    }
   };
 
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
