@@ -1,10 +1,10 @@
 "use client";
 import React, { useState } from "react";
-import TopProfiles from "./TopProfiles";
-import ClientCard from "./ClientCard";
-import CalendarGrid from "./CalendarGrid";
-import EventModal from "./EventModal";
-import SpotifyWidget from "./SpotifyWidget";
+import TopProfiles from "../components/TopProfiles";
+import ClientCard from "../components/ClientCard";
+import CalendarGrid from "../components/CalendarGrid";
+import EventModal from "../components/EventModal";
+import SpotifyWidget from "../components/SpotifyWidget";
 import "./AgendaTemplate.css";
 
 const AgendaTemplate: React.FC = () => {
