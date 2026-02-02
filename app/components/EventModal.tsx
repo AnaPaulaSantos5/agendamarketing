@@ -5,155 +5,108 @@ import { AgendaEvent } from './AgendaCalendar';
 
 interface Props {
   isOpen: boolean;
-  onClose: () => void;
   event: AgendaEvent | null;
   isAdmin: boolean;
-  userChatId: string;
-  userPerfil: string;
-  userImage: string;
+  onClose: () => void;
   onSaved: () => void;
 }
 
 export default function EventModal({
   isOpen,
-  onClose,
   event,
   isAdmin,
-  userChatId,
-  userPerfil,
-  userImage,
+  onClose,
   onSaved
 }: Props) {
-  const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState('');
-  const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
-  const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [cta, setCta] = useState('');
-  const [statusPostagem, setStatusPostagem] = useState('');
-  const [tarefaTitle, setTarefaTitle] = useState('');
-  const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState('');
-  const [perfilImage, setPerfilImage] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [form, setForm] = useState<AgendaEvent | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-
     if (event) {
-      setTitle(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || userPerfil);
-      setTipo(event.tipoEvento === 'Interno' ? 'Interno' : 'Perfil');
-      setConteudoSecundario(event.conteudoSecundario || '');
-      setCta(event.cta || '');
-      setStatusPostagem(event.statusPostagem || '');
-      setTarefaTitle(event.tarefa?.titulo || '');
-      setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(
-        event.tarefa?.responsavelChatId || userChatId || ''
-      );
-      setPerfilImage(event.tarefa?.userImage || userImage);
-      setStartDate(event.start || '');
-      setEndDate(event.end || '');
-    } else {
-      setResponsavelChatId(userChatId || '');
-      setPerfilImage(userImage);
-      setPerfil(userPerfil);
+      setForm({
+        ...event,
+        tarefa: {
+          responsavelChatId: event.tarefa?.responsavelChatId || '',
+          titulo: event.tarefa?.titulo || '',
+          linkDrive: event.tarefa?.linkDrive || ''
+        }
+      });
     }
-  }, [event, isOpen, userChatId, userImage, userPerfil]);
+  }, [event]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !form) return null;
 
-  async function handleSave() {
-    const payload = {
-      id: event?.id,
-      conteudoPrincipal: title,
-      conteudoSecundario,
-      cta,
-      statusPostagem,
-      perfil,
-      tipoEvento: tipo,
-      start: startDate,
-      end: endDate,
-      tarefa: {
-        titulo: tarefaTitle,
-        responsavelChatId,
-        linkDrive,
-        userImage: perfilImage
+  function updateField(path: string, value: string) {
+    setForm(prev => {
+      if (!prev) return prev;
+      const copy = structuredClone(prev);
+      if (path.startsWith('tarefa.')) {
+        const key = path.replace('tarefa.', '') as keyof typeof copy.tarefa;
+        copy.tarefa![key] = value;
+      } else {
+        (copy as any)[path] = value;
       }
-    };
-
-    await fetch('/api/agenda', {
-      method: event ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      return copy;
     });
+  }
 
+  async function save() {
+    await fetch('/api/agenda', {
+      method: form.id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
     onSaved();
     onClose();
   }
 
   return (
     <div className="modal">
-      <h2>{event ? 'Editar Evento' : 'Novo Evento'}</h2>
+      <h3>{form.id ? 'Editar evento' : 'Novo evento'}</h3>
 
       <input
-        placeholder="Título"
-        value={title}
-        onChange={e => setTitle(e.target.value)}
+        placeholder="Conteúdo principal"
+        value={form.conteudoPrincipal || ''}
+        onChange={e => updateField('conteudoPrincipal', e.target.value)}
       />
+
+      <select
+        value={form.perfil}
+        onChange={e => updateField('perfil', e.target.value)}
+      >
+        <option value="Confi Seguros">Confi Seguros</option>
+        <option value="Confi Finanças">Confi Finanças</option>
+        <option value="Confi Benefícios">Confi Benefícios</option>
+      </select>
 
       {isAdmin && (
         <input
-          placeholder="Responsável Chat ID"
-          value={responsavelChatId}
-          onChange={e => setResponsavelChatId(e.target.value)}
+          placeholder="Chat ID responsável"
+          value={form.tarefa?.responsavelChatId || ''}
+          onChange={e =>
+            updateField('tarefa.responsavelChatId', e.target.value)
+          }
         />
       )}
 
       <input
-        placeholder="Conteúdo secundário"
-        value={conteudoSecundario}
-        onChange={e => setConteudoSecundario(e.target.value)}
-      />
-
-      <input
-        placeholder="CTA"
-        value={cta}
-        onChange={e => setCta(e.target.value)}
-      />
-
-      <input
-        placeholder="Status"
-        value={statusPostagem}
-        onChange={e => setStatusPostagem(e.target.value)}
-      />
-
-      <input
-        placeholder="Tarefa"
-        value={tarefaTitle}
-        onChange={e => setTarefaTitle(e.target.value)}
+        placeholder="Título da tarefa"
+        value={form.tarefa?.titulo || ''}
+        onChange={e => updateField('tarefa.titulo', e.target.value)}
       />
 
       <input
         placeholder="Link Drive"
-        value={linkDrive}
-        onChange={e => setLinkDrive(e.target.value)}
+        value={form.tarefa?.linkDrive || ''}
+        onChange={e => updateField('tarefa.linkDrive', e.target.value)}
       />
 
       <input
-        type="datetime-local"
-        value={startDate}
-        onChange={e => setStartDate(e.target.value)}
+        type="date"
+        value={form.start}
+        onChange={e => updateField('start', e.target.value)}
       />
 
-      <input
-        type="datetime-local"
-        value={endDate}
-        onChange={e => setEndDate(e.target.value)}
-      />
-
-      <button onClick={handleSave}>Salvar</button>
+      <button onClick={save}>Salvar</button>
       <button onClick={onClose}>Cancelar</button>
     </div>
   );
