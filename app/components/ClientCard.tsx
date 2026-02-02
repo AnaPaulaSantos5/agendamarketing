@@ -1,17 +1,27 @@
-'use client';
-import React from 'react';
+"use client";
+import React from "react";
+import "./ClientCard.css";
 
-export default function ClientCard() {
+const ClientCard: React.FC = () => {
   return (
-    <div style={{ padding: 16, background: '#fff', borderRadius: 8, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#ccc' }} />
-        <div>
-          <div style={{ fontWeight: 'bold' }}>Nome Cliente</div>
-          <div style={{ fontSize: 12 }}>cliente@email.com</div>
-          <div style={{ fontSize: 12 }}>12345</div>
-        </div>
+    <div className="client-card">
+      <img src="/profiles/google-placeholder.png" alt="Cliente" />
+      <h3>Nome do Cliente</h3>
+      <p>Email: cliente@email.com</p>
+      <p>Telefone: 12345</p>
+
+      <div className="checklist">
+        <h4>Checklist</h4>
+        <ul>
+          <li>Revisar documento</li>
+          <li>Confirmar reunião</li>
+          <li>Enviar proposta</li>
+        </ul>
       </div>
+
+      <button>+ Adicionar Evento</button>
     </div>
   );
-}
+};
+
+export default ClientCard;
