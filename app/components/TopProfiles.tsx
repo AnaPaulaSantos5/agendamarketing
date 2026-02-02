@@ -2,20 +2,28 @@
 import React from "react";
 import "./TopProfiles.css";
 
-const profiles = [
-  { name: "Confi", img: "/profiles/confi.png" },
-  { name: "Luiza", img: "/profiles/luiza.png" },
-  { name: "Júlio", img: "/profiles/julio.png" },
-  { name: "Cecília", img: "/profiles/cecilia.png" },
-];
+interface Profile {
+  name: string;
+  photoUrl: string;
+  phone?: string; // chat id opcional
+}
 
-const TopProfiles: React.FC = () => {
+interface TopProfilesProps {
+  profiles: Profile[];
+  onSelect?: (profile: Profile) => void;
+}
+
+const TopProfiles: React.FC<TopProfilesProps> = ({ profiles, onSelect }) => {
   return (
     <div className="top-profiles">
-      {profiles.map((p) => (
-        <div key={p.name} className="profile">
-          <img src={p.img} alt={p.name} />
-          <span>{p.name}</span>
+      {profiles.map((profile) => (
+        <div
+          key={profile.name}
+          className="top-profile"
+          onClick={() => onSelect && onSelect(profile)}
+        >
+          <img src={profile.photoUrl} alt={profile.name} />
+          <span>{profile.name}</span>
         </div>
       ))}
     </div>
