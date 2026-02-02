@@ -1,0 +1,34 @@
+.client-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 16px;
+}
+
+.client-photo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 12px;
+  object-fit: cover;
+}
+
+.client-info {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.checklist {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.checklist li {
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.checklist li:hover {
+  text-decoration: line-through;
+}
