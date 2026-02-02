@@ -12,7 +12,7 @@ async function accessSpreadsheet() {
   return doc;
 }
 
-// GET: retorna checklist unificado do dia
+// GET: retorna checklist do dia
 export async function GET() {
   try {
     const doc = await accessSpreadsheet();
@@ -27,7 +27,6 @@ export async function GET() {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // Transformar cada aba em ChecklistItem
     const itemsFromAgenda = agendaRows.map(r => ({
       id: r.ID || `${r.Data_Inicio}-${r.Conteudo_Principal}`,
       date: r.Data_Inicio,
@@ -52,15 +51,12 @@ export async function GET() {
       done: r.Done === 'Sim',
     }));
 
-    // Juntar tudo e remover duplicados
     const allItemsMap = new Map<string, any>();
     [...itemsFromAgenda, ...itemsFromTarefas, ...itemsFromChecklist].forEach(item => {
       allItemsMap.set(item.id, item);
     });
 
     const allTasks = Array.from(allItemsMap.values());
-
-    // Filtrar apenas tarefas do dia e não concluídas
     const todayTasks = allTasks.filter(t => t.date.slice(0, 10) === today && !t.done);
 
     return NextResponse.json(todayTasks);
