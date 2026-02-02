@@ -44,13 +44,13 @@ export default function UserProfile({}: Props) {
                 type="text"
                 value={session.user.responsavelChatId || ''}
                 style={{ width: '100%' }}
-                disabled
+                readOnly
               />
             ) : (
               session.user.responsavelChatId || 'Não disponível'
             )}
           </p>
-          {isAdmin && <small style={{ color: '#888' }}>Você pode editar os ChatIDs no painel lateral</small>}
+          {isAdmin && <small style={{ color: '#888' }}>Você pode editar ChatIDs no painel</small>}
         </div>
       )}
     </div>
