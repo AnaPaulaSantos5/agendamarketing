@@ -1,13 +1,16 @@
-'use client';
-import React from 'react';
+"use client";
+import React from "react";
+import "./SpotifyWidget.css";
 
-export default function SpotifyWidget() {
+const SpotifyWidget: React.FC = () => {
   return (
-    <div style={{ background: '#1DB954', color: '#fff', padding: 16, borderRadius: 8 }}>
+    <div className="spotify-widget">
       <h4>Playlist Pública</h4>
-      <div style={{ height: 150, background: '#14833b', borderRadius: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        Widget Spotify (template)
+      <div className="spotify-placeholder">
+        <p>🎵 Widget do Spotify</p>
       </div>
     </div>
   );
-}
+};
+
+export default SpotifyWidget;
