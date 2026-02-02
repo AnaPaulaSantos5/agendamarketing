@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
+import FullCalendar, { EventContentArg } from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -44,8 +44,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [showProfileInfo, setShowProfileInfo] = useState(false);
-  const [filtroPerfil, setFiltroPerfil] = useState<Perfil | 'Todos'>('Todos');
 
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
@@ -86,60 +84,79 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     });
   };
 
-  const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
+  const handleEventDelete = async (ev: AgendaEvent) => {
+    try {
+      const res = await fetch('/api/agenda', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ev.id }),
+      });
+      if (!res.ok) throw new Error('Erro ao deletar evento');
+      setEvents(prev => prev.filter(e => e.id !== ev.id));
+      alert('Evento deletado!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao deletar evento');
+    }
+  };
 
-  const eventosFiltrados = events.filter(ev => filtroPerfil === 'Todos' || ev.perfil === filtroPerfil);
+  const perfilColors: Record<Perfil, string> = {
+    Confi: '#ffce0a',
+    Cecília: '#f5886c',
+    Luiza: '#1260c7',
+    Júlio: '#00b894',
+  };
+
+  const eventContent = (arg: EventContentArg) => {
+    const ev = events.find(e => e.id === arg.event.id);
+    if (!ev) return null;
+    return (
+      <div style={{ fontSize: 12, padding: 2 }}>
+        <strong>{ev.conteudoPrincipal}</strong>
+        <br />
+        <span style={{ fontSize: 10 }}>{ev.perfil}</span>
+      </div>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
       {/* Painel lateral */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
+        <div style={{ cursor: 'pointer', display: 'inline-block' }}>
           <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
-        {showProfileInfo && (
+        {isUserAdmin && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-            <p><strong>Nome:</strong> {userName}</p>
-            <p><strong>E-mail:</strong> {userEmail}</p>
-            {isUserAdmin && (
-              <>
-                <p><strong>Editar ChatIDs:</strong></p>
-                {profiles.map(p => (
-                  <div key={p} style={{ marginBottom: 6 }}>
-                    <label>{p}: </label>
-                    <input
-                      value={perfilMap[p].chatId}
-                      onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
-                      style={{ width: '70%' }}
-                    />
-                    <button onClick={() => savePerfil(p)}>Salvar</button>
-                  </div>
-                ))}
-              </>
-            )}
+            <p><strong>Editar ChatIDs:</strong></p>
+            {profiles.map(p => (
+              <div key={p} style={{ marginBottom: 6 }}>
+                <label>{p}: </label>
+                <input
+                  value={perfilMap[p].chatId}
+                  onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
+                  style={{ width: '70%' }}
+                />
+                <button onClick={() => savePerfil(p)}>Salvar</button>
+              </div>
+            ))}
           </div>
         )}
-        {/* Filtro de perfil */}
-        <div style={{ marginTop: 16 }}>
-          <label>Filtrar por perfil: </label>
-          <select value={filtroPerfil} onChange={e => setFiltroPerfil(e.target.value as Perfil | 'Todos')}>
-            <option value="Todos">Todos</option>
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
       </div>
 
       {/* Agenda em blocos */}
       <div style={{ flex: 3 }}>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
+          initialView="dayGridMonth"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
           selectable
           editable
-          allDaySlot={false}
-          slotMinTime="07:00:00"
-          slotMaxTime="21:00:00"
-          events={eventosFiltrados.map(ev => ({
+          events={events.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
             start: ev.start,
@@ -147,8 +164,8 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
             backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#999',
             borderColor: '#000',
             textColor: '#000',
-            extendedProps: { perfil: ev.perfil },
           }))}
+          eventContent={eventContent}
           select={info => {
             setSelectedEvent(null);
             setSelectedDate({ start: info.startStr, end: info.endStr });
@@ -162,13 +179,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
               setModalOpen(true);
             }
           }}
-          eventContent={info => (
-            <div style={{ padding: 4, fontSize: 12 }}>
-              <strong>{info.event.title}</strong>
-              <br />
-              <span>{info.event.extendedProps.perfil}</span>
-            </div>
-          )}
+          dayMaxEvents={true}
           height="auto"
         />
       </div>
@@ -182,6 +193,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           end={selectedDate.end}
           event={selectedEvent}
           onSave={handleEventSave}
+          onDelete={handleEventDelete}
           userPerfil={userName as Perfil}
           userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
