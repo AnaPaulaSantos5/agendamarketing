@@ -23,7 +23,7 @@ export type AgendaEvent = {
   cta?: string;
   linkDrive?: string;
 };
-
+export type PerfilsMap = Record<string, string>;
 /* =======================
 PROPS DO COMPONENTE
 ======================= */
