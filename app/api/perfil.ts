@@ -14,8 +14,8 @@ const auth = new google.auth.GoogleAuth({
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
+    // Use auth direto aqui (não getClient)
+    const sheets = google.sheets({ version: 'v4', auth });
 
     if (req.method === 'PATCH') {
       const { perfil, chatId } = req.body;
