@@ -1,37 +1,44 @@
-// app/api/perfil/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-async function auth() {
-  const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!);
+
+async function access() {
   await doc.useServiceAccountAuth({
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
   await doc.loadInfo();
-  return doc;
+  return doc.sheetsByTitle['Perfil'];
 }
 
+// ✅ GET → carregar perfis ao abrir a página
+export async function GET() {
+  const sheet = await access();
+  const rows = await sheet.getRows();
+
+  const map: any = {};
+  rows.forEach(r => {
+    map[r.Perfil] = {
+      chatId: r.ChatId || '',
+      image: r.Image || '',
+    };
+  });
+
+  return NextResponse.json(map);
+}
+
+// ✅ PATCH → salvar chatId
 export async function PATCH(req: NextRequest) {
-  try {
-    const { perfil, chatId } = await req.json();
-    if (!perfil || !chatId) throw new Error('Dados incompletos');
+  const { perfil, chatId } = await req.json();
+  const sheet = await access();
+  const rows = await sheet.getRows();
 
-    const doc = await auth();
-    const sheet = doc.sheetsByTitle['Tarefas'];
-    const rows = await sheet.getRows();
+  const row = rows.find(r => r.Perfil === perfil);
+  if (!row) throw new Error('Perfil não encontrado');
 
-    // Atualiza todos os registros do perfil com o novo ChatID
-    rows.forEach(r => {
-      if (r.Responsavel === perfil) {
-        r.ResponsavelChatId = chatId;
-        r.save().catch(console.error);
-      }
-    });
+  row.ChatId = chatId;
+  await row.save();
 
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('Erro ao atualizar ChatID:', err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
+  return NextResponse.json({ ok: true });
 }
