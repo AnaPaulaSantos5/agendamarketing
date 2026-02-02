@@ -1,108 +1,110 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { AgendaEvent, Perfil } from "./AgendaCalendar";
-
-type PerfilConfig = Record<Perfil, { chatId: string }>;
+'use client';
+import { useEffect, useState } from 'react';
+import { AgendaEvent } from './AgendaCalendar';
 
 interface Props {
   event: AgendaEvent | null;
-  start: string;
-  end: string;
-  perfilConfig: PerfilConfig;
+  date: string | null;
+  perfis: { nome: string; chatId: string }[];
   onSave: (data: AgendaEvent) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
 
-export default function EventModal({
-  event,
-  start,
-  end,
-  perfilConfig,
-  onSave,
-  onDelete,
-  onClose,
-}: Props) {
-  const [conteudoPrincipal, setConteudoPrincipal] = useState("");
-  const [conteudoSecundario, setConteudoSecundario] = useState("");
-  const [perfil, setPerfil] = useState<Perfil>("Confi");
-  const [dataInicio, setDataInicio] = useState(start);
-  const [dataFim, setDataFim] = useState(end);
-  const [linkDrive, setLinkDrive] = useState("");
+export default function EventModal({ event, date, perfis, onSave, onDelete, onClose }: Props) {
+  const [form, setForm] = useState<AgendaEvent>({
+    id: '',
+    start: date || '',
+    conteudoPrincipal: '',
+    conteudoSecundario: '',
+    perfil: undefined,
+  });
 
   useEffect(() => {
-    if (event) {
-      setConteudoPrincipal(event.conteudoPrincipal);
-      setConteudoSecundario(event.conteudoSecundario || "");
-      setPerfil(event.perfil);
-      setDataInicio(event.start);
-      setDataFim(event.end || event.start);
-      setLinkDrive(event.tarefa?.linkDrive || "");
-    }
-  }, [event]);
-
-  function salvar() {
-    onSave({
-      id: event?.id || "",
-      start: dataInicio,
-      end: dataFim,
-      conteudoPrincipal,
-      conteudoSecundario,
-      perfil,
-      tarefa: {
-        responsavelChatId: perfilConfig[perfil].chatId,
-        linkDrive,
-      },
-    });
-  }
+    if (event) setForm(event);
+    else if (date)
+      setForm({
+        id: '',
+        start: date,
+        conteudoPrincipal: '',
+        conteudoSecundario: '',
+        perfil: undefined,
+      });
+  }, [event, date]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)" }}>
-      <div style={{ background: "#fff", padding: 20, width: 420, margin: "80px auto" }}>
-        <h3>{event ? "Editar Evento" : "Novo Evento"}</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white rounded p-4 w-96 space-y-3">
+        <h2 className="font-bold">{event ? 'Editar evento' : 'Novo evento'}</h2>
 
+        {/* Título */}
         <input
-          placeholder="Conteúdo principal"
-          value={conteudoPrincipal}
-          onChange={e => setConteudoPrincipal(e.target.value)}
+          type="text"
+          className="w-full border p-2 rounded"
+          placeholder="Título"
+          value={form.conteudoPrincipal}
+          onChange={e => setForm({ ...form, conteudoPrincipal: e.target.value })}
         />
 
+        {/* Conteúdo secundário */}
         <input
+          type="text"
+          className="w-full border p-2 rounded"
           placeholder="Conteúdo secundário"
-          value={conteudoSecundario}
-          onChange={e => setConteudoSecundario(e.target.value)}
+          value={form.conteudoSecundario || ''}
+          onChange={e => setForm({ ...form, conteudoSecundario: e.target.value })}
         />
 
-        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {Object.keys(perfilConfig).map(p => (
-            <option key={p} value={p}>
-              {p}
+        {/* Perfil */}
+        <select
+          className="w-full border p-2 rounded"
+          value={form.perfil}
+          onChange={e => setForm({ ...form, perfil: e.target.value as any })}
+        >
+          <option value="">Selecione o perfil</option>
+          {perfis.map(p => (
+            <option key={p.nome} value={p.nome}>
+              {p.nome} - ChatID: {p.chatId}
             </option>
           ))}
         </select>
 
-        <small>ChatId: {perfilConfig[perfil].chatId || "N/A"}</small>
-
-        <input type="datetime-local" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
-        <input type="datetime-local" value={dataFim} onChange={e => setDataFim(e.target.value)} />
-
+        {/* Link Drive */}
         <input
-          placeholder="Link do Drive"
-          value={linkDrive}
-          onChange={e => setLinkDrive(e.target.value)}
+          type="text"
+          className="w-full border p-2 rounded"
+          placeholder="Link Drive"
+          value={form.linkDrive || ''}
+          onChange={e => setForm({ ...form, linkDrive: e.target.value })}
         />
 
-        <div style={{ marginTop: 12 }}>
-          <button onClick={salvar}>Salvar</button>
+        {/* Data/Hora */}
+        <input
+          type="datetime-local"
+          className="w-full border p-2 rounded"
+          value={form.start}
+          onChange={e => setForm({ ...form, start: e.target.value })}
+        />
 
+        <div className="flex justify-end space-x-2">
+          <button
+            className="bg-blue-500 text-white px-4 py-1 rounded"
+            onClick={() => onSave(form)}
+          >
+            Salvar
+          </button>
           {event && (
-            <button style={{ marginLeft: 8 }} onClick={() => onDelete(event.id)}>
+            <button
+              className="bg-red-500 text-white px-4 py-1 rounded"
+              onClick={() => onDelete(event.id)}
+            >
               Excluir
             </button>
           )}
-
-          <button style={{ marginLeft: 8 }} onClick={onClose}>
+          <button
+            className="bg-gray-300 px-4 py-1 rounded"
+            onClick={onClose}
+          >
             Cancelar
           </button>
         </div>
