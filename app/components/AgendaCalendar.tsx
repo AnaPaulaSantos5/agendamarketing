@@ -4,62 +4,40 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { EventClickArg, DateSelectArg } from '@fullcalendar/core';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import EventModal from './EventModal';
 
-/* =======================
-TIPAGEM DO EVENTO
-======================= */
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
+// Tipagem
 export type AgendaEvent = {
   id: string;
   title: string;
   start: string;
   end?: string;
-  perfil?: Perfil;
-  conteudoSecundario?: string;
-  cta?: string;
-  linkDrive?: string;
+  perfil?: string;
+  driveLink?: string;
 };
-export type PerfilsMap = Record<string, string>;
-/* =======================
-PROPS DO COMPONENTE
-======================= */
+
+export type Perfil = {
+  nome: string;
+  chatId: string;
+};
+
+export type PerfilsMap = Record<string, Perfil>; // <--- corrigido de PerfisMap para PerfilsMap
+
 interface AgendaCalendarProps {
   events: AgendaEvent[];
-  perfis: { nome: Perfil; chatId: string }[];
+  perfis: PerfilsMap;
   onRefresh: () => void;
-  isAdmin?: boolean;
 }
 
-/* =======================
-COMPONENTE
-======================= */
-export default function AgendaCalendar({
-  events: initialEvents,
-  perfis,
-  onRefresh,
-  isAdmin = false,
-}: AgendaCalendarProps) {
-  const [events, setEvents] = useState<AgendaEvent[]>(initialEvents || []);
+export default function AgendaCalendar({ events, perfis, onRefresh }: AgendaCalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  /* =======================
-  SINCRONIZA EVENTOS RECEBIDOS
-  ======================== */
-  useEffect(() => {
-    setEvents(initialEvents);
-  }, [initialEvents]);
-
-  /* =======================
-  CRIAR EVENTO
-  ======================== */
-  function handleSelect(info: DateSelectArg) {
+  // Criar evento
+  function handleSelect(info: any) {
     setSelectedEvent({
-      id: crypto.randomUUID(),
+      id: '',
       title: '',
       start: info.startStr,
       end: info.endStr,
@@ -67,56 +45,50 @@ export default function AgendaCalendar({
     setIsOpen(true);
   }
 
-  /* =======================
-  EDITAR EVENTO
-  ======================== */
-  function handleEventClick(click: EventClickArg) {
-    const ev = events.find(e => e.id === click.event.id);
-    if (!ev) return;
-
-    setSelectedEvent(ev);
+  // Editar evento
+  function handleEventClick(click: any) {
+    setSelectedEvent({
+      id: String(click.event.id),
+      title: click.event.title,
+      start: click.event.startStr,
+      end: click.event.endStr || undefined,
+      perfil: click.event.extendedProps?.perfil,
+      driveLink: click.event.extendedProps?.driveLink,
+    });
     setIsOpen(true);
   }
 
-  /* =======================
-  SALVAR EVENTO
-  ======================== */
   function handleSave(event: AgendaEvent) {
-    setEvents(prev =>
-      prev.some(e => e.id === event.id)
-        ? prev.map(e => (e.id === event.id ? event : e))
-        : [...prev, event]
-    );
+    const exists = events.find(e => e.id === event.id);
+    if (exists) {
+      // Editar
+      exists.title = event.title;
+      exists.start = event.start;
+      exists.end = event.end;
+      exists.perfil = event.perfil;
+      exists.driveLink = event.driveLink;
+    } else {
+      // Criar
+      events.push({ ...event, id: crypto.randomUUID() });
+    }
+    onRefresh();
     setIsOpen(false);
     setSelectedEvent(null);
-    onRefresh(); // recarrega dados da planilha
   }
 
-  /* =======================
-  EXCLUIR EVENTO
-  ======================== */
   function handleDelete(id: string) {
-    setEvents(prev => prev.filter(e => e.id !== id));
+    const index = events.findIndex(e => e.id === id);
+    if (index !== -1) events.splice(index, 1);
+    onRefresh();
     setIsOpen(false);
     setSelectedEvent(null);
-    onRefresh(); // recarrega dados da planilha
   }
-
-  /* =======================
-  CORES POR PERFIL
-  ======================== */
-  const perfilColors: Record<Perfil, string> = {
-    Confi: '#ffce0a',
-    Cecília: '#f5886c',
-    Luiza: '#1260c7',
-    Júlio: '#00b894',
-  };
 
   return (
     <>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView="dayGridMonth"
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -125,13 +97,7 @@ export default function AgendaCalendar({
         selectable
         select={handleSelect}
         eventClick={handleEventClick}
-        events={events.map(ev => ({
-          id: ev.id,
-          title: ev.title,
-          start: ev.start,
-          end: ev.end,
-          backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#ccc',
-        }))}
+        events={events}
         height="auto"
       />
 
@@ -139,8 +105,7 @@ export default function AgendaCalendar({
         <EventModal
           event={selectedEvent}
           date={selectedEvent.start}
-          perfis={perfis}
-          isAdmin={isAdmin}
+          perfis={Object.values(perfis)}
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={() => setIsOpen(false)}
