@@ -5,8 +5,8 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { useSession } from 'next-auth/react';
 import EventModal from './EventModal';
+import { useSession } from 'next-auth/react';
 
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
@@ -18,7 +18,6 @@ export type AgendaEvent = {
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
-  tipoEvento?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
@@ -31,40 +30,27 @@ export type AgendaEvent = {
   } | null;
 };
 
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
+const PERFIS: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
-
-export default function AgendaCalendar() {
+export default function AgendaCalendar({ isAdmin = false }) {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === 'admin';
-  const userPerfil = session?.user?.perfil as Perfil;
-  const userChatId = session?.user?.responsavelChatId || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
-
-  const [perfilConfig, setPerfilConfig] = useState<Record<Perfil, {
-    chatId: string;
-    image: string;
-  }>>({
-    Confi: { chatId: '', image: '/images/confi.png' },
-    Cecília: { chatId: '', image: '/images/cecilia.png' },
-    Luiza: { chatId: '', image: '/images/luiza.png' },
-    Júlio: { chatId: '', image: '/images/julio.png' },
-  });
-
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [selectedDate, setSelectedDate] = useState({ start: '', end: '' });
 
+  // 🔹 PERFIS CONTROLADOS PELO ADMIN
+  const [perfilConfig, setPerfilConfig] = useState<
+    Record<Perfil, { chatId: string }>
+  >({
+    Confi: { chatId: '' },
+    Cecília: { chatId: '' },
+    Luiza: { chatId: '' },
+    Júlio: { chatId: '' },
+  });
+
+  // 🔹 Carrega eventos
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -72,12 +58,15 @@ export default function AgendaCalendar() {
       .catch(console.error);
   }, []);
 
-  useEffect(() => {
-    fetch('/api/checklist')
-      .then(res => res.json())
-      .then(setChecklist)
-      .catch(console.error);
-  }, []);
+  // 🔹 Salvar chatIds (ADMIN)
+  const salvarChatIds = async () => {
+    await fetch('/api/agenda', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perfilConfig }),
+    });
+    alert('ChatIDs salvos');
+  };
 
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     await fetch('/api/agenda', {
@@ -91,67 +80,55 @@ export default function AgendaCalendar() {
     );
   };
 
-  const deleteEvent = async (id: string) => {
-    await fetch('/api/agenda', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-
-    setEvents(prev => prev.filter(e => e.id !== id));
-    setModalOpen(false);
+  const perfilColors: Record<Perfil, string> = {
+    Confi: '#ffce0a',
+    Cecília: '#f5886c',
+    Luiza: '#1260c7',
+    Júlio: '#00b894',
   };
 
-  const filteredEvents = events.filter(
-    e => filterProfile === 'Todos' || e.perfil === filterProfile
-  );
-
   return (
-    <div style={{ display: 'flex', gap: 16 }}>
-      {/* Painel esquerdo */}
+    <div style={{ display: 'flex', gap: 24 }}>
+      {/* 🔹 LATERAL ESQUERDA */}
       <div style={{ width: 260 }}>
         <h3>Perfis</h3>
 
-        {isAdmin && profiles.map(p => (
-          <div key={p}>
-            <strong>{p}</strong>
-            <input
-              style={{ width: '100%' }}
-              placeholder="ChatId"
-              value={perfilConfig[p].chatId}
-              onChange={e =>
-                setPerfilConfig(prev => ({
-                  ...prev,
-                  [p]: { ...prev[p], chatId: e.target.value }
-                }))
-              }
-            />
-          </div>
-        ))}
+        {isAdmin &&
+          PERFIS.map(perfil => (
+            <div key={perfil} style={{ marginBottom: 8 }}>
+              <strong>{perfil}</strong>
+              <input
+                placeholder="ChatId"
+                value={perfilConfig[perfil].chatId}
+                onChange={e =>
+                  setPerfilConfig(prev => ({
+                    ...prev,
+                    [perfil]: { chatId: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          ))}
+
+        {isAdmin && (
+          <button onClick={salvarChatIds}>Salvar ChatIDs</button>
+        )}
       </div>
 
-      {/* Calendário */}
+      {/* 🔹 CALENDÁRIO */}
       <div style={{ flex: 1 }}>
-        <select
-          value={filterProfile}
-          onChange={e => setFilterProfile(e.target.value as any)}
-        >
-          <option value="Todos">Todos</option>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
-          editable
-          events={filteredEvents.map(ev => ({
+          events={events.map(ev => ({
             id: ev.id,
             title: ev.conteudoPrincipal,
             start: ev.start,
             end: ev.end,
+            backgroundColor: ev.perfil
+              ? perfilColors[ev.perfil]
+              : '#ccc',
           }))}
           select={info => {
             setSelectedEvent(null);
@@ -173,14 +150,12 @@ export default function AgendaCalendar() {
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
           start={selectedDate.start}
           end={selectedDate.end}
           event={selectedEvent}
+          onSave={saveEvent}
+          onDelete={() => {}}
           perfilConfig={perfilConfig}
-          userPerfil={userPerfil}
-          userChatId={userChatId}
           isAdmin={isAdmin}
         />
       )}
