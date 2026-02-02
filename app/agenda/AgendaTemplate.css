@@ -1,0 +1,27 @@
+.agenda-container { display: flex; flex-direction: column; font-family: sans-serif; height: 100vh; }
+.agenda-top-profiles { display: flex; gap: 10px; padding: 10px; border-bottom: 1px solid #ccc; }
+.profile-avatar { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.profile-avatar.selected { border-color: #ffce0a; }
+
+.agenda-main { display: flex; flex: 1; }
+.agenda-left { width: 250px; background: #f9f9f9; padding: 10px; }
+.client-card img.client-photo { width: 100%; border-radius: 10px; }
+.client-card h3 { margin-top: 10px; }
+.checklist ul { padding-left: 20px; }
+.checklist li { margin-bottom: 5px; }
+.client-card button { margin-top: 10px; padding: 5px 10px; }
+
+.agenda-center { flex: 1; padding: 10px; background: #fff; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.calendar-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.calendar-block { flex: 1 1 calc(50% - 10px); padding: 15px; border-radius: 8px; color: #000; }
+
+.agenda-right { width: 250px; padding: 10px; background: #f1f1f1; display: flex; flex-direction: column; gap: 20px; }
+.spotify-placeholder { height: 150px; background: #ddd; display: flex; align-items: center; justify-content: center; }
+.whatsapp-notifications { display: flex; flex-direction: column; gap: 5px; }
+.notification { padding: 5px 10px; border-radius: 5px; color: #fff; font-size: 12px; }
+.notification.received { background: #25d366; }
+.notification.sent { background: #128c7e; }
+
+.event-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; }
+.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 400px; display: flex; flex-direction: column; gap: 10px; }
+.color-picker span { width: 20px; height: 20px; display: inline-block; margin-right: 5px; cursor: pointer; border-radius: 4px; }
