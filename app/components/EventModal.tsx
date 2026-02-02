@@ -7,7 +7,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDelete?: (ev: AgendaEvent) => void;
+  onDelete?: (id: string) => void; // ✅ callback para excluir
   start: string;
   end: string;
   event?: AgendaEvent | null;
@@ -21,7 +21,9 @@ type Props = {
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
+  isOpen, onClose, onSave, onDelete,
+  start, end, event, userPerfil, userChatId, userImage,
+  isAdmin, perfilMap, setPerfilMap, profiles
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
@@ -33,6 +35,7 @@ export default function EventModal({
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
+  // Atualiza campos quando o modal abre ou muda de evento
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -40,25 +43,27 @@ export default function EventModal({
       setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil]?.chatId || '');
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil]?.image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
       setStartDate(start);
       setEndDate(end);
-      setResponsavelChatId(perfilMap[perfil].chatId);
-      setPerfilImage(perfilMap[perfil].image || userImage);
+      setResponsavelChatId(perfilMap[perfil]?.chatId || '');
+      setPerfilImage(perfilMap[perfil]?.image || userImage);
     }
   }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
 
+  // Atualiza chatId e imagem quando muda o perfil
   useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil].chatId);
-    setPerfilImage(perfilMap[perfil].image || userImage);
+    setResponsavelChatId(perfilMap[perfil]?.chatId || '');
+    setPerfilImage(perfilMap[perfil]?.image || userImage);
   }, [perfil, perfilMap, userImage]);
 
   if (!isOpen) return null;
 
+  // Salvar evento
   const handleSave = () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
@@ -84,17 +89,23 @@ export default function EventModal({
     onClose();
   };
 
-  const handleDelete = () => {
-    if (event && onDelete) {
-      onDelete(event);
-      onClose();
-    }
+  // Excluir evento
+  const handleDelete = async () => {
+    if (!event?.id) return;
+    if (onDelete) onDelete(event.id); // Remove do estado e da planilha
+    onClose();
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
+        {perfilImage && (
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
+        )}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
@@ -111,9 +122,9 @@ export default function EventModal({
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
           <button onClick={handleSave}>Salvar</button>
-          {event && <button onClick={handleDelete} style={{ background: '#ff4d4f', color: '#fff' }}>Excluir</button>}
+          {event && <button style={{ background: '#e74c3c', color: '#fff' }} onClick={handleDelete}>Excluir</button>}
           <button onClick={onClose}>Fechar</button>
         </div>
       </div>
