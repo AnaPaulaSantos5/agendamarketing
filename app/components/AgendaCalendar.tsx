@@ -1,17 +1,12 @@
-"use client";
+'use client';
+import React, { useEffect, useState } from 'react';
+import FullCalendar, { EventClickArg } from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import EventModal from './EventModal';
 
-import { useEffect, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import { DateSelectArg, EventClickArg } from "@fullcalendar/core";
-import EventModal from "./EventModal";
-
-/* =======================
-TIPOS
-======================= */
-export type Perfil = "Confi" | "Cecília" | "Luiza" | "Júlio";
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
   id: string;
@@ -19,156 +14,123 @@ export type AgendaEvent = {
   end?: string;
   conteudoPrincipal: string;
   conteudoSecundario?: string;
-  perfil: Perfil;
+  cta?: string;
+  statusPostagem?: string;
+  perfil?: Perfil;
+  linkDrive?: string;
   tarefa?: {
+    titulo: string;
+    responsavel: Perfil;
     responsavelChatId?: string;
+    data?: string;
+    status?: string;
     linkDrive?: string;
+    notificar?: string;
   } | null;
 };
 
-type PerfilConfig = Record<Perfil, { chatId: string }>;
+export type PerfilConfig = Record<Perfil, { chatId: string }>;
 
-const PERFIS: Perfil[] = ["Confi", "Cecília", "Luiza", "Júlio"];
+interface Props {
+  events: AgendaEvent[];
+  perfilConfig: PerfilConfig;
+  setPerfilConfig: (v: PerfilConfig) => void;
+  onRefresh: () => void;
+  isAdmin?: boolean;
+}
 
-/* =======================
-COMPONENTE
-======================= */
-export default function AgendaCalendar({ isAdmin = true }) {
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [perfilConfig, setPerfilConfig] = useState<PerfilConfig>({
-    Confi: { chatId: "" },
-    Cecília: { chatId: "" },
-    Luiza: { chatId: "" },
-    Júlio: { chatId: "" },
-  });
+const PERFIS: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
+export default function AgendaCalendar({ events, perfilConfig, setPerfilConfig, onRefresh, isAdmin = false }: Props) {
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({
-    start: "",
-    end: "",
-  });
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState({ start: '', end: '' });
 
-  /* =======================
-CARREGAR DADOS (API = VERDADE)
-======================= */
-  async function loadAgenda() {
-    const res = await fetch("/api/agenda");
-    const data = await res.json();
+  const perfilColors: Record<Perfil, string> = {
+    Confi: '#ffce0a',
+    Cecília: '#f5886c',
+    Luiza: '#1260c7',
+    Júlio: '#00b894',
+  };
 
-    setEvents(Array.isArray(data.events) ? data.events : []);
-
-    if (data.perfis) {
-      setPerfilConfig(data.perfis);
-    }
-  }
-
-  useEffect(() => {
-    loadAgenda();
-  }, []);
-
-  /* =======================
-SALVAR CHATIDS (ADMIN)
-======================= */
-  async function salvarChatIds() {
-    await fetch("/api/agenda", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ perfilConfig }),
-    });
-    await loadAgenda();
-    alert("ChatIDs salvos");
-  }
-
-  /* =======================
-CRIAR EVENTO
-======================= */
-  function handleSelect(info: DateSelectArg) {
+  const handleSelect = (info: any) => {
     setSelectedEvent(null);
     setSelectedDate({ start: info.startStr, end: info.endStr });
-    setModalOpen(true);
-  }
+    setIsOpen(true);
+  };
 
-  /* =======================
-EDITAR EVENTO
-======================= */
-  function handleEventClick(click: EventClickArg) {
+  const handleEventClick = (click: EventClickArg) => {
     const ev = events.find(e => e.id === click.event.id);
-    if (!ev) return;
+    if (ev) {
+      setSelectedEvent(ev);
+      setSelectedDate({ start: ev.start, end: ev.end || '' });
+      setIsOpen(true);
+    }
+  };
 
-    setSelectedEvent(ev);
-    setSelectedDate({ start: ev.start, end: ev.end || ev.start });
-    setModalOpen(true);
-  }
-
-  /* =======================
-SALVAR EVENTO (API)
-======================= */
-  async function handleSave(data: AgendaEvent) {
-    await fetch("/api/agenda", {
-      method: data.id ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+  const handleSave = async (ev: AgendaEvent) => {
+    const method = ev.id ? 'PATCH' : 'POST';
+    await fetch('/api/agenda', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
     });
-
-    setModalOpen(false);
+    onRefresh();
+    setIsOpen(false);
     setSelectedEvent(null);
-    await loadAgenda();
-  }
+  };
 
-  /* =======================
-EXCLUIR EVENTO
-======================= */
-  async function handleDelete(id: string) {
-    await fetch("/api/agenda", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+  const handleDelete = async (id: string) => {
+    await fetch('/api/agenda', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-
-    setModalOpen(false);
+    onRefresh();
+    setIsOpen(false);
     setSelectedEvent(null);
-    await loadAgenda();
-  }
+  };
 
-  /* =======================
-RENDER
-======================= */
+  const salvarChatIds = async () => {
+    await fetch('/api/agenda', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perfilConfig }),
+    });
+    alert('ChatIDs salvos!');
+    onRefresh();
+  };
+
   return (
-    <div style={{ display: "flex", height: "100%" }}>
-      {/* 🔹 LATERAL PERFIS */}
-      <aside style={{ width: 260, padding: 16, borderRight: "1px solid #ddd" }}>
-        <h3>Perfis</h3>
-
-        {PERFIS.map(perfil => (
-          <div key={perfil} style={{ marginBottom: 12 }}>
-            <strong>{perfil}</strong>
-            {isAdmin && (
+    <div className="flex gap-4">
+      {/* LATERAL PERFIS */}
+      {isAdmin && (
+        <div className="w-48 border p-2 rounded space-y-2">
+          <h3 className="font-bold">Perfis</h3>
+          {PERFIS.map(perfil => (
+            <div key={perfil}>
+              <label>{perfil}</label>
               <input
+                className="w-full border p-1 rounded"
                 placeholder="ChatId"
-                value={perfilConfig[perfil].chatId}
+                value={perfilConfig[perfil]?.chatId || ''}
                 onChange={e =>
-                  setPerfilConfig(prev => ({
-                    ...prev,
-                    [perfil]: { chatId: e.target.value },
-                  }))
+                  setPerfilConfig({ ...perfilConfig, [perfil]: { chatId: e.target.value } })
                 }
-                style={{ width: "100%" }}
               />
-            )}
-          </div>
-        ))}
+            </div>
+          ))}
+          <button className="mt-2 bg-blue-500 text-white px-4 py-1 rounded" onClick={salvarChatIds}>
+            Salvar ChatIDs
+          </button>
+        </div>
+      )}
 
-        {isAdmin && (
-          <button onClick={salvarChatIds}>Salvar ChatIDs</button>
-        )}
-      </aside>
-
-      {/* 🔹 CALENDÁRIO */}
-      <main style={{ flex: 1, padding: 16 }}>
+      {/* CALENDÁRIO */}
+      <div className="flex-1">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
+          initialView="timeGridWeek"
           selectable
           select={handleSelect}
           eventClick={handleEventClick}
@@ -177,21 +139,25 @@ RENDER
             title: ev.conteudoPrincipal,
             start: ev.start,
             end: ev.end,
+            backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#ccc',
           }))}
           height="auto"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
         />
-      </main>
+      </div>
 
-      {/* 🔹 MODAL */}
-      {modalOpen && (
+      {isOpen && (
         <EventModal
           event={selectedEvent}
-          start={selectedDate.start}
-          end={selectedDate.end}
-          perfilConfig={perfilConfig}
+          date={selectedEvent ? null : selectedDate.start}
+          perfis={PERFIS.map(p => ({ nome: p, chatId: perfilConfig[p]?.chatId || '' }))}
           onSave={handleSave}
           onDelete={handleDelete}
-          onClose={() => setModalOpen(false)}
+          onClose={() => setIsOpen(false)}
         />
       )}
     </div>
