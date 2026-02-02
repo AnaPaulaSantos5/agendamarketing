@@ -1,52 +1,78 @@
 "use client";
 
-import { AgendaEvent } from "@/app/types/agenda";
+import { AgendaEvent } from "./AgendaCalendar";
 import { useState } from "react";
+
+type Props = {
+  event: AgendaEvent;
+  onSave: (event: AgendaEvent) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+};
 
 export default function AgendaModal({
   event,
+  onSave,
+  onDelete,
   onClose,
-}: {
-  event: AgendaEvent;
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState(event);
-
-  const save = async () => {
-    await fetch("/api/agenda", {
-      method: form.id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    onClose();
-  };
-
-  const remove = async () => {
-    await fetch("/api/agenda", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: form.id }),
-    });
-    onClose();
-  };
+}: Props) {
+  const [form, setForm] = useState<AgendaEvent>(event);
 
   return (
-    <div className="modal">
-      <input
-        value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-        placeholder="Título"
-      />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded w-full max-w-md space-y-4">
+        <h2 className="text-lg font-bold">
+          {form.id ? "Editar evento" : "Novo evento"}
+        </h2>
 
-      <input
-        value={form.perfil}
-        onChange={(e) => setForm({ ...form, perfil: e.target.value })}
-        placeholder="Perfil"
-      />
+        <input
+          className="w-full border p-2 rounded"
+          placeholder="Título"
+          value={form.title}
+          onChange={(e) =>
+            setForm({ ...form, title: e.target.value })
+          }
+        />
 
-      <button onClick={save}>Salvar</button>
-      {form.id && <button onClick={remove}>Excluir</button>}
-      <button onClick={onClose}>Cancelar</button>
+        <input
+          type="datetime-local"
+          className="w-full border p-2 rounded"
+          value={form.start}
+          onChange={(e) =>
+            setForm({ ...form, start: e.target.value })
+          }
+        />
+
+        <input
+          type="datetime-local"
+          className="w-full border p-2 rounded"
+          value={form.end || ""}
+          onChange={(e) =>
+            setForm({ ...form, end: e.target.value })
+          }
+        />
+
+        <div className="flex justify-between pt-4">
+          {form.id && (
+            <button
+              className="text-red-600"
+              onClick={() => onDelete(form.id)}
+            >
+              Excluir
+            </button>
+          )}
+
+          <div className="space-x-2">
+            <button onClick={onClose}>Cancelar</button>
+            <button
+              className="bg-black text-white px-4 py-1 rounded"
+              onClick={() => onSave(form)}
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
