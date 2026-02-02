@@ -1,109 +1,189 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
-import EventModal from './EventModal';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import { useSession } from 'next-auth/react';
+import EventModal from './EventModal';
 
-export interface AgendaEvent {
-  id?: string;
-  title: string;
+export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+
+export type AgendaEvent = {
+  id: string;
   start: string;
   end: string;
-  perfil: string;
-  tipoEvento: 'Interno' | 'Perfil';
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
   statusPostagem?: string;
+  tipoEvento?: string;
+  perfil?: Perfil;
   tarefa?: {
-    titulo?: string;
+    titulo: string;
+    responsavel: Perfil;
     responsavelChatId?: string;
+    data: string;
+    status: string;
     linkDrive?: string;
-    userImage?: string;
-  };
-}
+    notificar?: string;
+  } | null;
+};
+
+export type ChecklistItem = {
+  id: string;
+  date: string;
+  client: string;
+  task: string;
+  done: boolean;
+};
+
+const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 export default function AgendaCalendar() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === 'admin';
+  const userPerfil = session?.user?.perfil as Perfil;
+  const userChatId = session?.user?.responsavelChatId || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [perfilFiltro, setPerfilFiltro] = useState<string>('todos');
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
+
+  const [perfilConfig, setPerfilConfig] = useState<Record<Perfil, {
+    chatId: string;
+    image: string;
+  }>>({
+    Confi: { chatId: '', image: '/images/confi.png' },
+    Cecília: { chatId: '', image: '/images/cecilia.png' },
+    Luiza: { chatId: '', image: '/images/luiza.png' },
+    Júlio: { chatId: '', image: '/images/julio.png' },
+  });
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-
-  async function loadEvents() {
-    const res = await fetch('/api/agenda');
-    const data = await res.json();
-    setEvents(data);
-  }
+  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
-    loadEvents();
+    fetch('/api/agenda')
+      .then(res => res.json())
+      .then(setEvents)
+      .catch(console.error);
   }, []);
 
-  const filteredEvents = useMemo(() => {
-    if (perfilFiltro === 'todos') return events;
-    return events.filter(e => e.perfil === perfilFiltro);
-  }, [events, perfilFiltro]);
+  useEffect(() => {
+    fetch('/api/checklist')
+      .then(res => res.json())
+      .then(setChecklist)
+      .catch(console.error);
+  }, []);
 
-  function handleDateClick(arg: DateClickArg) {
-    setSelectedEvent({
-      title: '',
-      start: arg.dateStr,
-      end: arg.dateStr,
-      perfil: session?.user?.perfil || '',
-      tipoEvento: 'Perfil'
+  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
+    await fetch('/api/agenda', {
+      method: isEdit ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
     });
-    setModalOpen(true);
-  }
+
+    setEvents(prev =>
+      isEdit ? prev.map(e => (e.id === ev.id ? ev : e)) : [...prev, ev]
+    );
+  };
+
+  const deleteEvent = async (id: string) => {
+    await fetch('/api/agenda', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setModalOpen(false);
+  };
+
+  const filteredEvents = events.filter(
+    e => filterProfile === 'Todos' || e.perfil === filterProfile
+  );
 
   return (
-    <>
-      {/* 🔽 FILTRO DE PERFIL */}
-      <div style={{ marginBottom: 12 }}>
-        <select
-          value={perfilFiltro}
-          onChange={e => setPerfilFiltro(e.target.value)}
-        >
-          <option value="todos">Todos</option>
-          <option value="Confi Seguros">Confi Seguros</option>
-          <option value="Confi Finanças">Confi Finanças</option>
-          <option value="Confi Benefícios">Confi Benefícios</option>
-        </select>
+    <div style={{ display: 'flex', gap: 16 }}>
+      {/* Painel esquerdo */}
+      <div style={{ width: 260 }}>
+        <h3>Perfis</h3>
+
+        {isAdmin && profiles.map(p => (
+          <div key={p}>
+            <strong>{p}</strong>
+            <input
+              style={{ width: '100%' }}
+              placeholder="ChatId"
+              value={perfilConfig[p].chatId}
+              onChange={e =>
+                setPerfilConfig(prev => ({
+                  ...prev,
+                  [p]: { ...prev[p], chatId: e.target.value }
+                }))
+              }
+            />
+          </div>
+        ))}
       </div>
 
-      <FullCalendar
-        plugins={[dayGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={filteredEvents.map(e => ({
-          id: e.id,
-          title: `${e.perfil} — ${e.conteudoPrincipal || e.title}`,
-          start: e.start,
-          end: e.end
-        }))}
-        dateClick={handleDateClick}
-        eventClick={(info) => {
-          const ev = events.find(e => e.id === info.event.id);
-          if (!ev) return;
-          setSelectedEvent(ev);
-          setModalOpen(true);
-        }}
-      />
+      {/* Calendário */}
+      <div style={{ flex: 1 }}>
+        <select
+          value={filterProfile}
+          onChange={e => setFilterProfile(e.target.value as any)}
+        >
+          <option value="Todos">Todos</option>
+          {profiles.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
 
-      <EventModal
-        isOpen={modalOpen}
-        event={selectedEvent}
-        isAdmin={isAdmin}
-        onClose={() => {
-          setModalOpen(false);
-          setSelectedEvent(null);
-        }}
-        onSaved={loadEvents}
-      />
-    </>
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="timeGridWeek"
+          selectable
+          editable
+          events={filteredEvents.map(ev => ({
+            id: ev.id,
+            title: ev.conteudoPrincipal,
+            start: ev.start,
+            end: ev.end,
+          }))}
+          select={info => {
+            setSelectedEvent(null);
+            setSelectedDate({ start: info.startStr, end: info.endStr });
+            setModalOpen(true);
+          }}
+          eventClick={info => {
+            const ev = events.find(e => e.id === info.event.id);
+            if (ev) {
+              setSelectedEvent(ev);
+              setSelectedDate({ start: ev.start, end: ev.end });
+              setModalOpen(true);
+            }
+          }}
+        />
+      </div>
+
+      {modalOpen && (
+        <EventModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSave={saveEvent}
+          onDelete={deleteEvent}
+          start={selectedDate.start}
+          end={selectedDate.end}
+          event={selectedEvent}
+          perfilConfig={perfilConfig}
+          userPerfil={userPerfil}
+          userChatId={userChatId}
+          isAdmin={isAdmin}
+        />
+      )}
+    </div>
   );
 }
