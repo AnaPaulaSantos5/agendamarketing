@@ -1,145 +1,96 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import { AgendaEvent, Tarefa, Perfil } from './AgendaCalendar';
+import { AgendaEvent, Perfil } from './AgendaCalendar';
 
 interface Props {
   event: AgendaEvent | null;
-  date: string;
+  date: string | null;
   perfis: { nome: Perfil; chatId: string }[];
-  isAdmin?: boolean;
-  onSave: (data: AgendaEvent, isEdit?: boolean) => void;
+  onSave: (data: AgendaEvent) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
 
-export default function EventModal({
-  event,
-  date,
-  perfis,
-  isAdmin = false,
-  onSave,
-  onDelete,
-  onClose,
-}: Props) {
-  const [form, setForm] = useState({
+export default function EventModal({ event, date, perfis, onSave, onDelete, onClose }: Props) {
+  const [form, setForm] = useState<AgendaEvent>({
     id: '',
-    conteudoPrincipal: '',
+    title: '',
+    start: date || '',
+    end: date || '',
     conteudoSecundario: '',
-    start: date,
-    end: date,
-    perfil: perfis[0]?.nome || 'Confi',
-    tarefa: {
-      titulo: '',
-      responsavel: perfis[0]?.nome || 'Confi',
-      responsavelChatId: perfis[0]?.chatId || '',
-      data: date,
-      status: 'Pendente',
-      linkDrive: '',
-      notificar: 'Sim',
-    } as Tarefa,
+    perfil: undefined,
+    linkDrive: '',
   });
 
   useEffect(() => {
-    if (event) {
-      setForm({
-        id: event.id,
-        conteudoPrincipal: event.conteudoPrincipal || '',
-        conteudoSecundario: event.conteudoSecundario || '',
-        start: event.start,
-        end: event.end || event.start,
-        perfil: event.perfil || 'Confi',
-        tarefa: {
-          ...form.tarefa,
-          ...event.tarefa,
-          responsavelChatId: event.tarefa?.responsavelChatId || '',
-        },
-      });
-    } else {
-      setForm((prev) => ({ ...prev, start: date, end: date }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (event) setForm({ ...event });
+    else setForm({ ...form, start: date || '', end: date || '' });
   }, [event, date]);
 
-  const handleSave = () => {
-    onSave(form, !!event);
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded w-96">
-        <h2 className="text-lg font-bold mb-4">{event ? 'Editar Evento' : 'Novo Evento'}</h2>
+    <div className="modal-overlay">
+      <div className="modal">
+        <h2>{event?.id ? 'Editar evento' : 'Novo evento'}</h2>
 
-        <label className="block mb-1">Título</label>
         <input
-          className="w-full border p-1 mb-2 rounded"
-          value={form.conteudoPrincipal}
-          onChange={(e) => setForm({ ...form, conteudoPrincipal: e.target.value })}
+          className="w-full border p-2 rounded"
+          placeholder="Título"
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
         />
 
-        <label className="block mb-1">Conteúdo Secundário</label>
-        <input
-          className="w-full border p-1 mb-2 rounded"
+        <textarea
+          className="w-full border p-2 rounded mt-2"
+          placeholder="Conteúdo secundário"
           value={form.conteudoSecundario}
           onChange={(e) => setForm({ ...form, conteudoSecundario: e.target.value })}
         />
 
-        <label className="block mb-1">Perfil</label>
         <select
-          className="w-full border p-1 mb-2 rounded"
-          value={form.perfil}
-          onChange={(e) => {
-            const selectedPerfil = e.target.value as Perfil;
-            const chatId = perfis.find((p) => p.nome === selectedPerfil)?.chatId || '';
-            setForm({
-              ...form,
-              perfil: selectedPerfil,
-              tarefa: { ...form.tarefa, responsavel: selectedPerfil, responsavelChatId: chatId },
-            });
-          }}
+          className="w-full border p-2 rounded mt-2"
+          value={form.perfil || ''}
+          onChange={(e) => setForm({ ...form, perfil: e.target.value as Perfil })}
         >
+          <option value="">Selecione o perfil</option>
           {perfis.map((p) => (
             <option key={p.nome} value={p.nome}>
-              {p.nome} - {p.chatId}
+              {p.nome} (ChatID: {p.chatId})
             </option>
           ))}
         </select>
 
-        <label className="block mb-1">Data e Hora</label>
+        <input
+          type="text"
+          className="w-full border p-2 rounded mt-2"
+          placeholder="Link Drive"
+          value={form.linkDrive || ''}
+          onChange={(e) => setForm({ ...form, linkDrive: e.target.value })}
+        />
+
         <input
           type="datetime-local"
-          className="w-full border p-1 mb-2 rounded"
+          className="w-full border p-2 rounded mt-2"
           value={form.start}
           onChange={(e) => setForm({ ...form, start: e.target.value })}
         />
 
-        <label className="block mb-1">Link do Drive</label>
-        <input
-          type="text"
-          className="w-full border p-1 mb-2 rounded"
-          value={form.tarefa.linkDrive}
-          onChange={(e) =>
-            setForm({ ...form, tarefa: { ...form.tarefa, linkDrive: e.target.value } })
-          }
-        />
-
         <div className="flex justify-end mt-4">
-          <button
-            className="bg-green-500 text-white px-4 py-2 rounded mr-2"
-            onClick={handleSave}
-          >
-            Salvar
-          </button>
-          {event && (
+          {event?.id && (
             <button
-              className="bg-red-500 text-white px-4 py-2 rounded mr-2"
+              className="mr-2 text-red-600"
               onClick={() => onDelete(event.id)}
             >
               Excluir
             </button>
           )}
-          <button className="bg-gray-400 text-white px-4 py-2 rounded" onClick={onClose}>
-            Cancelar
+          <button
+            className="mr-2"
+            onClick={() => onSave(form)}
+          >
+            Salvar
           </button>
+          <button onClick={onClose}>Cancelar</button>
         </div>
       </div>
     </div>
