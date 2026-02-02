@@ -1,107 +1,147 @@
 'use client';
+import { useEffect, useState } from 'react';
+import { AgendaEvent, Tarefa, Perfil } from './AgendaCalendar';
 
-import React, { useEffect, useState } from 'react';
-import { AgendaEvent, Perfil } from './AgendaCalendar';
-
-type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
+interface Props {
+  event: AgendaEvent | null;
+  date: string;
+  perfis: { nome: Perfil; chatId: string }[];
+  isAdmin?: boolean;
+  onSave: (data: AgendaEvent, isEdit?: boolean) => void;
   onDelete: (id: string) => void;
-  start: string;
-  end: string;
-  event?: AgendaEvent | null;
-  perfilConfig: Record<Perfil, { chatId: string }>;
-  isAdmin: boolean;
-};
+  onClose: () => void;
+}
 
 export default function EventModal({
-  isOpen,
-  onClose,
-  onSave,
-  start,
-  end,
   event,
-  perfilConfig,
+  date,
+  perfis,
+  isAdmin = false,
+  onSave,
+  onDelete,
+  onClose,
 }: Props) {
-  const [perfil, setPerfil] = useState<Perfil>('Confi');
-  const [titulo, setTitulo] = useState('');
-  const [conteudoSecundario, setConteudoSecundario] = useState('');
-  const [linkDrive, setLinkDrive] = useState('');
-  const [startDate, setStartDate] = useState(start);
-  const [endDate, setEndDate] = useState(end);
+  const [form, setForm] = useState({
+    id: '',
+    conteudoPrincipal: '',
+    conteudoSecundario: '',
+    start: date,
+    end: date,
+    perfil: perfis[0]?.nome || 'Confi',
+    tarefa: {
+      titulo: '',
+      responsavel: perfis[0]?.nome || 'Confi',
+      responsavelChatId: perfis[0]?.chatId || '',
+      data: date,
+      status: 'Pendente',
+      linkDrive: '',
+      notificar: 'Sim',
+    } as Tarefa,
+  });
 
   useEffect(() => {
     if (event) {
-      setPerfil(event.perfil || 'Confi');
-      setTitulo(event.conteudoPrincipal || '');
-      setConteudoSecundario(event.conteudoSecundario || '');
-      setLinkDrive(event.tarefa?.linkDrive || '');
-      setStartDate(event.start);
-      setEndDate(event.end);
+      setForm({
+        id: event.id,
+        conteudoPrincipal: event.conteudoPrincipal || '',
+        conteudoSecundario: event.conteudoSecundario || '',
+        start: event.start,
+        end: event.end || event.start,
+        perfil: event.perfil || 'Confi',
+        tarefa: {
+          ...form.tarefa,
+          ...event.tarefa,
+          responsavelChatId: event.tarefa?.responsavelChatId || '',
+        },
+      });
+    } else {
+      setForm((prev) => ({ ...prev, start: date, end: date }));
     }
-  }, [event, start, end]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, date]);
 
   const handleSave = () => {
-    const ev: AgendaEvent = {
-      id: event?.id || String(Date.now()),
-      start: startDate,
-      end: endDate,
-      perfil,
-      conteudoPrincipal: titulo,
-      conteudoSecundario,
-      tarefa: {
-        titulo,
-        responsavel: perfil,
-        responsavelChatId: perfilConfig[perfil]?.chatId || '',
-        data: startDate,
-        status: 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      },
-    };
-
-    onSave(ev, !!event);
-    onClose();
+    onSave(form, !!event);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal">
-      <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded w-96">
+        <h2 className="text-lg font-bold mb-4">{event ? 'Editar Evento' : 'Novo Evento'}</h2>
 
-      <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-        {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => (
-          <option key={p}>{p}</option>
-        ))}
-      </select>
+        <label className="block mb-1">Título</label>
+        <input
+          className="w-full border p-1 mb-2 rounded"
+          value={form.conteudoPrincipal}
+          onChange={(e) => setForm({ ...form, conteudoPrincipal: e.target.value })}
+        />
 
-      <input
-        placeholder="Título"
-        value={titulo}
-        onChange={e => setTitulo(e.target.value)}
-      />
+        <label className="block mb-1">Conteúdo Secundário</label>
+        <input
+          className="w-full border p-1 mb-2 rounded"
+          value={form.conteudoSecundario}
+          onChange={(e) => setForm({ ...form, conteudoSecundario: e.target.value })}
+        />
 
-      <textarea
-        placeholder="Conteúdo alternativo"
-        value={conteudoSecundario}
-        onChange={e => setConteudoSecundario(e.target.value)}
-      />
+        <label className="block mb-1">Perfil</label>
+        <select
+          className="w-full border p-1 mb-2 rounded"
+          value={form.perfil}
+          onChange={(e) => {
+            const selectedPerfil = e.target.value as Perfil;
+            const chatId = perfis.find((p) => p.nome === selectedPerfil)?.chatId || '';
+            setForm({
+              ...form,
+              perfil: selectedPerfil,
+              tarefa: { ...form.tarefa, responsavel: selectedPerfil, responsavelChatId: chatId },
+            });
+          }}
+        >
+          {perfis.map((p) => (
+            <option key={p.nome} value={p.nome}>
+              {p.nome} - {p.chatId}
+            </option>
+          ))}
+        </select>
 
-      <input
-        placeholder="Link do Drive"
-        value={linkDrive}
-        onChange={e => setLinkDrive(e.target.value)}
-      />
+        <label className="block mb-1">Data e Hora</label>
+        <input
+          type="datetime-local"
+          className="w-full border p-1 mb-2 rounded"
+          value={form.start}
+          onChange={(e) => setForm({ ...form, start: e.target.value })}
+        />
 
-      <p>
-        <strong>ChatID:</strong>{' '}
-        {perfilConfig[perfil]?.chatId || 'NÃO DEFINIDO'}
-      </p>
+        <label className="block mb-1">Link do Drive</label>
+        <input
+          type="text"
+          className="w-full border p-1 mb-2 rounded"
+          value={form.tarefa.linkDrive}
+          onChange={(e) =>
+            setForm({ ...form, tarefa: { ...form.tarefa, linkDrive: e.target.value } })
+          }
+        />
 
-      <button onClick={handleSave}>Salvar</button>
-      <button onClick={onClose}>Cancelar</button>
+        <div className="flex justify-end mt-4">
+          <button
+            className="bg-green-500 text-white px-4 py-2 rounded mr-2"
+            onClick={handleSave}
+          >
+            Salvar
+          </button>
+          {event && (
+            <button
+              className="bg-red-500 text-white px-4 py-2 rounded mr-2"
+              onClick={() => onDelete(event.id)}
+            >
+              Excluir
+            </button>
+          )}
+          <button className="bg-gray-400 text-white px-4 py-2 rounded" onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
