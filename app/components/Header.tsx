@@ -1,4 +1,3 @@
-// app/components/Header.tsx
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
@@ -9,7 +8,7 @@ export default function Header() {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
       <div>
-        {session?.user?.name ? `Olá, ${session.user.name} (${session.user.perfil})` : ''}
+        {session?.user?.name ? `Olá, ${session.user.name}` : ''}
       </div>
       <button onClick={() => signOut()}>Sair</button>
     </div>
