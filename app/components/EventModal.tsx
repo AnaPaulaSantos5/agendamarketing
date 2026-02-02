@@ -39,26 +39,26 @@ export default function EventModal({
       setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil]?.chatId || userChatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil]?.image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
       setStartDate(start);
       setEndDate(end);
-      setResponsavelChatId(perfilMap[perfil].chatId);
-      setPerfilImage(perfilMap[perfil].image || userImage);
+      setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
+      setPerfilImage(perfilMap[perfil]?.image || userImage);
     }
   }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
 
   useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil].chatId);
-    setPerfilImage(perfilMap[perfil].image || userImage);
-  }, [perfil, perfilMap, userImage]);
+    setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
+    setPerfilImage(perfilMap[perfil]?.image || userImage);
+  }, [perfil, perfilMap, userImage, userChatId]);
 
   if (!isOpen) return null;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
       start: startDate,
@@ -80,18 +80,6 @@ export default function EventModal({
         : null,
     };
     onSave(ev, !!event);
-
-    // Atualiza ChatID no Google Sheet
-    try {
-      await fetch('/api/perfil', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ perfil, chatId: responsavelChatId }),
-      });
-    } catch (err) {
-      console.error('Erro ao salvar ChatID:', err);
-    }
-
     onClose();
   };
 
