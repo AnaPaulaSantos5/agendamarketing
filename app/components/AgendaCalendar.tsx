@@ -1,19 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 import { useSession } from 'next-auth/react';
 
 export interface AgendaEvent {
-  id: string;
+  id?: string;
   title: string;
   start: string;
   end: string;
-  perfil?: string;
-  tipoEvento?: string;
+  perfil: string;
+  tipoEvento: 'Interno' | 'Perfil';
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
   cta?: string;
@@ -28,34 +28,66 @@ export interface AgendaEvent {
 
 export default function AgendaCalendar() {
   const { data: session } = useSession();
-  const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-
   const isAdmin = session?.user?.role === 'admin';
 
+  const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [perfilFiltro, setPerfilFiltro] = useState<string>('todos');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
+
+  async function loadEvents() {
+    const res = await fetch('/api/agenda');
+    const data = await res.json();
+    setEvents(data);
+  }
+
   useEffect(() => {
-    fetch('/api/agenda')
-      .then(res => res.json())
-      .then(data => setEvents(data))
-      .catch(err => console.error(err));
+    loadEvents();
   }, []);
+
+  const filteredEvents = useMemo(() => {
+    if (perfilFiltro === 'todos') return events;
+    return events.filter(e => e.perfil === perfilFiltro);
+  }, [events, perfilFiltro]);
+
+  function handleDateClick(arg: DateClickArg) {
+    setSelectedEvent({
+      title: '',
+      start: arg.dateStr,
+      end: arg.dateStr,
+      perfil: session?.user?.perfil || '',
+      tipoEvento: 'Perfil'
+    });
+    setModalOpen(true);
+  }
 
   return (
     <>
+      {/* 🔽 FILTRO DE PERFIL */}
       <div style={{ marginBottom: 12 }}>
-        <strong>Responsável Chat ID:</strong>{' '}
-        {session?.user?.responsavelChatId || '—'}
+        <select
+          value={perfilFiltro}
+          onChange={e => setPerfilFiltro(e.target.value)}
+        >
+          <option value="todos">Todos</option>
+          <option value="Confi Seguros">Confi Seguros</option>
+          <option value="Confi Finanças">Confi Finanças</option>
+          <option value="Confi Benefícios">Confi Benefícios</option>
+        </select>
       </div>
 
       <FullCalendar
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        events={events}
+        events={filteredEvents.map(e => ({
+          id: e.id,
+          title: `${e.perfil} — ${e.conteudoPrincipal || e.title}`,
+          start: e.start,
+          end: e.end
+        }))}
+        dateClick={handleDateClick}
         eventClick={(info) => {
-          const ev = events.find(
-            e => String(e.id) === String(info.event.id)
-          );
+          const ev = events.find(e => e.id === info.event.id);
           if (!ev) return;
           setSelectedEvent(ev);
           setModalOpen(true);
@@ -64,20 +96,13 @@ export default function AgendaCalendar() {
 
       <EventModal
         isOpen={modalOpen}
+        event={selectedEvent}
+        isAdmin={isAdmin}
         onClose={() => {
           setModalOpen(false);
           setSelectedEvent(null);
         }}
-        event={selectedEvent}
-        isAdmin={isAdmin}
-        userChatId={session?.user?.responsavelChatId || ''}
-        userPerfil={session?.user?.perfil || ''}
-        userImage={session?.user?.image || ''}
-        onSaved={() => {
-          fetch('/api/agenda')
-            .then(res => res.json())
-            .then(data => setEvents(data));
-        }}
+        onSaved={loadEvents}
       />
     </>
   );
