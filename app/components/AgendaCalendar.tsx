@@ -8,6 +8,10 @@ import interactionPlugin from '@fullcalendar/interaction';
 import EventModal from './EventModal';
 import { useSession } from 'next-auth/react';
 
+/* =======================
+   Tipos
+======================= */
+
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
@@ -30,9 +34,15 @@ export type AgendaEvent = {
   } | null;
 };
 
+type PerfilConfig = Record<Perfil, { chatId: string }>;
+
 const PERFIS: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
-export default function AgendaCalendar({ isAdmin = false }) {
+/* =======================
+   Componente
+======================= */
+
+export default function AgendaCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
   const { data: session } = useSession();
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
@@ -40,25 +50,34 @@ export default function AgendaCalendar({ isAdmin = false }) {
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState({ start: '', end: '' });
 
-  // 🔹 PERFIS CONTROLADOS PELO ADMIN
-  const [perfilConfig, setPerfilConfig] = useState<
-    Record<Perfil, { chatId: string }>
-  >({
+  /* 🔹 PERFIS CONTROLADOS PELO ADMIN */
+  const [perfilConfig, setPerfilConfig] = useState<PerfilConfig>({
     Confi: { chatId: '' },
     Cecília: { chatId: '' },
     Luiza: { chatId: '' },
     Júlio: { chatId: '' },
   });
 
-  // 🔹 Carrega eventos
+  /* =======================
+     Carregar eventos
+  ======================= */
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then(setEvents)
+      .then(data => {
+        if (Array.isArray(data)) {
+          setEvents(data);
+        } else {
+          console.error('Agenda não retornou array:', data);
+          setEvents([]);
+        }
+      })
       .catch(console.error);
   }, []);
 
-  // 🔹 Salvar chatIds (ADMIN)
+  /* =======================
+     Salvar ChatIds (ADMIN)
+  ======================= */
   const salvarChatIds = async () => {
     await fetch('/api/agenda', {
       method: 'PATCH',
@@ -68,6 +87,9 @@ export default function AgendaCalendar({ isAdmin = false }) {
     alert('ChatIDs salvos');
   };
 
+  /* =======================
+     Salvar Evento
+  ======================= */
   const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
     await fetch('/api/agenda', {
       method: isEdit ? 'PATCH' : 'POST',
@@ -76,7 +98,9 @@ export default function AgendaCalendar({ isAdmin = false }) {
     });
 
     setEvents(prev =>
-      isEdit ? prev.map(e => (e.id === ev.id ? ev : e)) : [...prev, ev]
+      isEdit
+        ? prev.map(e => (e.id === ev.id ? ev : e))
+        : [...prev, ev]
     );
   };
 
@@ -88,16 +112,19 @@ export default function AgendaCalendar({ isAdmin = false }) {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 24 }}>
-      {/* 🔹 LATERAL ESQUERDA */}
-      <div style={{ width: 260 }}>
-        <h3>Perfis</h3>
+    <div className="flex h-full">
+      {/* =======================
+         LATERAL ESQUERDA
+      ======================= */}
+      <aside className="w-64 p-4 border-r">
+        <h3 className="font-bold mb-4">Perfis</h3>
 
         {isAdmin &&
           PERFIS.map(perfil => (
-            <div key={perfil} style={{ marginBottom: 8 }}>
-              <strong>{perfil}</strong>
+            <div key={perfil} className="mb-3">
+              <label className="block text-sm font-medium">{perfil}</label>
               <input
+                className="w-full border rounded px-2 py-1"
                 placeholder="ChatId"
                 value={perfilConfig[perfil].chatId}
                 onChange={e =>
@@ -111,24 +138,29 @@ export default function AgendaCalendar({ isAdmin = false }) {
           ))}
 
         {isAdmin && (
-          <button onClick={salvarChatIds}>Salvar ChatIDs</button>
+          <button
+            onClick={salvarChatIds}
+            className="mt-4 w-full bg-black text-white py-2 rounded"
+          >
+            Salvar ChatIDs
+          </button>
         )}
-      </div>
+      </aside>
 
-      {/* 🔹 CALENDÁRIO */}
-      <div style={{ flex: 1 }}>
+      {/* =======================
+         CALENDÁRIO
+      ======================= */}
+      <main className="flex-1 p-4">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
           selectable
           events={events.map(ev => ({
             id: ev.id,
-            title: ev.conteudoPrincipal,
+            title: ev.conteudoPrincipal || '(Sem título)',
             start: ev.start,
             end: ev.end,
-            backgroundColor: ev.perfil
-              ? perfilColors[ev.perfil]
-              : '#ccc',
+            backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#ccc',
           }))}
           select={info => {
             setSelectedEvent(null);
@@ -137,15 +169,18 @@ export default function AgendaCalendar({ isAdmin = false }) {
           }}
           eventClick={info => {
             const ev = events.find(e => e.id === info.event.id);
-            if (ev) {
-              setSelectedEvent(ev);
-              setSelectedDate({ start: ev.start, end: ev.end });
-              setModalOpen(true);
-            }
+            if (!ev) return;
+
+            setSelectedEvent(ev);
+            setSelectedDate({ start: ev.start, end: ev.end });
+            setModalOpen(true);
           }}
         />
-      </div>
+      </main>
 
+      {/* =======================
+         MODAL
+      ======================= */}
       {modalOpen && (
         <EventModal
           isOpen={modalOpen}
