@@ -14,49 +14,56 @@ async function accessSpreadsheet() {
   return {
     agendaSheet: doc.sheetsByTitle['Agenda'],
     tarefasSheet: doc.sheetsByTitle['Tarefas'],
+    perfisSheet: doc.sheetsByTitle['Perfis'],
   };
 }
 
 /**
- * ✅ Sempre retorna data válida para FullCalendar + Google Sheets
+ * Sempre retorna data válida para FullCalendar
  */
 function normalizeDate(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+  return d.toISOString().slice(0, 16);
 }
 
 /**
- * ✅ Formato para planilha
+ * Formato correto para Google Sheets
  */
 function formatDateForSheet(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
-
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   const hh = String(d.getHours()).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
-
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// GET
+// GET — Agenda + Tarefas + Perfis
 ////////////////////////////////////////////////////////////////////////////////
 export async function GET() {
   try {
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+    const { agendaSheet, tarefasSheet, perfisSheet } =
+      await accessSpreadsheet();
 
     const agendaRows = await agendaSheet.getRows();
     const tarefasRows = await tarefasSheet.getRows();
+    const perfisRows = perfisSheet ? await perfisSheet.getRows() : [];
+
+    const perfis: Record<string, { chatId: string }> = {};
+    perfisRows.forEach(row => {
+      perfis[row.Perfil] = {
+        chatId: row.ChatId || '',
+      };
+    });
 
     const events = agendaRows.map(row => {
       const blocoId = String(row._rowNumber);
-
       const tarefa = tarefasRows.find(
         t => String(t.Bloco_ID) === blocoId
       );
@@ -72,11 +79,15 @@ export async function GET() {
         cta: row.CTA || '',
         statusPostagem: row.Status_Postagem || '',
         perfil: row.Perfil || 'Confi',
+
         tarefa: tarefa
           ? {
-              titulo: tarefa.Titulo,
-              responsavel: tarefa.Responsavel,
-              responsavelChatId: tarefa.ResponsavelChatId || '',
+              titulo: tarefa.Titulo || '',
+              responsavel: tarefa.Responsavel || '',
+              responsavelChatId:
+                tarefa.ResponsavelChatId ||
+                perfis[row.Perfil]?.chatId ||
+                '',
               data: normalizeDate(tarefa.Data),
               status: tarefa.Status || 'Pendente',
               linkDrive: tarefa.LinkDrive || '',
@@ -86,20 +97,27 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(events);
+    return NextResponse.json({
+      events,
+      perfis,
+    });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(err) },
+      { status: 500 }
+    );
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// POST
+// POST — Criar evento
 ////////////////////////////////////////////////////////////////////////////////
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+    const { agendaSheet, tarefasSheet } =
+      await accessSpreadsheet();
 
     const agendaRow = await agendaSheet.addRow({
       Data_Inicio: formatDateForSheet(data.start),
@@ -129,20 +147,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(err) },
+      { status: 500 }
+    );
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// PATCH
+// PATCH — Atualizar EVENTO ou PERFIS
 ////////////////////////////////////////////////////////////////////////////////
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+    const { agendaSheet, tarefasSheet, perfisSheet } =
+      await accessSpreadsheet();
 
+    /**
+     * 🔹 Atualização de PERFIS (chatIds)
+     */
+    if (!data.id && data.perfilConfig && perfisSheet) {
+      const rows = await perfisSheet.getRows();
+
+      for (const perfil of Object.keys(data.perfilConfig)) {
+        const row = rows.find(r => r.Perfil === perfil);
+        if (row) {
+          row.ChatId = data.perfilConfig[perfil].chatId || '';
+          await row.save();
+        }
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * 🔹 Atualização de EVENTO
+     */
     const agendaRows = await agendaSheet.getRows();
-    const row = agendaRows.find(r => String(r._rowNumber) === data.id);
+    const row = agendaRows.find(
+      r => String(r._rowNumber) === data.id
+    );
     if (!row) throw new Error('Evento não encontrado');
 
     row.Data_Inicio = formatDateForSheet(data.start);
@@ -170,41 +214,52 @@ export async function PATCH(req: NextRequest) {
 
       tarefaRow.Titulo = data.tarefa.titulo;
       tarefaRow.Responsavel = data.tarefa.responsavel;
-      tarefaRow.ResponsavelChatId = data.tarefa.responsavelChatId || '';
+      tarefaRow.ResponsavelChatId =
+        data.tarefa.responsavelChatId || '';
       tarefaRow.Data = formatDateForSheet(data.tarefa.data);
       tarefaRow.Status = data.tarefa.status || 'Pendente';
       tarefaRow.LinkDrive = data.tarefa.linkDrive || '';
       tarefaRow.Notificar = data.tarefa.notificar || 'Sim';
-
       await tarefaRow.save();
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(err) },
+      { status: 500 }
+    );
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DELETE
+// DELETE — Evento + Tarefa
 ////////////////////////////////////////////////////////////////////////////////
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json();
-    const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
+    const { agendaSheet, tarefasSheet } =
+      await accessSpreadsheet();
 
     const agendaRows = await agendaSheet.getRows();
-    const agendaRow = agendaRows.find(r => String(r._rowNumber) === id);
+    const agendaRow = agendaRows.find(
+      r => String(r._rowNumber) === id
+    );
     if (agendaRow) await agendaRow.delete();
 
     const tarefasRows = await tarefasSheet.getRows();
-    const tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === id);
+    const tarefaRow = tarefasRows.find(
+      t => String(t.Bloco_ID) === id
+    );
     if (tarefaRow) await tarefaRow.delete();
 
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(err) },
+      { status: 500 }
+    );
   }
 }
