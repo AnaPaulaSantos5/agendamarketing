@@ -1,56 +1,45 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { AgendaEvent, Perfil } from './AgendaCalendar';
+import { useEffect, useState } from 'react';
+import { AgendaEvent } from './AgendaCalendar';
 
-const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
-};
-
-type Props = {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
-  onDelete: (id: string) => void;
-  start: string;
-  end: string;
-  event?: AgendaEvent | null;
-  userPerfil: Perfil;
-  userChatId: string;
-  userImage?: string;
+  event: AgendaEvent | null;
   isAdmin: boolean;
-};
+  userChatId: string;
+  userPerfil: string;
+  userImage: string;
+  onSaved: () => void;
+}
 
 export default function EventModal({
   isOpen,
   onClose,
-  onSave,
-  onDelete,
-  start,
-  end,
   event,
-  userPerfil,
-  userChatId,
-  userImage,
   isAdmin,
+  userChatId,
+  userPerfil,
+  userImage,
+  onSaved
 }: Props) {
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
+  const [perfil, setPerfil] = useState('');
   const [tipo, setTipo] = useState<'Interno' | 'Perfil'>('Perfil');
   const [conteudoSecundario, setConteudoSecundario] = useState('');
   const [cta, setCta] = useState('');
   const [statusPostagem, setStatusPostagem] = useState('');
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
-  const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
-  const [perfilImage, setPerfilImage] = useState(userImage);
-  const [startDate, setStartDate] = useState(start);
-  const [endDate, setEndDate] = useState(end);
+  const [responsavelChatId, setResponsavelChatId] = useState('');
+  const [perfilImage, setPerfilImage] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (event) {
       setTitle(event.conteudoPrincipal || '');
       setPerfil(event.perfil || userPerfil);
@@ -60,82 +49,112 @@ export default function EventModal({
       setStatusPostagem(event.statusPostagem || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
-      setStartDate(event.start);
-      setEndDate(event.end);
+      setResponsavelChatId(
+        event.tarefa?.responsavelChatId || userChatId || ''
+      );
+      setPerfilImage(event.tarefa?.userImage || userImage);
+      setStartDate(event.start || '');
+      setEndDate(event.end || '');
     } else {
-      setResponsavelChatId(perfilMap[perfil].chatId);
-      setPerfilImage(perfilMap[perfil].image || userImage);
+      setResponsavelChatId(userChatId || '');
+      setPerfilImage(userImage);
+      setPerfil(userPerfil);
     }
-  }, [event, start, end, userPerfil, userImage, perfil]);
-
-  useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil].chatId);
-    setPerfilImage(perfilMap[perfil].image || userImage);
-  }, [perfil, userImage]);
+  }, [event, isOpen, userChatId, userImage, userPerfil]);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    const ev: AgendaEvent = {
-      id: event?.id || String(Date.now()),
-      start: startDate,
-      end: endDate,
+  async function handleSave() {
+    const payload = {
+      id: event?.id,
       conteudoPrincipal: title,
       conteudoSecundario,
       cta,
       statusPostagem,
       perfil,
       tipoEvento: tipo,
-      tarefa: tarefaTitle
-        ? {
-            titulo: tarefaTitle,
-            responsavel: perfil,
-            responsavelChatId,
-            userImage: perfilImage,
-            data: startDate,
-            status: 'Pendente',
-            linkDrive,
-            notificar: 'Sim',
-          }
-        : null,
+      start: startDate,
+      end: endDate,
+      tarefa: {
+        titulo: tarefaTitle,
+        responsavelChatId,
+        linkDrive,
+        userImage: perfilImage
+      }
     };
-    onSave(ev, !!event);
+
+    await fetch('/api/agenda', {
+      method: event ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    onSaved();
     onClose();
-  };
+  }
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
-        <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
+    <div className="modal">
+      <h2>{event ? 'Editar Evento' : 'Novo Evento'}</h2>
 
-        <label>Perfil responsável:</label>
-        <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {['Confi', 'Cecília', 'Luiza', 'Júlio'].map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+      <input
+        placeholder="Título"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+      />
 
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
-        <input value={cta} onChange={e => setCta(e.target.value)} placeholder="CTA" />
-        <input value={statusPostagem} onChange={e => setStatusPostagem(e.target.value)} placeholder="Status postagem" />
-        <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} onChange={e => setResponsavelChatId(e.target.value)} placeholder="Responsável Chat ID" />
-        <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
+      {isAdmin && (
+        <input
+          placeholder="Responsável Chat ID"
+          value={responsavelChatId}
+          onChange={e => setResponsavelChatId(e.target.value)}
+        />
+      )}
 
-        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+      <input
+        placeholder="Conteúdo secundário"
+        value={conteudoSecundario}
+        onChange={e => setConteudoSecundario(e.target.value)}
+      />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
-        <button onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event?.id!); }} style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}>
-          Excluir
-        </button>
-      </div>
+      <input
+        placeholder="CTA"
+        value={cta}
+        onChange={e => setCta(e.target.value)}
+      />
+
+      <input
+        placeholder="Status"
+        value={statusPostagem}
+        onChange={e => setStatusPostagem(e.target.value)}
+      />
+
+      <input
+        placeholder="Tarefa"
+        value={tarefaTitle}
+        onChange={e => setTarefaTitle(e.target.value)}
+      />
+
+      <input
+        placeholder="Link Drive"
+        value={linkDrive}
+        onChange={e => setLinkDrive(e.target.value)}
+      />
+
+      <input
+        type="datetime-local"
+        value={startDate}
+        onChange={e => setStartDate(e.target.value)}
+      />
+
+      <input
+        type="datetime-local"
+        value={endDate}
+        onChange={e => setEndDate(e.target.value)}
+      />
+
+      <button onClick={handleSave}>Salvar</button>
+      <button onClick={onClose}>Cancelar</button>
     </div>
   );
 }
-
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
