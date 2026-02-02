@@ -6,10 +6,9 @@ import { AgendaEvent, Perfil } from './AgendaCalendar';
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
+  event?: AgendaEvent | null;
   start: string;
   end: string;
-  event?: AgendaEvent | null;
   userPerfil: Perfil;
   userChatId: string;
   userImage?: string;
@@ -17,14 +16,17 @@ type Props = {
   perfilMap: Record<Perfil, { chatId: string; image?: string }>;
   setPerfilMap: React.Dispatch<React.SetStateAction<Record<Perfil, { chatId: string; image?: string }>>>;
   profiles: Perfil[];
+  onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
+  isOpen, onClose, event, start, end,
+  userPerfil, userChatId, userImage, isAdmin,
+  perfilMap, setPerfilMap, profiles, onSave
 }: Props) {
   const [title, setTitle] = useState('');
-  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [conteudoSecundario, setConteudoSecundario] = useState('');
+  const [perfil, setPerfil] = useState<Perfil>(userPerfil);
   const [tarefaTitle, setTarefaTitle] = useState('');
   const [linkDrive, setLinkDrive] = useState('');
   const [responsavelChatId, setResponsavelChatId] = useState(userChatId);
@@ -35,8 +37,8 @@ export default function EventModal({
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
-      setPerfil(event.perfil || userPerfil);
       setConteudoSecundario(event.conteudoSecundario || '');
+      setPerfil(event.perfil || userPerfil);
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
       setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
@@ -51,36 +53,46 @@ export default function EventModal({
     }
   }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
 
-  useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil].chatId);
-    setPerfilImage(perfilMap[perfil].image || userImage);
-  }, [perfil, perfilMap, userImage]);
-
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    const ev: AgendaEvent = {
-      id: event?.id || String(Date.now()),
-      start: startDate,
-      end: endDate,
-      conteudoPrincipal: title,
-      conteudoSecundario,
-      perfil,
-      tarefa: tarefaTitle
-        ? {
-            titulo: tarefaTitle,
-            responsavel: perfil,
-            responsavelChatId,
-            userImage: perfilImage,
-            data: startDate,
-            status: 'Pendente',
-            linkDrive,
-            notificar: 'Sim',
-          }
-        : null,
-    };
-    onSave(ev, !!event);
-    onClose();
+  const handleSave = async () => {
+    try {
+      const ev: AgendaEvent = {
+        id: event?.id || String(Date.now()),
+        start: startDate,
+        end: endDate,
+        conteudoPrincipal: title,
+        conteudoSecundario,
+        perfil,
+        tarefa: tarefaTitle
+          ? {
+              titulo: tarefaTitle,
+              responsavel: perfil,
+              responsavelChatId,
+              userImage: perfilImage,
+              data: startDate,
+              status: 'Pendente',
+              linkDrive,
+              notificar: 'Sim',
+            }
+          : null,
+      };
+
+      // Chama API para criar ou atualizar
+      const method = event ? 'PATCH' : 'POST';
+      const url = '/api/agenda';
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ev),
+      });
+
+      onSave(ev, !!event);
+      onClose();
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err);
+      alert('Erro ao salvar evento!');
+    }
   };
 
   return (
