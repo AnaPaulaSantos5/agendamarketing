@@ -1,24 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Header from '@/app/components/Header';
-import AgendaCalendar, { AgendaEvent } from '@/app/components/AgendaCalendar';
+import AgendaCalendar, { AgendaEvent, Perfil, PerfisMap } from '@/app/components/AgendaCalendar';
 
-/* =======================
-Tipos
-======================= */
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
-
-export type PerfisMap = Record<Perfil, { chatId: string }>;
-
-type ApiResponse = {
-  events: AgendaEvent[];
-  perfis: PerfisMap;
-};
-
-/* =======================
-Página
-======================= */
 export default function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [perfis, setPerfis] = useState<PerfisMap>({
@@ -30,66 +14,37 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true);
 
   /* =======================
-  Carregar agenda da API
+  Carregar eventos da API
   ====================== */
-  useEffect(() => {
-    const loadAgenda = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/agenda');
-        const data: ApiResponse = await res.json();
-
-        setEvents(Array.isArray(data.events) ? data.events : []);
-        setPerfis({ ...perfis, ...data.perfis }); // mantém as chaves existentes
-      } catch (err) {
-        console.error('Erro ao carregar agenda:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAgenda();
-  }, []);
-
-  /* =======================
-  Refresh simples após salvar/editar
-  ====================== */
-  const handleRefresh = async () => {
+  const loadAgenda = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/agenda');
-      const data: ApiResponse = await res.json();
-
+      const data = await res.json();
       setEvents(Array.isArray(data.events) ? data.events : []);
-      setPerfis({ ...perfis, ...data.perfis });
+      setPerfis(data.perfis || perfis);
     } catch (err) {
-      console.error('Erro ao atualizar agenda:', err);
+      console.error('Erro ao carregar agenda:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <>
-      <Header />
-      <div style={{ display: 'flex', height: '100vh' }}>
-        <div style={{ flex: 1 }}>
-          {loading ? (
-            <p>Carregando agenda…</p>
-          ) : (
-            <AgendaCalendar
-              events={events}
-              perfis={perfis}
-              onRefresh={handleRefresh}
-            />
-          )}
-        </div>
+  useEffect(() => {
+    loadAgenda();
+  }, []);
 
-        {/* Aqui você pode adicionar painel lateral se quiser */}
-        <div style={{ width: 320, borderLeft: '1px solid #ddd' }}>
-          {/* Exemplo: Checklist lateral ou informações */}
-        </div>
+  if (loading) return <p>Carregando agenda…</p>;
+
+  return (
+    <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ flex: 1 }}>
+        <AgendaCalendar
+          events={events}
+          perfis={perfis}
+          onRefresh={loadAgenda}
+        />
       </div>
-    </>
+    </div>
   );
 }
