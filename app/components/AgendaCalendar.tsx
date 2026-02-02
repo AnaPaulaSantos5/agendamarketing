@@ -3,83 +3,113 @@
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin, { EventClickArg, DateSelectArg } from '@fullcalendar/interaction';
+import interactionPlugin from '@fullcalendar/interaction';
+import type { EventClickArg, DateSelectArg } from '@fullcalendar/core';
 import { useState, useEffect } from 'react';
 import EventModal from './EventModal';
 
+/* =======================
+TIPAGEM DO EVENTO
+======================= */
 export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
 
 export type AgendaEvent = {
   id: string;
+  title: string;
   start: string;
   end?: string;
-  title: string;
-  conteudoSecundario?: string;
   perfil?: Perfil;
+  conteudoSecundario?: string;
+  cta?: string;
   linkDrive?: string;
 };
 
-export type PerfisMap = Record<Perfil, { chatId: string }>;
-
-interface Props {
+/* =======================
+PROPS DO COMPONENTE
+======================= */
+interface AgendaCalendarProps {
   events: AgendaEvent[];
-  perfis: PerfisMap;
+  perfis: { nome: Perfil; chatId: string }[];
   onRefresh: () => void;
+  isAdmin?: boolean;
 }
 
-export default function AgendaCalendar({ events: initialEvents, perfis, onRefresh }: Props) {
-  const [events, setEvents] = useState<AgendaEvent[]>(initialEvents);
+/* =======================
+COMPONENTE
+======================= */
+export default function AgendaCalendar({
+  events: initialEvents,
+  perfis,
+  onRefresh,
+  isAdmin = false,
+}: AgendaCalendarProps) {
+  const [events, setEvents] = useState<AgendaEvent[]>(initialEvents || []);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end?: string } | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => setEvents(initialEvents), [initialEvents]);
+  /* =======================
+  SINCRONIZA EVENTOS RECEBIDOS
+  ======================== */
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
 
+  /* =======================
+  CRIAR EVENTO
+  ======================== */
+  function handleSelect(info: DateSelectArg) {
+    setSelectedEvent({
+      id: crypto.randomUUID(),
+      title: '',
+      start: info.startStr,
+      end: info.endStr,
+    });
+    setIsOpen(true);
+  }
+
+  /* =======================
+  EDITAR EVENTO
+  ======================== */
+  function handleEventClick(click: EventClickArg) {
+    const ev = events.find(e => e.id === click.event.id);
+    if (!ev) return;
+
+    setSelectedEvent(ev);
+    setIsOpen(true);
+  }
+
+  /* =======================
+  SALVAR EVENTO
+  ======================== */
+  function handleSave(event: AgendaEvent) {
+    setEvents(prev =>
+      prev.some(e => e.id === event.id)
+        ? prev.map(e => (e.id === event.id ? event : e))
+        : [...prev, event]
+    );
+    setIsOpen(false);
+    setSelectedEvent(null);
+    onRefresh(); // recarrega dados da planilha
+  }
+
+  /* =======================
+  EXCLUIR EVENTO
+  ======================== */
+  function handleDelete(id: string) {
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setIsOpen(false);
+    setSelectedEvent(null);
+    onRefresh(); // recarrega dados da planilha
+  }
+
+  /* =======================
+  CORES POR PERFIL
+  ======================== */
   const perfilColors: Record<Perfil, string> = {
     Confi: '#ffce0a',
     Cecília: '#f5886c',
     Luiza: '#1260c7',
     Júlio: '#00b894',
-  };
-
-  function handleSelect(info: DateSelectArg) {
-    setSelectedEvent({ id: '', title: '', start: info.startStr, end: info.endStr });
-    setSelectedDate({ start: info.startStr, end: info.endStr });
-    setModalOpen(true);
-  }
-
-  function handleEventClick(click: EventClickArg) {
-    const ev = events.find((e) => e.id === click.event.id);
-    if (!ev) return;
-    setSelectedEvent(ev);
-    setSelectedDate({ start: ev.start, end: ev.end });
-    setModalOpen(true);
-  }
-
-  const handleSave = async (ev: AgendaEvent) => {
-    if (!ev.id) ev.id = crypto.randomUUID();
-    setEvents((prev) =>
-      prev.find((e) => e.id === ev.id) ? prev.map((e) => (e.id === ev.id ? ev : e)) : [...prev, ev]
-    );
-
-    await fetch('/api/agenda', {
-      method: ev.id ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ev),
-    });
-
-    setModalOpen(false);
-    setSelectedEvent(null);
-    onRefresh();
-  };
-
-  const handleDelete = async (id: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
-    await fetch(`/api/agenda?id=${id}`, { method: 'DELETE' });
-
-    setModalOpen(false);
-    setSelectedEvent(null);
-    onRefresh();
   };
 
   return (
@@ -95,7 +125,7 @@ export default function AgendaCalendar({ events: initialEvents, perfis, onRefres
         selectable
         select={handleSelect}
         eventClick={handleEventClick}
-        events={events.map((ev) => ({
+        events={events.map(ev => ({
           id: ev.id,
           title: ev.title,
           start: ev.start,
@@ -105,14 +135,15 @@ export default function AgendaCalendar({ events: initialEvents, perfis, onRefres
         height="auto"
       />
 
-      {modalOpen && selectedEvent && (
+      {isOpen && selectedEvent && (
         <EventModal
           event={selectedEvent}
-          date={selectedDate?.start || null}
-          perfis={Object.entries(perfis).map(([nome, { chatId }]) => ({ nome: nome as Perfil, chatId }))}
+          date={selectedEvent.start}
+          perfis={perfis}
+          isAdmin={isAdmin}
           onSave={handleSave}
           onDelete={handleDelete}
-          onClose={() => setModalOpen(false)}
+          onClose={() => setIsOpen(false)}
         />
       )}
     </>
