@@ -8,20 +8,21 @@
     "start": "next start"
   },
   "dependencies": {
-    "encoding": "^0.1.13",
-    "google-auth-library": "^9.0.0",
-    "google-spreadsheet": "^3.3.0",
-    "googleapis": "^121.0.0",
-    "next": "13.4.12",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "next-auth": "^4.0.0", 
-    "supports-color": "^8.1.1",
-    "@fullcalendar/react": "^6.1.8",
-    "@fullcalendar/daygrid": "^6.1.8",
-    "@fullcalendar/timegrid": "^6.1.8",
-    "@fullcalendar/interaction": "^6.1.8",
-     "@fullcalendar/core": "^6.1.8"
+  "encoding": "^0.1.13",
+  "google-auth-library": "^9.0.0",
+  "google-spreadsheet": "^3.3.0",
+  "googleapis": "^121.0.0",
+  "next": "13.4.12",
+  "react": "18.2.0",
+  "react-dom": "18.2.0",
+  "next-auth": "^4.0.0",
+  "supports-color": "^8.1.1",
+  "@fullcalendar/react": "^6.1.8",
+  "@fullcalendar/daygrid": "^6.1.8",
+  "@fullcalendar/timegrid": "^6.1.8",
+  "@fullcalendar/interaction": "^6.1.8",
+  "@fullcalendar/core": "^6.1.8",
+  "framer-motion": "^10.12.16"
 
   },
   
