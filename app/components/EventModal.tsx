@@ -20,7 +20,19 @@ type Props = {
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
+  isOpen,
+  onClose,
+  onSave,
+  start,
+  end,
+  event,
+  userPerfil,
+  userChatId,
+  userImage,
+  isAdmin,
+  perfilMap,
+  setPerfilMap,
+  profiles,
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
@@ -39,7 +51,7 @@ export default function EventModal({
       setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil]?.chatId || userChatId);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil]?.chatId || '');
       setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil]?.image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
@@ -49,7 +61,7 @@ export default function EventModal({
       setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
       setPerfilImage(perfilMap[perfil]?.image || userImage);
     }
-  }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
+  }, [event, start, end, perfil, perfilMap, userPerfil, userImage, userChatId]);
 
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
@@ -58,7 +70,7 @@ export default function EventModal({
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
       start: startDate,
@@ -79,19 +91,40 @@ export default function EventModal({
           }
         : null,
     };
-    onSave(ev, !!event);
-    onClose();
+
+    try {
+      const res = await fetch('/api/agenda', {
+        method: event ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ev),
+      });
+      if (!res.ok) throw new Error('Erro ao salvar evento');
+
+      onSave(ev, !!event);
+      onClose();
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err);
+      alert('Erro ao salvar evento');
+    }
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
+        {perfilImage && (
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
+        )}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          {profiles.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
@@ -110,5 +143,13 @@ export default function EventModal({
   );
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+};
 const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 400, borderRadius: 8 };
