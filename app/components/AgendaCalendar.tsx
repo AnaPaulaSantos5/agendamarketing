@@ -14,11 +14,8 @@ export type AgendaEvent = {
   id: string;
   start: string;
   end: string;
-  tipoEvento?: string;
-  tipo?: string;
   conteudoPrincipal?: string;
   conteudoSecundario?: string;
-  statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
     titulo: string;
@@ -33,14 +30,6 @@ export type AgendaEvent = {
   allDay?: boolean;
 };
 
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
-
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 type Props = { isAdmin?: boolean };
@@ -52,14 +41,11 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const userImage = session?.user?.image || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [showProfileInfo, setShowProfileInfo] = useState(false);
-
-  const today = new Date().toISOString().slice(0, 10);
 
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
@@ -70,6 +56,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
+  // Busca eventos da planilha ao iniciar
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -77,6 +64,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
+  // Função para salvar ChatID de qualquer perfil
   const savePerfil = async (perfil: Perfil) => {
     try {
       const chatId = perfilMap[perfil].chatId;
@@ -100,7 +88,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Painel esquerdo */}
+      {/* Painel lateral */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
         <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
           <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
@@ -109,17 +97,17 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
             <p><strong>Nome:</strong> {userName}</p>
             <p><strong>E-mail:</strong> {userEmail}</p>
-            <p><strong>Responsável Chat ID:</strong> {perfilMap[userName as Perfil]?.chatId || 'N/A'}</p>
-            {isUserAdmin && (
-              <div>
-                <label>Atualizar Chat ID:</label>
+            {isUserAdmin && profiles.map(p => (
+              <div key={p} style={{ marginBottom: 8 }}>
+                <strong>{p}</strong>
                 <input
-                  value={perfilMap[userName as Perfil]?.chatId || ''}
-                  onChange={e => setPerfilMap({ ...perfilMap, [userName as Perfil]: { ...perfilMap[userName as Perfil], chatId: e.target.value } })}
+                  style={{ marginLeft: 4, width: '100%' }}
+                  value={perfilMap[p].chatId}
+                  onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
                 />
-                <button onClick={() => savePerfil(userName as Perfil)}>Salvar</button>
+                <button style={{ marginTop: 4 }} onClick={() => savePerfil(p)}>Salvar</button>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -150,8 +138,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           }))}
           select={info => { setSelectedEvent(null); setSelectedDate({ start: info.startStr, end: info.endStr }); setModalOpen(true); }}
           eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
-          eventDrop={info => { const ev = events.find(e => e.id === info.event.id); if (ev) {} }}
-          eventResize={info => { const ev = events.find(e => e.id === info.event.id); if (ev) {} }}
           height="auto"
         />
       </div>
@@ -172,7 +158,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           userImage={userImage}
           perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
-          profiles={profiles} // necessário para o select
+          profiles={profiles}
         />
       )}
     </div>
