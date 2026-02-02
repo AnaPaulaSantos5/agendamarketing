@@ -44,6 +44,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [showProfileInfo, setShowProfileInfo] = useState(false);
 
   const [perfilMap, setPerfilMap] = useState<Record<Perfil, { chatId: string; image?: string }>>({
     Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
@@ -54,7 +55,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
-  // 🔹 Carregar eventos da planilha
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -62,7 +62,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
-  // 🔹 Salvar ChatID de perfis
   const savePerfil = async (perfil: Perfil) => {
     try {
       const chatId = perfilMap[perfil].chatId;
@@ -79,7 +78,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     }
   };
 
-  // 🔹 Função para salvar evento no calendário
   const handleEventSave = (ev: AgendaEvent, isEdit?: boolean) => {
     setEvents(prev => isEdit ? prev.map(e => e.id === ev.id ? ev : e) : [...prev, ev]);
   };
@@ -90,23 +88,29 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
     <div style={{ display: 'flex', gap: 24 }}>
       {/* Painel lateral */}
       <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div style={{ cursor: 'pointer', display: 'inline-block' }}>
+        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
           <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
         </div>
-        {isUserAdmin && (
+        {showProfileInfo && (
           <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-            <p><strong>Editar ChatIDs:</strong></p>
-            {profiles.map(p => (
-              <div key={p} style={{ marginBottom: 6 }}>
-                <label>{p}: </label>
-                <input
-                  value={perfilMap[p].chatId}
-                  onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
-                  style={{ width: '70%' }}
-                />
-                <button onClick={() => savePerfil(p)}>Salvar</button>
-              </div>
-            ))}
+            <p><strong>Nome:</strong> {userName}</p>
+            <p><strong>E-mail:</strong> {userEmail}</p>
+            {isUserAdmin && (
+              <>
+                <p><strong>Editar ChatIDs:</strong></p>
+                {profiles.map(p => (
+                  <div key={p} style={{ marginBottom: 6 }}>
+                    <label>{p}: </label>
+                    <input
+                      value={perfilMap[p].chatId}
+                      onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
+                      style={{ width: '70%' }}
+                    />
+                    <button onClick={() => savePerfil(p)}>Salvar</button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -152,9 +156,10 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         <EventModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          event={selectedEvent}
           start={selectedDate.start}
           end={selectedDate.end}
+          event={selectedEvent}
+          onSave={handleEventSave}
           userPerfil={userName as Perfil}
           userChatId={perfilMap[userName as Perfil]?.chatId || ''}
           userImage={userImage}
@@ -162,7 +167,6 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           perfilMap={perfilMap}
           setPerfilMap={setPerfilMap}
           profiles={profiles}
-          onSave={handleEventSave}
         />
       )}
     </div>
