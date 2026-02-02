@@ -21,7 +21,20 @@ type Props = {
 };
 
 export default function EventModal({
-  isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  start,
+  end,
+  event,
+  userPerfil,
+  userChatId,
+  userImage,
+  isAdmin,
+  perfilMap,
+  setPerfilMap,
+  profiles,
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
@@ -33,7 +46,7 @@ export default function EventModal({
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
-  // Atualiza campos quando muda evento ou perfil
+  // Carrega dados do evento quando abre modal
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -46,12 +59,14 @@ export default function EventModal({
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
-      setStartDate(start); setEndDate(end);
+      setStartDate(start);
+      setEndDate(end);
       setResponsavelChatId(perfilMap[perfil].chatId);
       setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, perfilMap, userPerfil, userImage, perfil]);
+  }, [event, start, end, userPerfil, userImage, perfilMap, perfil]);
 
+  // Atualiza chatId quando o perfil selecionado muda
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
@@ -67,47 +82,117 @@ export default function EventModal({
       conteudoPrincipal: title,
       conteudoSecundario,
       perfil,
-      tarefa: tarefaTitle ? {
-        titulo: tarefaTitle,
-        responsavel: perfil,
-        responsavelChatId,
-        userImage: perfilImage,
-        data: startDate,
-        status: 'Pendente',
-        linkDrive,
-        notificar: 'Sim',
-      } : null,
+      tarefa: tarefaTitle
+        ? {
+            titulo: tarefaTitle,
+            responsavel: perfil,
+            responsavelChatId,
+            userImage: perfilImage,
+            data: startDate,
+            status: 'Pendente',
+            linkDrive,
+            notificar: 'Sim',
+          }
+        : null,
     };
+
     onSave(ev, !!event);
     onClose();
   };
 
+  // Função para atualizar chatId do perfil direto do modal
+  const savePerfilChatId = async () => {
+    try {
+      if (!responsavelChatId) return alert('ChatID vazio');
+      const res = await fetch('/api/perfil', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perfil, chatId: responsavelChatId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro desconhecido');
+      setPerfilMap({ ...perfilMap, [perfil]: { ...perfilMap[perfil], chatId: responsavelChatId } });
+      alert(`ChatID de ${perfil} atualizado!`);
+    } catch (err: any) {
+      console.error('Erro ao salvar ChatID:', err);
+      alert(`Erro ao salvar ChatID: ${err.message || err}`);
+    }
+  };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#fff', padding: 24, width: 400, borderRadius: 8, border: '2px solid #1260c7' /* detalhe visual diferente */ }}>
-        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
+    <div style={overlay}>
+      <div style={modal}>
+        {perfilImage && (
+          <img
+            src={perfilImage}
+            alt={perfil}
+            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
+          />
+        )}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          {profiles.map(p => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
-        <textarea value={conteudoSecundario} onChange={e => setConteudoSecundario(e.target.value)} placeholder="Conteúdo secundário" />
+        <textarea
+          value={conteudoSecundario}
+          onChange={e => setConteudoSecundario(e.target.value)}
+          placeholder="Conteúdo secundário"
+        />
         <input value={tarefaTitle} onChange={e => setTarefaTitle(e.target.value)} placeholder="Tarefa" />
-        <input value={responsavelChatId} placeholder="Responsável Chat ID" disabled />
+        <input
+          value={responsavelChatId}
+          onChange={e => setResponsavelChatId(e.target.value)}
+          placeholder="Responsável Chat ID"
+          disabled={!isAdmin}
+        />
+        {isAdmin && <button onClick={savePerfilChatId}>Salvar ChatID</button>}
         <input value={linkDrive} onChange={e => setLinkDrive(e.target.value)} placeholder="Link do Drive" />
 
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
         <div style={{ marginTop: 12 }}>
-          <button onClick={handleSave} style={{ marginRight: 6 }}>Salvar</button>
-          <button onClick={onClose} style={{ marginRight: 6 }}>Fechar</button>
-          {event && <button onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }} style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4 }}>Excluir</button>}
+          <button onClick={handleSave}>Salvar Evento</button>
+          <button onClick={onClose} style={{ marginLeft: 8 }}>
+            Fechar
+          </button>
+          {event && (
+            <button
+              onClick={() => {
+                if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id);
+              }}
+              style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
+            >
+              Excluir
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+};
+
+const modal: React.CSSProperties = {
+  background: '#fff',
+  padding: 20,
+  width: 400,
+  borderRadius: 8,
+};
