@@ -7,6 +7,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSave: (ev: AgendaEvent, isEdit?: boolean) => void;
+  onDelete?: (ev: AgendaEvent) => void;
   start: string;
   end: string;
   event?: AgendaEvent | null;
@@ -20,19 +21,7 @@ type Props = {
 };
 
 export default function EventModal({
-  isOpen,
-  onClose,
-  onSave,
-  start,
-  end,
-  event,
-  userPerfil,
-  userChatId,
-  userImage,
-  isAdmin,
-  perfilMap,
-  setPerfilMap,
-  profiles,
+  isOpen, onClose, onSave, onDelete, start, end, event, userPerfil, userChatId, userImage, isAdmin, perfilMap, setPerfilMap, profiles,
 }: Props) {
   const [title, setTitle] = useState('');
   const [perfil, setPerfil] = useState<Perfil>(userPerfil);
@@ -51,26 +40,26 @@ export default function EventModal({
       setConteudoSecundario(event.conteudoSecundario || '');
       setTarefaTitle(event.tarefa?.titulo || '');
       setLinkDrive(event.tarefa?.linkDrive || '');
-      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil]?.chatId || '');
-      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil]?.image || userImage);
+      setResponsavelChatId(event.tarefa?.responsavelChatId || perfilMap[event.perfil || userPerfil].chatId);
+      setPerfilImage(event.tarefa?.userImage || perfilMap[event.perfil || userPerfil].image || userImage);
       setStartDate(event.start);
       setEndDate(event.end);
     } else {
       setStartDate(start);
       setEndDate(end);
-      setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
-      setPerfilImage(perfilMap[perfil]?.image || userImage);
+      setResponsavelChatId(perfilMap[perfil].chatId);
+      setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, perfil, perfilMap, userPerfil, userImage, userChatId]);
+  }, [event, start, end, perfil, perfilMap, userPerfil, userImage]);
 
   useEffect(() => {
-    setResponsavelChatId(perfilMap[perfil]?.chatId || userChatId);
-    setPerfilImage(perfilMap[perfil]?.image || userImage);
-  }, [perfil, perfilMap, userImage, userChatId]);
+    setResponsavelChatId(perfilMap[perfil].chatId);
+    setPerfilImage(perfilMap[perfil].image || userImage);
+  }, [perfil, perfilMap, userImage]);
 
   if (!isOpen) return null;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const ev: AgendaEvent = {
       id: event?.id || String(Date.now()),
       start: startDate,
@@ -91,40 +80,26 @@ export default function EventModal({
           }
         : null,
     };
+    onSave(ev, !!event);
+    onClose();
+  };
 
-    try {
-      const res = await fetch('/api/agenda', {
-        method: event ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ev),
-      });
-      if (!res.ok) throw new Error('Erro ao salvar evento');
-
-      onSave(ev, !!event);
+  const handleDelete = () => {
+    if (event && onDelete) {
+      onDelete(event);
       onClose();
-    } catch (err) {
-      console.error('Erro ao salvar evento:', err);
-      alert('Erro ao salvar evento');
     }
   };
 
   return (
     <div style={overlay}>
       <div style={modal}>
-        {perfilImage && (
-          <img
-            src={perfilImage}
-            alt={perfil}
-            style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }}
-          />
-        )}
+        {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
         <label>Perfil responsável:</label>
         <select value={perfil} onChange={e => setPerfil(e.target.value as Perfil)}>
-          {profiles.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+          {profiles.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" />
@@ -136,20 +111,15 @@ export default function EventModal({
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={handleSave}>Salvar</button>
+          {event && <button onClick={handleDelete} style={{ background: '#ff4d4f', color: '#fff' }}>Excluir</button>}
+          <button onClick={onClose}>Fechar</button>
+        </div>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-};
+const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
 const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 400, borderRadius: 8 };
