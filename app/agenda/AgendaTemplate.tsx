@@ -1,11 +1,17 @@
 "use client";
 import React, { useState } from "react";
-import TopProfiles, { Profile } from "../components/TopProfiles";
+import TopProfiles from "../components/TopProfiles";
 import ClientCard from "../components/ClientCard";
 import CalendarGrid from "../components/CalendarGrid";
 import EventModal from "../components/EventModal";
 import SpotifyWidget from "../components/SpotifyWidget";
 import WhatsAppNotifications from "../components/WhatsAppNotifications";
+
+// Tipo local para perfis
+type Profile = {
+  name: string;
+  avatarUrl: string;
+};
 
 const AgendaTemplate: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
