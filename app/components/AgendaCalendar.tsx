@@ -1,241 +1,104 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import EventModal from './EventModal';
-import { useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import AgendaModal from './AgendaModal';
 
-export type Perfil = 'Confi' | 'Cecília' | 'Luiza' | 'Júlio';
+export type Perfil = 'Confi' | 'Luiza' | 'Cecília' | 'Júlio';
 
 export type AgendaEvent = {
-  id: string;
+  id: string; // ⚠️ string (FullCalendar exige)
+  title: string;
   start: string;
-  end: string;
-  tipoEvento?: string;
-  tipo?: string;
-  conteudoPrincipal?: string;
-  conteudoSecundario?: string;
-  cta?: string;
-  statusPostagem?: string;
+  end?: string;
   perfil?: Perfil;
   tarefa?: {
-    titulo: string;
-    responsavel: Perfil;
     responsavelChatId?: string;
     userImage?: string;
-    data: string;
-    status: string;
-    linkDrive?: string;
-    notificar?: string;
-  } | null;
-  allDay?: boolean;
+  };
 };
 
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
+type PerfilConfig = {
+  chatId: string;
+  image: string;
 };
 
-const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
-
-// Mapeamento perfil → chatId + imagem
-const perfilMap: Record<Perfil, { chatId: string; image?: string }> = {
-  Confi: { chatId: 'confi@email.com', image: '/images/confi.png' },
-  Cecília: { chatId: 'cecilia@email.com', image: '/images/cecilia.png' },
-  Luiza: { chatId: 'luiza@email.com', image: '/images/luiza.png' },
-  Júlio: { chatId: 'julio@email.com', image: '/images/julio.png' },
-};
-
-type Props = {
-  isAdmin?: boolean;
-};
-
-export default function AgendaCalendar({ isAdmin = false }: Props) {
-  const { data: session } = useSession();
-  const userEmail = session?.user?.email || '';
-  const userName = session?.user?.name || '';
-  const userImage = session?.user?.image || '';
-
+export default function AgendaCalendar({ isAdmin }: { isAdmin: boolean }) {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [filterProfile, setFilterProfile] = useState<Perfil | 'Todos'>('Confi');
-
-  const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
-  const [selectedDate, setSelectedDate] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [perfilMap, setPerfilMap] = useState<Record<Perfil, PerfilConfig>>({} as any);
 
-  const [showProfileInfo, setShowProfileInfo] = useState(false);
-
-  const today = new Date().toISOString().slice(0, 10);
-
+  // 🔹 Carregar eventos
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then(setEvents)
-      .catch(console.error);
+      .then(data =>
+        setEvents(
+          data.map((e: any) => ({
+            ...e,
+            id: String(e.id), // 🔥 garante compatibilidade
+          }))
+        )
+      );
   }, []);
 
+  // 🔹 Carregar perfis
   useEffect(() => {
-    fetch('/api/checklist')
+    fetch('/api/perfil')
       .then(res => res.json())
-      .then((data: ChecklistItem[]) => {
-        const todayTasks = data.filter(item => item.date?.slice(0, 10) === today && !item.done);
-        setChecklist(todayTasks);
-      })
-      .catch(console.error);
-  }, [today]);
+      .then(data => {
+        const map: any = {};
+        data.forEach((p: any) => {
+          map[p.perfil] = { chatId: p.chatId, image: p.image };
+        });
+        setPerfilMap(map);
+      });
+  }, []);
 
-  const saveEvent = async (ev: AgendaEvent, isEdit = false) => {
-    const method = isEdit ? 'PATCH' : 'POST';
-
-    await fetch('/api/agenda', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ev),
-    });
-
-    if (isEdit) setEvents(prev => prev.map(e => (e.id === ev.id ? ev : e)));
-    else setEvents(prev => [...prev, ev]);
-  };
-
-  const deleteEvent = async (id: string) => {
-    await fetch('/api/agenda', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-
-    setEvents(prev => prev.filter(e => e.id !== id));
-    setChecklist(prev => prev.filter(c => c.id !== id));
-    setModalOpen(false);
-  };
-
-  const toggleChecklistItem = async (item: ChecklistItem) => {
-    setChecklist(prev => prev.filter(c => c.id !== item.id));
-    await fetch('/api/checklist', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id }),
-    });
-  };
-
-  const filteredEvents = events.filter(
-    e => filterProfile === 'Todos' || e.perfil === filterProfile
-  );
-
-  const perfilColors: Record<Perfil, string> = {
-    Confi: '#ffce0a',
-    Cecília: '#f5886c',
-    Luiza: '#1260c7',
-    Júlio: '#00b894',
-  };
+  function getPerfilConfig(perfil?: Perfil): PerfilConfig {
+    return perfil && perfilMap[perfil]
+      ? perfilMap[perfil]
+      : { chatId: '', image: '' };
+  }
 
   return (
-    <div style={{ display: 'flex', gap: 24 }}>
-      {/* Painel esquerdo com foto do usuário */}
-      <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setShowProfileInfo(!showProfileInfo)}>
-          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
-        </div>
-        {showProfileInfo && (
-          <div style={{ marginTop: 8, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-            <p><strong>Nome:</strong> {userName}</p>
-            <p><strong>E-mail:</strong> {userEmail}</p>
-            <p><strong>Responsável Chat ID:</strong> {perfilMap[userName as Perfil]?.chatId || 'N/A'}</p>
-          </div>
-        )}
-      </div>
+    <>
+      <FullCalendar
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        initialView="dayGridMonth"
+        headerToolbar={{
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay',
+        }}
+        events={events}
+        selectable
+        eventClick={info => {
+          const ev = events.find(e => e.id === info.event.id);
+          if (ev) setSelectedEvent(ev);
+        }}
+      />
 
-      {/* Agenda */}
-      <div style={{ flex: 3 }}>
-        <label style={{ marginBottom: 12, display: 'block' }}>
-          Filtrar por perfil:{' '}
-          <select value={filterProfile} onChange={e => setFilterProfile(e.target.value as Perfil | 'Todos')}>
-            <option value="Todos">Todos</option>
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </label>
-
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          selectable
-          editable
-          events={filteredEvents.map(ev => ({
-            id: ev.id,
-            title: ev.conteudoPrincipal,
-            start: ev.start,
-            end: ev.end,
-            backgroundColor: ev.perfil ? perfilColors[ev.perfil] : '#999',
-            borderColor: '#000',
-            textColor: '#000',
-          }))}
-          select={info => {
-            setSelectedEvent(null);
-            setSelectedDate({ start: info.startStr, end: info.endStr });
-            setModalOpen(true);
-          }}
-          eventClick={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) {
-              setSelectedEvent(ev);
-              setSelectedDate({ start: ev.start, end: ev.end });
-              setModalOpen(true);
-            }
-          }}
-          eventDrop={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
-          eventResize={info => {
-            const ev = events.find(e => e.id === info.event.id);
-            if (ev) saveEvent({ ...ev, start: info.event.startStr, end: info.event.endStr }, true);
-          }}
-          height="auto"
-        />
-      </div>
-
-      {/* Checklist do usuário */}
-      <div style={{ flex: 1, borderLeft: '1px solid #ccc', paddingLeft: 16 }}>
-        <h3>Checklist Hoje</h3>
-        {checklist.length === 0 && <p>Sem tarefas para hoje ✅</p>}
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {checklist.map(item => (
-            <li key={item.id} style={{ marginBottom: 6 }}>
-              {item.task} ({item.client})
-              <button
-                style={{ marginLeft: 8, background: '#1260c7', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '2px 6px' }}
-                onClick={() => toggleChecklistItem(item)}
-              >
-                ✅
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Modal de evento */}
-      {modalOpen && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
+      {selectedEvent && (
+        <AgendaModal
           event={selectedEvent}
-          onSave={saveEvent}
-          onDelete={deleteEvent}
+          perfilConfig={getPerfilConfig(selectedEvent.perfil)}
+          perfilMap={perfilMap}
           isAdmin={isAdmin}
-          userPerfil={userName as Perfil}
-          userChatId={userEmail}
-          userImage={userImage}
+          onClose={() => setSelectedEvent(null)}
+          onSaved={() => {
+            setSelectedEvent(null);
+            fetch('/api/agenda')
+              .then(res => res.json())
+              .then(data =>
+                setEvents(data.map((e: any) => ({ ...e, id: String(e.id) })))
+              );
+          }}
         />
       )}
-    </div>
+    </>
   );
 }
