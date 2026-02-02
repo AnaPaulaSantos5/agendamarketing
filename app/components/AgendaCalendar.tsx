@@ -17,7 +17,7 @@ export type AgendaEvent = {
   tipoEvento?: string;
   tipo?: string;
   conteudoPrincipal?: string;
-  conteudoSecundario?: string; // corrigido aqui
+  conteudoSecundario?: string;
   statusPostagem?: string;
   perfil?: Perfil;
   tarefa?: {
@@ -33,14 +33,6 @@ export type AgendaEvent = {
   allDay?: boolean;
 };
 
-export type ChecklistItem = {
-  id: string;
-  date: string;
-  client: string;
-  task: string;
-  done: boolean;
-};
-
 const profiles: Perfil[] = ['Confi', 'Cecília', 'Luiza', 'Júlio'];
 
 type Props = { isAdmin?: boolean };
@@ -48,7 +40,6 @@ type Props = { isAdmin?: boolean };
 export default function AgendaCalendar({ isAdmin = false }: Props) {
   const { data: session } = useSession();
   const userEmail = session?.user?.email || '';
-  const userName = session?.user?.name || '';
   const userImage = session?.user?.image || '';
 
   const [events, setEvents] = useState<AgendaEvent[]>([]);
@@ -65,6 +56,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
+  // Carrega eventos da planilha
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
@@ -72,49 +64,51 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
       .catch(console.error);
   }, []);
 
+  // Função para salvar chatId de qualquer perfil
   const savePerfil = async (perfil: Perfil) => {
     try {
-      const chatId = perfilMap[perfil].chatId;
+      const chatId = perfilMap[perfil]?.chatId;
+      if (!chatId) return alert(`ChatID vazio para ${perfil}`);
+
+      console.log('Enviando para API:', { perfil, chatId });
       const res = await fetch('/api/perfil', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ perfil, chatId }),
       });
 
-      if (!res.ok) throw new Error('Erro ao salvar ChatID');
-      alert('Responsável ChatID salvo!');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao salvar ChatID');
+      const data = await res.json();
+      console.log('Resposta da API:', data);
+
+      if (!res.ok) throw new Error(data.error || 'Erro desconhecido');
+
+      alert(`Responsável ChatID de ${perfil} salvo com sucesso!`);
+    } catch (err: any) {
+      console.error('Erro no savePerfil:', err);
+      alert(`Erro ao salvar ChatID: ${err.message || err}`);
     }
   };
 
   const filteredEvents = events.filter(e => filterProfile === 'Todos' || e.perfil === filterProfile);
+
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
 
   return (
-    <div style={{ display: 'flex', gap: 24 }}>
+    <div style={{ display: 'flex', gap: 24, backgroundColor: '#f0f4f8', padding: 12 }}>
       {/* Painel esquerdo */}
-      <div style={{ flex: 0.3, textAlign: 'center' }}>
-        <div style={{ cursor: 'pointer', display: 'inline-block' }} onClick={() => setModalOpen(!modalOpen)}>
-          <img src={userImage} alt={userName} style={{ width: 60, height: 60, borderRadius: '50%' }} />
-        </div>
-        {isUserAdmin && (
-          <div style={{ marginTop: 12, textAlign: 'left', border: '1px solid #ccc', padding: 8, borderRadius: 4 }}>
-            <h4>Atualizar Chat IDs dos perfis</h4>
-            {profiles.map(p => (
-              <div key={p} style={{ marginBottom: 6 }}>
-                <label>{p}: </label>
-                <input
-                  value={perfilMap[p].chatId}
-                  onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
-                  style={{ width: '70%' }}
-                />
-                <button onClick={() => savePerfil(p)} style={{ marginLeft: 6 }}>Salvar</button>
-              </div>
-            ))}
+      <div style={{ flex: 0.3, textAlign: 'center', border: '1px solid #ccc', borderRadius: 8, padding: 8 }}>
+        <h3>Perfis e ChatIDs</h3>
+        {profiles.map(p => (
+          <div key={p} style={{ marginBottom: 12 }}>
+            <p><strong>{p}</strong></p>
+            <input
+              value={perfilMap[p]?.chatId || ''}
+              onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
+              disabled={!isUserAdmin}
+            />
+            {isUserAdmin && <button onClick={() => savePerfil(p)}>Salvar</button>}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Agenda */}
@@ -145,27 +139,27 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
           eventClick={info => { const ev = events.find(e => e.id === info.event.id); if (ev) { setSelectedEvent(ev); setSelectedDate({ start: ev.start, end: ev.end }); setModalOpen(true); } }}
           height="auto"
         />
-      </div>
 
-      {/* Modal */}
-      {modalOpen && (
-        <EventModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          start={selectedDate.start}
-          end={selectedDate.end}
-          event={selectedEvent}
-          onSave={() => {}}
-          onDelete={() => {}}
-          isAdmin={isUserAdmin}
-          userPerfil={userName as Perfil}
-          userChatId={perfilMap[userName as Perfil]?.chatId || ''}
-          userImage={userImage}
-          perfilMap={perfilMap}
-          setPerfilMap={setPerfilMap}
-          profiles={profiles}
-        />
-      )}
+        {/* Modal de eventos */}
+        {modalOpen && selectedDate && (
+          <EventModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            start={selectedDate.start}
+            end={selectedDate.end}
+            event={selectedEvent}
+            onSave={() => {}}
+            onDelete={() => {}}
+            isAdmin={isUserAdmin}
+            userPerfil={userEmail as Perfil} // apenas para preencher modal
+            userChatId={''}
+            userImage={userImage}
+            perfilMap={perfilMap}
+            setPerfilMap={setPerfilMap}
+            profiles={profiles}
+          />
+        )}
+      </div>
     </div>
   );
 }
