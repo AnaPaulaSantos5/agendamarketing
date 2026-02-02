@@ -5,32 +5,43 @@ import ClientCard from "../components/ClientCard";
 import CalendarGrid from "../components/CalendarGrid";
 import EventModal from "../components/EventModal";
 import SpotifyWidget from "../components/SpotifyWidget";
-import "./AgendaTemplate.css";
+import WhatsAppNotifications from "../components/WhatsAppNotifications";
 
 const AgendaTemplate: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Exemplo de perfil de clientes (apenas visual)
+  const client = {
+    name: "Nome Cliente",
+    email: "cliente@email.com",
+    phone: "12345",
+    checklist: ["Revisar documento", "Confirmar reunião"]
+  };
+
   return (
-    <div className="agenda-template">
+    <div className="agenda-container">
       {/* Topo com perfis */}
       <header className="agenda-header">
-        <TopProfiles />
+        <TopProfiles profiles={["Confi", "Luiza", "Júlio", "Cecília"]} />
       </header>
 
+      {/* Corpo da agenda */}
       <div className="agenda-body">
-        {/* Lateral esquerda com cliente */}
-        <aside className="agenda-left">
-          <ClientCard />
+        {/* Lateral esquerda: foto do cliente, dados e checklist */}
+        <aside className="agenda-sidebar">
+          <ClientCard client={client} />
+          <button onClick={() => setModalOpen(true)}>+ Adicionar Evento</button>
         </aside>
 
         {/* Calendário central */}
-        <main className="agenda-center">
+        <main className="agenda-calendar">
           <CalendarGrid />
         </main>
 
-        {/* Lateral direita com Spotify */}
+        {/* Lateral direita: Spotify e notificações */}
         <aside className="agenda-right">
-          <SpotifyWidget />
+          <SpotifyWidget playlistUrl="https://open.spotify.com/playlist/..." />
+          <WhatsAppNotifications />
         </aside>
       </div>
 
@@ -39,14 +50,6 @@ const AgendaTemplate: React.FC = () => {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
       />
-
-      {/* Botão flutuante para abrir modal */}
-      <button
-        className="floating-add-event"
-        onClick={() => setModalOpen(true)}
-      >
-        + Adicionar Evento
-      </button>
     </div>
   );
 };
