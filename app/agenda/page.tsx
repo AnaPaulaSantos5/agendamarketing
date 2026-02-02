@@ -1,36 +1,35 @@
-'use client';
+"use client"; // necessário para usar useState, useEffect
 
 import React, { useState } from 'react';
 import TopProfiles from '@/app/components/TopProfiles';
 import ClientCard from '@/app/components/ClientCard';
 import CalendarGrid from '@/app/components/CalendarGrid';
 import EventModal from '@/app/components/EventModal';
-import Checklist from '@/app/components/Checklist';
-import SpotifyWidget from '@/app/components/SpotifyWidget';
 import WhatsAppNotifications from '@/app/components/WhatsAppNotifications';
 
 export default function AgendaPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#f5f5f5' }}>
-      
-      {/* Lateral Esquerda */}
-      <div style={{ width: 300, padding: 16, borderRight: '1px solid #ddd', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="agenda-page flex">
+      {/* Lateral esquerda: cliente */}
+      <div className="client-panel w-1/4 p-4 border-r">
         <ClientCard />
-        <Checklist />
       </div>
 
-      {/* Calendário Central */}
-      <div style={{ flex: 1, padding: 16, position: 'relative' }}>
+      {/* Centro: calendário */}
+      <div className="calendar-panel flex-1 p-4">
         <TopProfiles />
         <CalendarGrid onEventClick={() => setModalOpen(true)} />
       </div>
 
-      {/* Lateral Direita */}
-      <div style={{ width: 300, padding: 16, borderLeft: '1px solid #ddd', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <SpotifyWidget />
+      {/* Lateral direita: notificações */}
+      <div className="notifications-panel w-1/4 p-4 border-l">
         <WhatsAppNotifications />
+        {/* SpotifyPlaceholder */}
+        <div className="spotify-placeholder mt-4 p-2 border rounded">
+          Spotify Widget Aqui
+        </div>
       </div>
 
       {/* Modal de evento */}
