@@ -55,16 +55,34 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
 
   const isUserAdmin = isAdmin || userEmail === 'ana.paulinhacarneirosantos@gmail.com';
 
+  // 🔹 Carrega eventos e sincroniza perfilMap
   useEffect(() => {
     fetch('/api/agenda')
       .then(res => res.json())
-      .then(setEvents)
+      .then(eventsData => {
+        setEvents(eventsData);
+
+        // Reconstrói perfilMap com base na planilha
+        const newPerfilMap: Record<Perfil, { chatId: string; image?: string }> = { ...perfilMap };
+
+        eventsData.forEach(ev => {
+          if (ev.tarefa && ev.perfil) {
+            newPerfilMap[ev.perfil] = {
+              chatId: ev.tarefa.responsavelChatId || newPerfilMap[ev.perfil]?.chatId || '',
+              image: newPerfilMap[ev.perfil]?.image,
+            };
+          }
+        });
+
+        setPerfilMap(newPerfilMap);
+      })
       .catch(console.error);
   }, []);
 
+  // 🔹 Salva chatId alterado pelo admin
   const savePerfil = async (perfil: Perfil) => {
     try {
-      const chatId = perfilMap[perfil].chatId;
+      const chatId = perfilMap[perfil]?.chatId || '';
       const res = await fetch('/api/perfil', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -79,7 +97,21 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
   };
 
   const handleEventSave = (ev: AgendaEvent, isEdit?: boolean) => {
-    setEvents(prev => isEdit ? prev.map(e => e.id === ev.id ? ev : e) : [...prev, ev]);
+    setEvents(prev => {
+      if (isEdit) return prev.map(e => (e.id === ev.id ? ev : e));
+      return [...prev, ev];
+    });
+
+    // Atualiza perfilMap se tiver chatId novo
+    if (ev.perfil && ev.tarefa?.responsavelChatId) {
+      setPerfilMap(prev => ({
+        ...prev,
+        [ev.perfil]: {
+          chatId: ev.tarefa.responsavelChatId,
+          image: prev[ev.perfil]?.image,
+        },
+      }));
+    }
   };
 
   const perfilColors: Record<Perfil, string> = { Confi: '#ffce0a', Cecília: '#f5886c', Luiza: '#1260c7', Júlio: '#00b894' };
@@ -102,7 +134,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
                   <div key={p} style={{ marginBottom: 6 }}>
                     <label>{p}: </label>
                     <input
-                      value={perfilMap[p].chatId}
+                      value={perfilMap[p]?.chatId || ''}
                       onChange={e => setPerfilMap({ ...perfilMap, [p]: { ...perfilMap[p], chatId: e.target.value } })}
                       style={{ width: '70%' }}
                     />
@@ -115,7 +147,7 @@ export default function AgendaCalendar({ isAdmin = false }: Props) {
         )}
       </div>
 
-      {/* Agenda */}
+      {/* Agenda em blocos */}
       <div style={{ flex: 3 }}>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
