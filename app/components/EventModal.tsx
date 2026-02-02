@@ -33,6 +33,7 @@ export default function EventModal({
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
 
+  // Atualiza campos quando muda evento ou perfil
   useEffect(() => {
     if (event) {
       setTitle(event.conteudoPrincipal || '');
@@ -49,12 +50,12 @@ export default function EventModal({
       setResponsavelChatId(perfilMap[perfil].chatId);
       setPerfilImage(perfilMap[perfil].image || userImage);
     }
-  }, [event, start, end, userPerfil, userImage, perfilMap, perfil]);
+  }, [event, start, end, perfilMap, userPerfil, userImage, perfil]);
 
   useEffect(() => {
     setResponsavelChatId(perfilMap[perfil].chatId);
     setPerfilImage(perfilMap[perfil].image || userImage);
-  }, [perfil, userImage, perfilMap]);
+  }, [perfil, perfilMap, userImage]);
 
   if (!isOpen) return null;
 
@@ -82,8 +83,8 @@ export default function EventModal({
   };
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#fff', padding: 24, width: 400, borderRadius: 8, border: '2px solid #1260c7' /* detalhe visual diferente */ }}>
         {perfilImage && <img src={perfilImage} alt={perfil} style={{ width: 50, height: 50, borderRadius: '50%', float: 'left', marginRight: 12 }} />}
         <h3>{event ? 'Editar Evento' : 'Novo Evento'}</h3>
 
@@ -101,16 +102,12 @@ export default function EventModal({
         <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
         <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
 
-        <button onClick={handleSave}>Salvar</button>
-        <button onClick={onClose}>Fechar</button>
-        <button
-          onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event?.id || ''); }}
-          style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4, marginLeft: 8 }}
-        >Excluir</button>
+        <div style={{ marginTop: 12 }}>
+          <button onClick={handleSave} style={{ marginRight: 6 }}>Salvar</button>
+          <button onClick={onClose} style={{ marginRight: 6 }}>Fechar</button>
+          {event && <button onClick={() => { if (confirm('Deseja realmente excluir este evento?')) onDelete(event.id); }} style={{ backgroundColor: '#ff4d4f', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4 }}>Excluir</button>}
+        </div>
       </div>
     </div>
   );
 }
-
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modal: React.CSSProperties = { background: '#fff', padding: 20, width: 360, borderRadius: 8 };
