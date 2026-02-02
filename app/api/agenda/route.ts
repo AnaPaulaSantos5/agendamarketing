@@ -8,7 +8,6 @@ async function accessSpreadsheet() {
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
     private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
   });
-
   await doc.loadInfo();
 
   return {
@@ -17,30 +16,22 @@ async function accessSpreadsheet() {
   };
 }
 
-/**
- * ✅ Sempre retorna data válida para FullCalendar + Google Sheets
- */
 function normalizeDate(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+  return d.toISOString().slice(0, 16);
 }
 
-/**
- * ✅ Formato para planilha
- */
 function formatDateForSheet(dateStr?: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
-
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   const hh = String(d.getHours()).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
-
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
@@ -50,16 +41,12 @@ function formatDateForSheet(dateStr?: string) {
 export async function GET() {
   try {
     const { agendaSheet, tarefasSheet } = await accessSpreadsheet();
-
     const agendaRows = await agendaSheet.getRows();
     const tarefasRows = await tarefasSheet.getRows();
 
     const events = agendaRows.map(row => {
       const blocoId = String(row._rowNumber);
-
-      const tarefa = tarefasRows.find(
-        t => String(t.Bloco_ID) === blocoId
-      );
+      const tarefa = tarefasRows.find(t => String(t.Bloco_ID) === blocoId);
 
       return {
         id: blocoId,
@@ -158,14 +145,9 @@ export async function PATCH(req: NextRequest) {
 
     if (data.tarefa) {
       const tarefasRows = await tarefasSheet.getRows();
-      let tarefaRow = tarefasRows.find(
-        t => String(t.Bloco_ID) === data.id
-      );
-
+      let tarefaRow = tarefasRows.find(t => String(t.Bloco_ID) === data.id);
       if (!tarefaRow) {
-        tarefaRow = await tarefasSheet.addRow({
-          Bloco_ID: data.id,
-        });
+        tarefaRow = await tarefasSheet.addRow({ Bloco_ID: data.id });
       }
 
       tarefaRow.Titulo = data.tarefa.titulo;
