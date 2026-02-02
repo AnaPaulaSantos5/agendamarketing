@@ -1,25 +1,42 @@
-'use client';
-import React from 'react';
+"use client";
+import React from "react";
+import "./EventModal.css";
 
-export default function EventModal({ open, onClose }: { open: boolean, onClose: () => void }) {
+type EventModalProps = {
+  open: boolean;
+  onClose: () => void;
+};
+
+const EventModal: React.FC<EventModalProps> = ({ open, onClose }) => {
   if (!open) return null;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-    }}>
-      <div style={{ background: '#fff', padding: 24, borderRadius: 8, width: 400 }}>
-        <h3>Título do Evento</h3>
-        <p>Conteúdo secundário</p>
-        <input placeholder="Link Drive" style={{ width: '100%', marginBottom: 8 }} />
-        <input type="datetime-local" style={{ width: '100%', marginBottom: 8 }} />
-        <input type="datetime-local" style={{ width: '100%', marginBottom: 8 }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+    <div className="modal-backdrop">
+      <div className="modal-content">
+        <h2>Título do Evento</h2>
+        <textarea placeholder="Conteúdo secundário..." />
+        <input type="text" placeholder="Link do Drive" />
+        <div className="profile-selection">
+          <div className="profile-item">
+            <img src="/profiles/confi.png" alt="Confi" />
+            <span>Confi</span>
+          </div>
+          <div className="profile-item">
+            <img src="/profiles/luiza.png" alt="Luiza" />
+            <span>Luiza</span>
+          </div>
+        </div>
+        <div className="date-time">
+          <input type="date" />
+          <input type="time" />
+        </div>
+        <div className="modal-actions">
           <button onClick={onClose}>Fechar</button>
-          <button>Salvar</button>
+          <button>Criar Evento</button>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default EventModal;
