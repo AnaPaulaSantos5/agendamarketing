@@ -1,5 +1,5 @@
 import React from 'react';
-import { Profile } from '../types';
+import { Profile } from '../../types';
 
 interface TopProfilesProps {
   profiles: Profile[];
