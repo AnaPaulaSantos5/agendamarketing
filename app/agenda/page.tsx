@@ -1,39 +1,77 @@
-"use client"; // necessário para usar useState, useEffect
+"use client";
 
-import React, { useState } from 'react';
-import TopProfiles from '@/app/components/TopProfiles';
-import ClientCard from '@/app/components/ClientCard';
-import CalendarGrid from '@/app/components/CalendarGrid';
-import EventModal from '@/app/components/EventModal';
-import WhatsAppNotifications from '@/app/components/WhatsAppNotifications';
+import React, { useState } from "react";
+
+// Components
+import TopProfiles from "../components/TopProfiles";
+import ClientCard from "../components/ClientCard";
+import CalendarGrid from "../components/CalendarGrid";
+import EventModal from "../components/EventModal";
+import SpotifyWidget from "../components/SpotifyWidget";
+import WhatsAppWidget from "../components/WhatsAppWidget";
+
+// Definindo interface Profile mínima para TopProfiles
+interface Profile {
+  name: string;
+  photoUrl?: string;
+}
+
+// Cliente de teste
+const testClients = [
+  {
+    name: "Confi Seguros",
+    status: "Ativo",
+    tasks: ["Segurança Residencial", "Consórcio Imóvel"]
+  },
+  {
+    name: "Luiza",
+    status: "Ativo",
+    tasks: ["Seguro Auto", "Vida Individual"]
+  }
+];
+
+// Perfis de teste
+const profiles: Profile[] = [
+  { name: "Confi" },
+  { name: "Luiza" },
+  { name: "Júlio" },
+  { name: "Cecília" }
+];
 
 export default function AgendaPage() {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   return (
-    <div className="agenda-page flex">
+    <div className="agenda-container flex h-screen">
       {/* Lateral esquerda: cliente */}
       <div className="client-panel w-1/4 p-4 border-r">
-        <ClientCard />
+        <h3>Clientes</h3>
+        {testClients.map((client, idx) => (
+          <ClientCard key={idx} client={client} />
+        ))}
       </div>
 
       {/* Centro: calendário */}
-      <div className="calendar-panel flex-1 p-4">
-        <TopProfiles />
-        <CalendarGrid onEventClick={() => setModalOpen(true)} />
+      <div className="calendar-panel w-1/2 p-4">
+        {/* Topo com perfis */}
+        <header className="agenda-header mb-4">
+          <TopProfiles profiles={profiles} />
+        </header>
+
+        {/* Calendário */}
+        <CalendarGrid />
+
+        {/* Modal de eventos */}
+        {selectedEvent && (
+          <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        )}
       </div>
 
-      {/* Lateral direita: notificações */}
-      <div className="notifications-panel w-1/4 p-4 border-l">
-        <WhatsAppNotifications />
-        {/* SpotifyPlaceholder */}
-        <div className="spotify-placeholder mt-4 p-2 border rounded">
-          Spotify Widget Aqui
-        </div>
+      {/* Lateral direita: widgets */}
+      <div className="widgets-panel w-1/4 p-4 border-l flex flex-col gap-4">
+        <SpotifyWidget />
+        <WhatsAppWidget />
       </div>
-
-      {/* Modal de evento */}
-      <EventModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   );
 }
