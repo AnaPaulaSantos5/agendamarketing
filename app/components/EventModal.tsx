@@ -1,6 +1,6 @@
 // components/EventModal.tsx
 import React from "react";
-import { Event } from "../types"; // ajuste para onde seu tipo Event está
+import { Event } from "../../types"; // ajuste para onde seu tipo Event está
 
 interface EventModalProps {
   event: Event;
