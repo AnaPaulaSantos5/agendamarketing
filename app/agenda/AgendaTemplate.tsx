@@ -3,12 +3,18 @@
 import React, { useState } from "react";
 
 // Components
-import TopProfiles, { Profile } from "../components/TopProfiles";
+import TopProfiles from "../components/TopProfiles";
 import ClientCard from "../components/ClientCard";
 import CalendarGrid from "../components/CalendarGrid";
 import EventModal from "../components/EventModal";
 import SpotifyWidget from "../components/SpotifyWidget";
 import WhatsAppWidget from "../components/WhatsAppWidget";
+
+// Definindo a interface Profile aqui para não depender de TopProfiles
+interface Profile {
+  name: string;
+  photoUrl: string;
+}
 
 // Dados de teste
 const testProfiles: Profile[] = [
