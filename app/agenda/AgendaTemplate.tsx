@@ -1,11 +1,11 @@
 import React from 'react';
-import TopProfiles from './TopProfiles';
-import ClientCard from './ClientCard';
-import CalendarGrid from './CalendarGrid';
-import EventModal from './EventModal';
-import WhatsAppWidget from './WhatsAppWidget';
-import SpotifyWidget from './SpotifyWidget';
-import { Profile, Client } from '../types';
+import TopProfiles from '../components/TopProfiles'
+import ClientCard from '../components/ClientCard'
+import CalendarGrid from '../components/CalendarGrid'
+import EventModal from '../components/EventModal'
+import WhatsAppWidget from '../components/WhatsAppWidget'
+import SpotifyWidget from '../components/SpotifyWidget'
+import { Profile, Client } from '../components/types'
 
 const profiles: Profile[] = [
   { name: 'Ana', role: 'Designer', photoUrl: '/ana.jpg' },
