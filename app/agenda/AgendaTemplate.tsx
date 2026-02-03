@@ -2,7 +2,7 @@
 
 import React from "react";
 
-// Tipos
+// Tipo unificado usado em todo o arquivo
 interface Profile {
   name: string;
   photoUrl: string;
@@ -78,7 +78,7 @@ export default function AgendaTemplate() {
         <TopProfiles profiles={profiles} />
       </header>
 
-      {/* Painel de clientes */}
+      {/* Painel de clientes + widgets */}
       <div className="flex gap-4">
         <div className="client-panel w-full md:w-1/4 p-4 border-r">
           <h3 className="text-lg font-bold mb-2">Clientes</h3>
@@ -87,7 +87,6 @@ export default function AgendaTemplate() {
           ))}
         </div>
 
-        {/* Widgets */}
         <div className="flex flex-col flex-1 gap-4">
           <SpotifyWidget />
           <WhatsAppWidget />
