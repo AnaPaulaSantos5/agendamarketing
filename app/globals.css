@@ -1,5 +1,11 @@
-body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 0;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilização para deixar o Calendário com cara de Dashboard Moderno */
+.fc { @apply font-sans border-none; }
+.fc .fc-toolbar-title { @apply text-xl font-extrabold text-slate-800; }
+.fc .fc-button-primary { @apply bg-slate-900 border-none hover:bg-slate-700 transition-colors shadow-sm; }
+.fc .fc-col-header-cell { @apply bg-slate-50 py-3 text-xs uppercase tracking-wider text-slate-500 font-bold; }
+.fc-daygrid-day { @apply border-slate-100 !important; }
+.fc-event { @apply border-none shadow-sm font-medium text-[10px] p-1 rounded-md cursor-pointer hover:opacity-80; }
