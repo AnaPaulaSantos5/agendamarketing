@@ -1,91 +1,98 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 
-// Components
-import TopProfiles from "../components/TopProfiles";
-import ClientCard from "../components/ClientCard";
-import CalendarGrid from "../components/CalendarGrid";
-import EventModal from "../components/EventModal";
-import SpotifyWidget from "../components/SpotifyWidget";
-import WhatsAppWidget from "../components/WhatsAppWidget";
-
-// Definindo a interface Profile aqui para não depender de TopProfiles
+// Tipos
 interface Profile {
   name: string;
   photoUrl: string;
 }
 
-// Dados de teste
-const testProfiles: Profile[] = [
-  { name: "Confi", photoUrl: "https://via.placeholder.com/40" },
-  { name: "Luiza", photoUrl: "https://via.placeholder.com/40" },
-  { name: "Júlio", photoUrl: "https://via.placeholder.com/40" },
-  { name: "Cecília", photoUrl: "https://via.placeholder.com/40" },
+interface Client {
+  name: string;
+  status: string;
+  tasks: string[];
+}
+
+// Dados de exemplo
+const profiles: Profile[] = [
+  { name: "Confi", photoUrl: "/images/confi.jpg" },
+  { name: "Luiza", photoUrl: "/images/luiza.jpg" },
+  { name: "Júlio", photoUrl: "/images/julio.jpg" },
+  { name: "Cecília", photoUrl: "/images/cecilia.jpg" },
 ];
 
-const testClients = [
-  { name: "Cliente A", status: "Pendente", tasks: ["Enviar proposta", "Confirmar reunião"] },
-  { name: "Cliente B", status: "Concluído", tasks: ["Reunião realizada", "Checklist preenchido"] },
-  { name: "Cliente C", status: "Em andamento", tasks: ["Documentação pendente"] },
+const testClients: Client[] = [
+  { name: "Cliente 1", status: "Ativo", tasks: ["Tarefa A", "Tarefa B"] },
+  { name: "Cliente 2", status: "Pendente", tasks: ["Tarefa C"] },
+  { name: "Cliente 3", status: "Ativo", tasks: ["Tarefa D", "Tarefa E", "Tarefa F"] },
 ];
 
-const AgendaTemplate: React.FC = () => {
-  const [modalOpen, setModalOpen] = useState(false);
+// Componentes internos
+const TopProfiles: React.FC<{ profiles: Profile[] }> = ({ profiles }) => (
+  <div className="flex gap-4">
+    {profiles.map((p, idx) => (
+      <div key={idx} className="flex flex-col items-center">
+        <img
+          src={p.photoUrl}
+          alt={p.name}
+          className="w-12 h-12 rounded-full object-cover"
+        />
+        <span className="text-sm mt-1">{p.name}</span>
+      </div>
+    ))}
+  </div>
+);
 
+const ClientCard: React.FC<{ client: Client }> = ({ client }) => (
+  <div className="p-2 mb-2 border rounded">
+    <h4 className="font-bold">{client.name}</h4>
+    <p>Status: {client.status}</p>
+    <ul className="list-disc ml-4">
+      {client.tasks.map((task, idx) => (
+        <li key={idx}>{task}</li>
+      ))}
+    </ul>
+  </div>
+);
+
+const SpotifyWidget: React.FC = () => (
+  <div className="p-2 bg-green-500 text-white text-center rounded">
+    Spotify Widget
+  </div>
+);
+
+const WhatsAppWidget: React.FC = () => (
+  <div className="p-2 bg-[#25D366] text-white text-center rounded">
+    WhatsApp Widget
+  </div>
+);
+
+// Template principal
+export default function AgendaTemplate() {
   return (
-    <div className="agenda-container" style={{ display: "flex", flexDirection: "column", fontFamily: "Arial, sans-serif" }}>
-      
+    <div className="agenda-template flex flex-col p-4 gap-6">
+
       {/* Topo com perfis */}
-      <header className="agenda-header" style={{ display: "flex", justifyContent: "space-between", padding: "10px", background: "#f0f0f0" }}>
-        <h2>Agenda Marketing</h2>
-        <TopProfiles profiles={testProfiles} />
+      <header className="agenda-header mb-4">
+        <TopProfiles profiles={profiles} />
       </header>
 
-      {/* Corpo da agenda */}
-      <div className="agenda-body" style={{ display: "flex", gap: "20px", padding: "20px" }}>
-        
-        {/* Calendário */}
-        <div className="calendar-section" style={{ flex: 2 }}>
-          <CalendarGrid />
+      {/* Painel de clientes */}
+      <div className="flex gap-4">
+        <div className="client-panel w-full md:w-1/4 p-4 border-r">
+          <h3 className="text-lg font-bold mb-2">Clientes</h3>
+          {testClients.map((client, idx) => (
+            <ClientCard key={idx} client={client} />
+          ))}
         </div>
 
-        {/* Painel lateral */}
-        <aside className="sidebar" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "20px" }}>
-          
-          {/* Clientes */}
-          <div className="clients-panel" style={{ background: "#fff", padding: "10px", borderRadius: "8px", boxShadow: "0 0 5px rgba(0,0,0,0.1)" }}>
-            <h3>Clientes</h3>
-            {testClients.map((client, idx) => (
-              <ClientCard key={idx} client={client} />
-            ))}
-          </div>
-
-          {/* Widgets */}
-          <div className="widgets-panel" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <SpotifyWidget />
-            <WhatsAppWidget />
-          </div>
-
-          {/* Botão abrir modal */}
-          <button
-            style={{ padding: "10px", borderRadius: "5px", background: "#0070f3", color: "#fff", border: "none", cursor: "pointer" }}
-            onClick={() => setModalOpen(true)}
-          >
-            Criar Evento
-          </button>
-        </aside>
+        {/* Widgets */}
+        <div className="flex flex-col flex-1 gap-4">
+          <SpotifyWidget />
+          <WhatsAppWidget />
+        </div>
       </div>
-
-      {/* Modal de evento */}
-      <EventModal open={modalOpen} onClose={() => setModalOpen(false)} />
-
-      {/* Footer de teste */}
-      <footer style={{ textAlign: "center", padding: "10px", background: "#f0f0f0" }}>
-        Template de agenda visual completo
-      </footer>
     </div>
   );
-};
-
-export default AgendaTemplate;
+}
