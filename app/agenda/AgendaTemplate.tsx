@@ -5,7 +5,7 @@ import CalendarGrid from '../components/CalendarGrid'
 import EventModal from '../components/EventModal'
 import WhatsAppWidget from '../components/WhatsAppWidget'
 import SpotifyWidget from '../components/SpotifyWidget'
-import { Profile, Client } from '../types'
+import { Profile, Client } from './types'
 
 const profiles: Profile[] = [
   { name: 'Ana', role: 'Designer', photoUrl: '/ana.jpg' },
