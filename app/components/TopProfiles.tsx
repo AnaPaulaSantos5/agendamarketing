@@ -1,29 +1,18 @@
-"use client";
-import React from "react";
-import "./TopProfiles.css";
-
-interface Profile {
-  name: string;
-  photoUrl: string;
-  phone?: string; // chat id opcional
-}
+import React from 'react';
+import { Profile } from '../types';
 
 interface TopProfilesProps {
   profiles: Profile[];
-  onSelect?: (profile: Profile) => void;
 }
 
-const TopProfiles: React.FC<TopProfilesProps> = ({ profiles, onSelect }) => {
+const TopProfiles: React.FC<TopProfilesProps> = ({ profiles }) => {
   return (
-    <div className="top-profiles">
-      {profiles.map((profile) => (
-        <div
-          key={profile.name}
-          className="top-profile"
-          onClick={() => onSelect && onSelect(profile)}
-        >
-          <img src={profile.photoUrl} alt={profile.name} />
-          <span>{profile.name}</span>
+    <div className="top-profiles flex gap-4">
+      {profiles.map((p, idx) => (
+        <div key={idx} className="profile-card text-center">
+          <img src={p.photoUrl} alt={p.name} className="w-16 h-16 rounded-full mx-auto" />
+          <div>{p.name}</div>
+          <small>{p.role}</small>
         </div>
       ))}
     </div>
