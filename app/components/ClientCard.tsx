@@ -1,5 +1,5 @@
 import React from 'react';
-import { Client } from '../types';
+import { Client } from '../../types';
 
 interface ClientCardProps {
   client: Client;
