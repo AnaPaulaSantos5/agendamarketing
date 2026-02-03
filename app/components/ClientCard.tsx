@@ -1,25 +1,37 @@
+// /app/components/ClientCard.tsx
 "use client";
+
 import React from "react";
-import "./ClientCard.css";
 
-const ClientCard: React.FC = () => {
+// Interface para a prop que o componente vai receber
+interface Client {
+  name: string;
+  status: string;
+  tasks: string[];
+}
+
+interface ClientCardProps {
+  client: Client;
+}
+
+const ClientCard: React.FC<ClientCardProps> = ({ client }) => {
   return (
-    <div className="client-card">
-      <img src="/profiles/google-placeholder.png" alt="Cliente" />
-      <h3>Nome do Cliente</h3>
-      <p>Email: cliente@email.com</p>
-      <p>Telefone: 12345</p>
-
-      <div className="checklist">
-        <h4>Checklist</h4>
-        <ul>
-          <li>Revisar documento</li>
-          <li>Confirmar reunião</li>
-          <li>Enviar proposta</li>
-        </ul>
-      </div>
-
-      <button>+ Adicionar Evento</button>
+    <div
+      style={{
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        padding: "10px",
+        marginBottom: "10px",
+        backgroundColor: "#f9f9f9",
+      }}
+    >
+      <h4 style={{ margin: "0 0 5px 0" }}>{client.name}</h4>
+      <p style={{ margin: "0 0 5px 0" }}>Status: {client.status}</p>
+      <ul style={{ paddingLeft: "20px", margin: 0 }}>
+        {client.tasks.map((task, idx) => (
+          <li key={idx}>{task}</li>
+        ))}
+      </ul>
     </div>
   );
 };
