@@ -1,150 +1,124 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import daygridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import { Settings, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AgendaPage() {
-  // Estado para gerenciar qual dia está selecionado e qual modal exibir
-  const [diaAtivo, setDiaAtivo] = useState<number | null>(1);
-  const [modoEdicao, setModoEdicao] = useState(true);
+export default function AgendaCausten() {
+  const calendarRef = useRef<any>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [selectedRange, setSelectedRange] = useState<any>(null);
 
-  const colors = { 
-    orange: '#f5886c', 
-    blue: '#1260c7', 
-    yellow: '#ffce0a', 
-    black: '#000000' 
-  };
-
-  const cardStyle = { 
-    border: '2px solid black', 
-    borderRadius: '30px', 
-    padding: '20px', 
-    backgroundColor: 'white',
-    transition: 'all 0.2s ease-in-out'
-  };
+  // Cores do Template
+  const colors = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a' };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1400px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh' }}>
+    <div className="p-8 max-w-[1400px] mx-auto min-h-screen relative">
       
-      {/* CABEÇALHO - EDITAR CLIENTE */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '40px', gap: '40px', height: '180px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', minWidth: '320px' }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: '85px', height: '85px', borderRadius: '50%', border: '2px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
+      {/* HEADER CLEAN */}
+      <header className="flex justify-between items-start mb-16">
+        <div className="flex items-center gap-6">
+          <div className="relative cursor-pointer" onClick={() => setShowUserModal(true)}>
+            <div className="w-20 h-20 rounded-full border-2 border-black flex items-center justify-center text-3xl font-bold bg-gray-50">
               A
             </div>
-            <Settings size={22} style={{ position: 'absolute', top: -5, left: -5, background: 'white', borderRadius: '50%', border: '1px solid black', padding: '2px' }} />
-            <ChevronDown size={22} style={{ position: 'absolute', right: -10, top: '40%', cursor: 'pointer' }} />
+            <div className="absolute -top-2 -left-2 bg-white border border-black rounded-full p-1.5 hover:rotate-90 transition-transform">
+              <Settings size={18} />
+            </div>
           </div>
-          <div style={{ lineHeight: '1.4' }}>
-            <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>Editar Cliente</h3>
-            <p style={{ fontSize: '14px', margin: '4px 0', color: '#555' }}>Nome do Cliente</p>
-            <p style={{ fontSize: '14px', margin: '2px 0', color: '#555' }}>WhatsApp ID (ChatId)</p>
-            <p style={{ fontSize: '14px', margin: '2px 0', color: '#555' }}>Email do Google</p>
+          <div className="space-y-1">
+             <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-sm">
+                <span className="text-sm font-bold uppercase tracking-wider">Perfil Ativo</span>
+                <ChevronLeft size={14} />
+                <ChevronRight size={14} />
+             </div>
           </div>
         </div>
-
-        {/* ÁREA DE FOTO AMPLIADA */}
-        <div style={{ flex: 3, border: '2px dashed #bbb', height: '100%', borderRadius: '25px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', cursor: 'pointer', fontSize: '18px', fontWeight: '500' }}>
+        <button className="text-gray-400 text-sm font-medium hover:text-black transition-colors underline underline-offset-4">
           Adicionar foto do dispositivo
+        </button>
+      </header>
+
+      {/* NAVEGAÇÃO TEMPO (MÊS --- ANO) */}
+      <div className="flex items-center justify-between mb-10 border-b-2 border-black pb-6">
+        <div className="flex items-center gap-6">
+          <ChevronLeft className="cursor-pointer" size={40} onClick={() => calendarRef.current.getApi().prev()} />
+          <h1 className="text-8xl font-black italic tracking-tighter uppercase">Mês</h1>
+        </div>
+        <div className="flex-1 mx-12 h-[2px] bg-gray-200" />
+        <div className="flex items-center gap-6">
+          <h1 className="text-8xl font-light tracking-tighter uppercase opacity-20">2026</h1>
+          <ChevronRight className="cursor-pointer" size={40} onClick={() => calendarRef.current.getApi().next()} />
         </div>
       </div>
 
-      {/* TÍTULO MÊS / 2026 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <ChevronLeft size={45} style={{ cursor: 'pointer' }} />
-          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '900', letterSpacing: '-5px' }}>MÊS</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '300' }}>2026</h1>
-          <ChevronRight size={45} style={{ cursor: 'pointer' }} />
-        </div>
-      </div>
+      {/* CALENDÁRIO FULL-GRID */}
+      <main className="z-10 relative">
+        <FullCalendar
+          ref={calendarRef}
+          plugins={[daygridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          selectable={true}
+          headerToolbar={false}
+          locale="pt-br"
+          select={(info) => {
+            setSelectedRange(info);
+            setShowEventModal(true);
+          }}
+          dateClick={() => setShowEventModal(true)}
+        />
+      </main>
 
-      {/* ÁREA PRINCIPAL: CALENDÁRIO + PAINÉIS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '35px' }}>
-        
-        {/* CALENDÁRIO HORIZONTAL */}
-        <div style={{ width: '100%' }}>
-          <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '20px' }}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(dia => (
-              <div 
-                key={dia} 
-                onClick={() => { setDiaAtivo(dia); setModoEdicao(true); }}
-                style={{ 
-                  ...cardStyle, 
-                  minWidth: '155px', 
-                  height: '155px', 
-                  textAlign: 'center', 
-                  cursor: 'pointer',
-                  borderColor: diaAtivo === dia ? colors.orange : 'black',
-                  backgroundColor: diaAtivo === dia ? '#fef3f0' : 'white',
-                  transform: diaAtivo === dia ? 'scale(1.05)' : 'scale(1)'
-                }}
-              >
-                <p style={{ fontWeight: 'bold', margin: '0 0 15px 0', fontSize: '18px' }}>DIA {dia}</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: colors.orange }}></div>
-                  <span style={{ fontSize: '13px', fontStyle: 'italic', fontWeight: '500' }}>evento</span>
+      {/* OVERLAY MODALS (ANIMAÇÕES) */}
+      <AnimatePresence>
+        {/* MODAL EDITAR CLIENTE (ENGRENAGEM) */}
+        {showUserModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/5 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="modal-glass p-12 w-full max-w-xl">
+              <h2 className="text-4xl font-bold mb-8 italic uppercase">Editar Cliente</h2>
+              <div className="space-y-6 text-lg">
+                <input className="w-full border-b-2 border-black py-2 outline-none" placeholder="Nome do Cliente" />
+                <input className="w-full border-b-2 border-black py-2 outline-none" placeholder="WhatsApp ID" />
+                <div className="flex justify-between pt-10 font-bold">
+                  <button onClick={() => setShowUserModal(false)}>SALVAR</button>
+                  <button onClick={() => setShowUserModal(false)} className="opacity-30">FECHAR</button>
                 </div>
               </div>
-            ))}
+            </motion.div>
           </div>
-          <p style={{ marginTop: '5px', textAlign: 'left', fontWeight: 'bold', color: '#444', fontSize: '18px', fontStyle: 'italic' }}>
-            Clicar e arrastar:
-          </p>
-        </div>
+        )}
 
-        {/* MODAIS DE EVENTO LADO A LADO */}
-        <div style={{ display: 'flex', gap: '35px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          
-          {/* EDITAR EVENTO */}
-          <div style={{ ...cardStyle, width: '400px', boxShadow: '12px 12px 0px black', opacity: modoEdicao ? 1 : 0.5 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '25px', alignItems: 'center' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '18px' }}>EDITAR EVENTO</span>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: colors.orange, border: '1px solid black' }}></div>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: colors.blue, border: '1px solid black' }}></div>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: colors.yellow, border: '1px solid black' }}></div>
-                <Plus size={20} style={{ cursor: 'pointer' }} onClick={() => setModoEdicao(false)} />
+        {/* MODAL NOVO EVENTO (CALENDÁRIO) */}
+        {showEventModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/5 backdrop-blur-sm">
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="modal-glass p-10 w-full max-w-lg relative border-2 border-black">
+              <div className="flex justify-between items-center mb-10">
+                <h3 className="text-3xl font-bold italic uppercase">Novo Evento</h3>
+                <div className="flex gap-3">
+                  {Object.values(colors).map(c => <div key={c} className="w-6 h-6 rounded-full border border-black" style={{ backgroundColor: c }} />)}
+                </div>
               </div>
-            </div>
-            
-            <div style={{ fontSize: '17px', lineHeight: '2.6' }}>
-              <p style={{ margin: 0 }}><strong>Início</strong></p>
-              <p style={{ margin: 0 }}><strong>Título</strong></p>
-              <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>TipoExterno (Notificar) Interno</p>
-              <p style={{ margin: '10px 0 0 0', fontSize: '14px', color: '#666' }}>WhatsApp ID</p>
-              <p style={{ margin: 0, fontWeight: 'bold', fontSize: '15px', color: colors.blue }}>4599992869@u.s</p>
-              <p style={{ margin: '15px 0 0 0', color: '#aaa', fontStyle: 'italic' }}>Conteúdo Secundário</p>
-            </div>
-
-            <div style={{ marginTop: '45px', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
-              <button style={{ background: 'none', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>SALVAR</button>
-              <button style={{ background: 'none', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>EXCLUIR</button>
-              <button style={{ background: 'none', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>FECHAR</button>
-            </div>
+              <div className="space-y-8 font-medium">
+                <div className="border-b-2 border-black/10 pb-2">
+                  <p className="text-[10px] uppercase font-bold opacity-30">Título</p>
+                  <input className="w-full text-2xl font-bold outline-none bg-transparent" placeholder="DIGITE O TÍTULO..." />
+                </div>
+                <div className="bg-blue-600 text-white p-5 rounded-[25px] flex justify-between items-center">
+                  <span className="font-mono">4599992869@u.s</span>
+                </div>
+                <div className="flex justify-between pt-6 font-bold text-sm tracking-widest">
+                  <button className="hover:underline">SALVAR</button>
+                  <button onClick={() => setShowEventModal(false)} className="opacity-20">FECHAR</button>
+                </div>
+              </div>
+            </motion.div>
           </div>
-
-          <div style={{ alignSelf: 'center', fontWeight: '900', fontSize: '24px' }}>OU</div>
-
-          {/* NOVO EVENTO */}
-          <div 
-            onClick={() => setModoEdicao(false)}
-            style={{ ...cardStyle, width: '400px', opacity: modoEdicao ? 0.3 : 1, border: modoEdicao ? '2px solid #ccc' : '2px solid black', cursor: 'pointer' }}
-          >
-            <span style={{ fontWeight: 'bold', fontSize: '18px', display: 'block', marginBottom: '25px', color: modoEdicao ? '#999' : 'black' }}>NOVO EVENTO</span>
-            <div style={{ fontSize: '17px', lineHeight: '2.6', color: modoEdicao ? '#ccc' : '#444' }}>
-              <p>Início</p>
-              <p>Título</p>
-              <p>TipoExterno...</p>
-              <p>WhatsApp ID</p>
-            </div>
-          </div>
-
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
