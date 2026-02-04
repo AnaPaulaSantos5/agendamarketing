@@ -4,27 +4,29 @@
 
 @layer base {
   body {
-    @apply bg-[#f4ece1] text-black font-sans overflow-x-hidden;
+    @apply bg-[#f4ece1] text-black font-sans antialiased;
   }
 }
 
-/* NEO-BRUTALISMO: Bordas de 6px e Sombra Rígida */
-.neo-container {
-  @apply bg-white border-[6px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] rounded-[50px];
+/* CONTAINER ESTILO RASCUNHO */
+.sketch-border {
+  @apply border-[6px] border-black bg-white shadow-[12px_12px_0px_0px_rgba(0,0,0,1)];
 }
 
+/* BOTÕES E INPUTS NEO-BRUTALISTAS */
 .neo-input {
-  @apply bg-transparent border-b-4 border-black outline-none font-black italic uppercase placeholder:text-gray-300;
+  @apply bg-transparent border-b-4 border-black outline-none font-black italic uppercase text-3xl py-2 placeholder:opacity-20;
 }
 
-/* AJUSTE DO CALENDÁRIO PARA FICAR IGUAL AO DESENHO */
+/* CALENDÁRIO CUSTOMIZADO */
 .fc {
-  @apply bg-white p-6 !important;
-  border: 6px solid black !important;
-  border-radius: 60px !important;
-  box-shadow: 12px 12px 0px 0px black !important;
+  @apply bg-white p-8 sketch-border rounded-[60px] !important;
 }
 
 .fc-daygrid-day-number {
-  @apply font-black italic text-5xl opacity-5 p-4 !important;
+  @apply font-black italic text-6xl opacity-10 p-4 !important;
+}
+
+.fc-col-header-cell-cushion {
+  @apply font-black uppercase text-xl !important;
 }
