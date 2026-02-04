@@ -1,155 +1,219 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import daygridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { Settings, ChevronLeft, ChevronRight, Plus, X, Camera } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AgendaCausten() {
-  const calendarRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
+interface Evento {
+  id: string;
+  dataKey: string; 
+  titulo: string;
+  cor: string;
+  whatsapp: string;
+}
+
+export default function AgendaPage() {
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [dataAtiva, setDataAtiva] = useState(new Date(2026, 1, 4)); 
+  const [showPerfilModal, setShowPerfilModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [selectedRange, setSelectedRange] = useState<any>(null);
+  const [tempEvento, setTempEvento] = useState({ id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
+  
+  // ESTADO PARA A CAPA
   const [capaImage, setCapaImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const colors = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a' };
+  const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+  const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+
+  const diasNoMes = useMemo(() => {
+    return new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate();
+  }, [dataAtiva]);
+
+  const primeiroDiaSemana = useMemo(() => {
+    return new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), 1).getDay();
+  }, [dataAtiva]);
+
+  const mudarMes = (direcao: number) => {
+    setDataAtiva(prev => new Date(prev.getFullYear(), prev.getMonth() + direcao, 1));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setCapaImage(reader.result as string);
+      reader.onloadend = () => {
+        setCapaImage(reader.result as string);
+      };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleDiaClick = (dia: number) => {
+    const dataKey = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
+    const existente = eventos.find(e => e.dataKey === dataKey);
+    setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia));
+    setTempEvento(existente ? { ...existente } : { id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
+    setShowEventModal(true);
+  };
+
+  const handleSalvar = () => {
+    const dataKey = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dataAtiva.getDate()}`;
+    if (tempEvento.id) {
+      setEventos(eventos.map(e => e.id === tempEvento.id ? { ...tempEvento, dataKey } : e));
+    } else {
+      setEventos([...eventos, { ...tempEvento, id: Date.now().toString(), dataKey }]);
+    }
+    setShowEventModal(false);
+  };
+
+  const cardStyle = { border: '2px solid black', borderRadius: '30px', padding: '20px', backgroundColor: 'white' };
+
   return (
-    <div className="p-8 max-w-[1400px] mx-auto min-h-screen relative">
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1400px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh' }}>
       
-      {/* HEADER COMO CAPA AMPLA */}
-      <header 
-        className="relative w-full h-64 mb-16 border-2 border-black rounded-[50px] overflow-hidden bg-gray-50 flex items-center justify-center group cursor-pointer transition-all hover:border-blue-500"
-        onClick={() => !capaImage && fileInputRef.current?.click()}
-      >
-        {/* Imagem de Fundo (Capa) */}
-        {capaImage ? (
-          <img src={capaImage} className="absolute inset-0 w-full h-full object-cover" alt="Capa" />
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-gray-400 font-bold italic">
-            <Camera size={40} />
-            <span>Adicionar foto do dispositivo</span>
-          </div>
-        )}
+      {/* CABEÇALHO COM CAPA INTEGRADA */}
+      <div style={{ 
+        ...cardStyle, 
+        position: 'relative',
+        marginBottom: '40px', 
+        height: '320px', // Altura otimizada para visual de capa
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'flex-end',
+        padding: '30px'
+      }}>
+        
+        {/* ÁREA DA CAPA (FUNDO) */}
+        <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" style={{ display: 'none' }} />
+        <div 
+          onClick={() => fileInputRef.current?.click()}
+          style={{ 
+            position: 'absolute',
+            inset: 0,
+            cursor: 'pointer',
+            zIndex: 0,
+            backgroundImage: capaImage ? `url(${capaImage})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundColor: '#f9f9f9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {!capaImage && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ccc' }}>
+              <Camera size={48} />
+              <span style={{ fontWeight: 'bold', marginTop: '10px' }}>Adicionar foto do dispositivo</span>
+            </div>
+          )}
+        </div>
 
-        {/* Overlay para facilitar a leitura se houver capa */}
-        {capaImage && <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all" />}
-
-        {/* Elementos de Perfil Flutuantes sobre a Capa */}
-        <div className="absolute left-10 bottom-8 flex items-center gap-6 z-10">
-          <div className="relative cursor-pointer" onClick={(e) => { e.stopPropagation(); setShowUserModal(true); }}>
-            <div className="w-24 h-24 rounded-full border-4 border-white flex items-center justify-center text-4xl font-bold bg-white shadow-xl">
+        {/* ELEMENTOS DE PERFIL (SOBRE A CAPA) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1, position: 'relative' }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '3px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', fontWeight: 'bold', backgroundColor: 'white', shadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
               A
             </div>
-            <div className="absolute -top-1 -left-1 bg-white border-2 border-black rounded-full p-2 hover:rotate-90 transition-transform shadow-md">
-              <Settings size={20} />
-            </div>
+            <Settings size={26} onClick={(e) => { e.stopPropagation(); setShowPerfilModal(true); }} style={{ position: 'absolute', top: -5, left: -5, background: 'white', borderRadius: '50%', border: '2px solid black', padding: '3px', cursor: 'pointer' }} />
+            <ChevronDown size={26} style={{ position: 'absolute', right: -15, top: '40%', cursor: 'pointer', color: 'black', background: 'white', borderRadius: '50%', border: '1px solid black' }} />
           </div>
-          <div className="space-y-1">
-             <div className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-black rounded-full shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                <span className="text-lg font-bold uppercase tracking-wider">Perfil Ativo</span>
-                <ChevronLeft size={18} />
-                <ChevronRight size={18} />
-             </div>
+          <div style={{ background: 'white', padding: '10px 20px', borderRadius: '20px', border: '2px solid black', boxShadow: '4px 4px 0px black' }}>
+            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>Editar Cliente</h3>
           </div>
-        </div>
-
-        {/* Botão de trocar foto (visível no hover se já houver capa) */}
-        {capaImage && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-            className="absolute right-8 top-8 bg-white/90 border-2 border-black px-4 py-2 rounded-full font-bold text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            Trocar Capa
-          </button>
-        )}
-
-        <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-      </header>
-
-      {/* NAVEGAÇÃO TEMPO (MÊS --- ANO) */}
-      <div className="flex items-center justify-between mb-10 border-b-2 border-black pb-6">
-        <div className="flex items-center gap-6">
-          <ChevronLeft className="cursor-pointer" size={40} onClick={() => calendarRef.current.getApi().prev()} />
-          <h1 className="text-8xl font-black italic tracking-tighter uppercase leading-none">Mês</h1>
-        </div>
-        <div className="flex-1 mx-12 h-[2px] bg-gray-200" />
-        <div className="flex items-center gap-6">
-          <h1 className="text-8xl font-light tracking-tighter uppercase opacity-20 leading-none">2026</h1>
-          <ChevronRight className="cursor-pointer" size={40} onClick={() => calendarRef.current.getApi().next()} />
         </div>
       </div>
 
-      {/* CALENDÁRIO FULL-GRID */}
-      <main className="z-10 relative">
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[daygridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          selectable={true}
-          headerToolbar={false}
-          locale="pt-br"
-          select={(info) => {
-            setSelectedRange(info);
-            setShowEventModal(true);
-          }}
-          dateClick={() => setShowEventModal(true)}
-        />
-      </main>
+      {/* TÍTULO MÊS / ANO */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <ChevronLeft size={45} className="cursor-pointer" onClick={() => mudarMes(-1)} />
+          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '900', letterSpacing: '-5px' }}>{meses[dataAtiva.getMonth()]}</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '300' }}>{dataAtiva.getFullYear()}</h1>
+          <ChevronRight size={45} className="cursor-pointer" onClick={() => mudarMes(1)} />
+        </div>
+      </div>
 
-      {/* OVERLAY MODALS */}
-      <AnimatePresence>
-        {/* MODAL EDITAR CLIENTE */}
-        {showUserModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/5 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="modal-glass p-12 w-full max-w-xl bg-white border-2 border-black rounded-[50px] shadow-2xl">
-              <h2 className="text-4xl font-bold mb-8 italic uppercase">Editar Cliente</h2>
-              <div className="space-y-6 text-lg font-causten">
-                <input className="w-full border-b-2 border-black py-2 outline-none" placeholder="Nome do Cliente" />
-                <input className="w-full border-b-2 border-black py-2 outline-none" placeholder="WhatsApp ID" />
-                <div className="flex justify-between pt-10 font-bold uppercase tracking-widest">
-                  <button onClick={() => setShowUserModal(false)} className="hover:underline">SALVAR</button>
-                  <button onClick={() => setShowUserModal(false)} className="opacity-30">FECHAR</button>
+      {/* GRADE DE DIAS DA SEMANA */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', marginBottom: '10px', textAlign: 'center' }}>
+        {diasSemana.map(d => <div key={d} style={{ fontWeight: '900', fontSize: '14px', opacity: 0.3 }}>{d}</div>)}
+      </div>
+
+      {/* CALENDÁRIO COMPLETO (GRID) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '15px' }}>
+        {Array.from({ length: primeiroDiaSemana }).map((_, i) => <div key={`empty-${i}`} />)}
+        
+        {Array.from({ length: diasNoMes }, (_, i) => {
+          const dia = i + 1;
+          const key = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
+          const evento = eventos.find(e => e.dataKey === key);
+          const isAtivo = dataAtiva.getDate() === dia;
+
+          return (
+            <div 
+              key={dia} 
+              onClick={() => handleDiaClick(dia)}
+              style={{ 
+                ...cardStyle, height: '160px', textAlign: 'center', cursor: 'pointer',
+                borderColor: isAtivo ? colors.orange : 'black',
+                backgroundColor: isAtivo ? '#fef3f0' : 'white',
+                display: 'flex', flexDirection: 'column', justifyContent: 'center'
+              }}
+            >
+              <p style={{ fontWeight: 'bold', margin: '0 0 10px 0', fontSize: '20px' }}>{dia}</p>
+              {evento && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: evento.cor }}></div>
+                  <span style={{ fontSize: '11px', fontStyle: 'italic', fontWeight: 'bold' }}>evento</span>
                 </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MODAIS */}
+      <AnimatePresence>
+        {showPerfilModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} style={{ ...cardStyle, width: '500px', boxShadow: '20px 20px 0px black' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
+                <h2 style={{ fontSize: '30px', fontWeight: '900', fontStyle: 'italic' }}>EDITAR CLIENTE</h2>
+                <X style={{ cursor: 'pointer' }} onClick={() => setShowPerfilModal(false)} />
               </div>
+              <input style={{ width: '100%', border: 'none', borderBottom: '2px solid black', padding: '10px 0', outline: 'none', fontSize: '18px' }} placeholder="Nome do Cliente" />
+              <button onClick={() => setShowPerfilModal(false)} style={{ marginTop: '30px', fontWeight: 'bold', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px' }}>SALVAR</button>
             </motion.div>
           </div>
         )}
 
-        {/* MODAL NOVO EVENTO */}
         {showEventModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/5 backdrop-blur-sm">
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="modal-glass p-10 w-full max-w-lg relative border-2 border-black bg-white rounded-[50px] shadow-2xl">
-              <div className="flex justify-between items-center mb-10">
-                <h3 className="text-3xl font-bold italic uppercase">Novo Evento</h3>
-                <div className="flex gap-3">
-                  {Object.values(colors).map(c => <div key={c} className="w-7 h-7 rounded-full border-2 border-black shadow-sm" style={{ backgroundColor: c }} />)}
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110 }}>
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} style={{ ...cardStyle, width: '500px', boxShadow: '20px 20px 0px black' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                <h3 style={{ fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic' }}>{tempEvento.id ? 'EDITAR EVENTO' : 'NOVO EVENTO'}</h3>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {Object.values(colors).map(c => (
+                    <div key={c} onClick={() => setTempEvento({...tempEvento, cor: c})} style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: c, border: '1px solid black', cursor: 'pointer', opacity: tempEvento.cor === c ? 1 : 0.3 }} />
+                  ))}
                 </div>
               </div>
-              <div className="space-y-8 font-medium">
-                <div className="border-b-2 border-black/10 pb-2">
-                  <p className="text-[10px] uppercase font-bold opacity-30 tracking-widest">Título</p>
-                  <input className="w-full text-3xl font-bold outline-none bg-transparent" placeholder="DIGITE O TÍTULO..." />
-                </div>
-                <div className="bg-blue-600 text-white p-6 rounded-[30px] flex justify-between items-center shadow-lg">
-                  <span className="font-mono text-xl">4599992869@u.s</span>
-                </div>
-                <div className="flex justify-between pt-6 font-bold text-sm tracking-widest uppercase">
-                  <button className="hover:underline decoration-4">SALVAR</button>
-                  <button onClick={() => setShowEventModal(false)} className="opacity-20">FECHAR</button>
-                </div>
+              <input 
+                style={{ width: '100%', border: 'none', borderBottom: '2px solid black', padding: '10px 0', fontSize: '24px', fontWeight: 'bold', outline: 'none', marginBottom: '20px', textTransform: 'uppercase' }} 
+                placeholder="TÍTULO DO EVENTO" 
+                value={tempEvento.titulo}
+                onChange={(e) => setTempEvento({...tempEvento, titulo: e.target.value})}
+              />
+              <div style={{ background: '#fff9c4', border: '2px solid black', padding: '20px', borderRadius: '20px' }}>
+                <p style={{ margin: 0, fontSize: '18px', color: '#1260c7', textDecoration: 'underline', fontWeight: 'bold' }}>{tempEvento.whatsapp}</p>
+              </div>
+              <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                <button onClick={handleSalvar} style={{ fontSize: '16px', cursor: 'pointer' }}>SALVAR</button>
+                <button onClick={() => setShowEventModal(false)} style={{ opacity: 0.3, fontSize: '16px', cursor: 'pointer' }}>FECHAR</button>
               </div>
             </motion.div>
           </div>
