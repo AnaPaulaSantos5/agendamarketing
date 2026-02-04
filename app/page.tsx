@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Evento {
   id: string;
-  dataKey: string; // Chave única para o dia (ex: "2026-02-04")
+  dataKey: string; 
   titulo: string;
   cor: string;
   whatsapp: string;
@@ -15,7 +15,7 @@ interface Evento {
 export default function AgendaPage() {
   // --- ESTADOS ---
   const [eventos, setEventos] = useState<Evento[]>([]);
-  const [dataAtiva, setDataAtiva] = useState(new Date(2026, 1, 4)); // Começa em 4 de Fev de 2026
+  const [dataAtiva, setDataAtiva] = useState(new Date(2026, 1, 4)); // Fevereiro 2026
   const [showPerfilModal, setShowPerfilModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [tempEvento, setTempEvento] = useState({ id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
@@ -25,6 +25,7 @@ export default function AgendaPage() {
   // --- LÓGICA DE CALENDÁRIO DINÂMICO ---
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
   
+  // Calcula o número exato de dias do mês atual
   const diasNoMes = useMemo(() => {
     const ano = dataAtiva.getFullYear();
     const mes = dataAtiva.getMonth();
@@ -32,17 +33,22 @@ export default function AgendaPage() {
   }, [dataAtiva]);
 
   const mudarMes = (direcao: number) => {
-    setDataAtiva(prev => new Date(prev.getFullYear(), prev.getMonth() + direcao, 1));
+    setDataAtiva(prev => {
+      const novaData = new Date(prev.getFullYear(), prev.getMonth() + direcao, 1);
+      return novaData;
+    });
   };
 
   const handleDiaClick = (dia: number) => {
     const dataKey = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
     const existente = eventos.find(e => e.dataKey === dataKey);
     
+    // Atualiza o dia selecionado na data ativa antes de abrir o modal
+    const novaDataComDia = new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia);
+    setDataAtiva(novaDataComDia);
+
     setTempEvento(existente ? { ...existente } : { id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
     setShowEventModal(true);
-    // Atualiza apenas o dia na data ativa para visual
-    setDataAtiva(prev => new Date(prev.getFullYear(), prev.getMonth(), dia));
   };
 
   const handleSalvar = () => {
@@ -88,9 +94,9 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* CALENDÁRIO HORIZONTAL DINÂMICO */}
+      {/* CALENDÁRIO HORIZONTAL DINÂMICO - MOSTRA TODOS OS DIAS DO MÊS */}
       <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '20px' }} className="no-scrollbar">
-        {[...Array(diasNoMes)].map((_, i) => {
+        {Array.from({ length: diasNoMes }, (_, i) => {
           const dia = i + 1;
           const key = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
           const evento = eventos.find(e => e.dataKey === key);
