@@ -2,21 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilo Base da Foto 3 */
-body {
-  @apply bg-[#f4ece1] text-black antialiased font-sans;
+@layer base {
+  body {
+    @apply bg-[#f4ece1] text-black antialiased font-sans;
+  }
 }
 
-/* Bordas Grossas e Sombras (Neo-Brutalismo) */
-.neo-card {
-  @apply border-[6px] border-black bg-white shadow-[12px_12px_0px_0px_rgba(0,0,0,1)];
+/* ESTILO NEO-BRUTALISTA (FOTO DO TEMPLATE) */
+.neo-border {
+  border: 6px solid black !important;
 }
 
-/* Personalização do Calendário Estilo "Bolha" */
-.fc-theme-standard .fc-scrollgrid {
-  @apply border-[6px] border-black rounded-[40px] overflow-hidden !important;
+.neo-shadow {
+  box-shadow: 15px 15px 0px 0px black !important;
+}
+
+.neo-shadow-sm {
+  box-shadow: 6px 6px 0px 0px black !important;
+}
+
+/* CALENDÁRIO ESTILO BOLHA */
+.fc {
+  @apply bg-white p-4 !important;
+  border: 8px solid black !important;
+  border-radius: 60px !important;
 }
 
 .fc-daygrid-day-number {
-  @apply font-black italic text-4xl opacity-10 p-4 !important;
+  @apply font-black italic text-6xl opacity-10 p-6 !important;
 }
+
+/* ESCONDER SCROLLBARS */
+::-webkit-scrollbar { display: none; }
