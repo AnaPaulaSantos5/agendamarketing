@@ -1,149 +1,175 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Settings, X, Plus, Trash2 } from 'lucide-react';
+import { Settings, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Simulação de Banco de Dados de Eventos
-const eventosIniciais = [
-  { id: '1', dia: 1, titulo: 'Reunião Marketing', cor: '#f5886c', whatsapp: '4599992869@u.s' }
-];
+// Definindo a estrutura exata do Evento para o TypeScript
+interface Evento {
+  id: string;
+  dia: number;
+  titulo: string;
+  cor: string;
+  whatsapp: string;
+}
 
-export default function AgendaFuncional() {
-  // --- ESTADOS DE CONTROLE ---
-  const [eventos, setEventos] = useState(eventosIniciais);
+export default function AgendaPage() {
+  // --- ESTADOS ---
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null);
+  const [showPerfilModal, setShowPerfilModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   
-  // Modais
-  const [showConfigModal, setShowConfigModal] = useState(false); // Modal da Engrenagem
-  const [showEventModal, setShowEventModal] = useState(false);   // Modal de Eventos (Novo/Editar)
-  
-  // Dados do Formulário
-  const [tempEvento, setTempEvento] = useState({ id: '', titulo: '', whatsapp: '', cor: '#f5886c' });
+  // Estado do formulário
+  const [tempEvento, setTempEvento] = useState({ 
+    id: '', 
+    titulo: '', 
+    whatsapp: '4599992869@u.s', 
+    cor: '#f5886c' 
+  });
 
-  // --- AÇÕES ---
+  const cores = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a' };
 
-  // 1. Ao clicar em um dia do calendário
+  // --- FUNÇÕES ---
+
   const handleDiaClick = (dia: number) => {
     setDiaSelecionado(dia);
-    const eventoExistente = eventos.find(e => e.dia === dia);
-
-    if (eventoExistente) {
-      // MODO EDIÇÃO: Carrega dados existentes
-      setTempEvento(eventoExistente);
+    const existente = eventos.find(e => e.dia === dia);
+    
+    if (existente) {
+      setTempEvento({ ...existente });
     } else {
-      // MODO NOVO: Reseta o formulário
       setTempEvento({ id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
     }
     setShowEventModal(true);
   };
 
-  // 2. Salvar ou Atualizar
   const handleSalvar = () => {
+    if (diaSelecionado === null) return;
+
     if (tempEvento.id) {
-      // Atualiza existente
-      setEventos(eventos.map(e => e.id === tempEvento.id ? { ...tempEvento } : e));
+      // Editar
+      setEventos(eventos.map(e => e.id === tempEvento.id ? { ...tempEvento, dia: diaSelecionado } : e));
     } else {
-      // Cria novo
-      const novo = { ...tempEvento, id: Date.now().toString(), dia: diaSelecionado! };
-      setEventos([...eventos, novo]);
+      // Novo
+      const novoEvento: Evento = {
+        ...tempEvento,
+        id: Date.now().toString(),
+        dia: diaSelecionado
+      };
+      setEventos([...eventos, novoEvento]);
     }
     setShowEventModal(false);
   };
 
-  // 3. Excluir Evento
   const handleExcluir = () => {
     setEventos(eventos.filter(e => e.id !== tempEvento.id));
     setShowEventModal(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#f4ece1] p-10 font-sans">
+    <div className="p-8 max-w-[1400px] mx-auto min-h-screen bg-white font-sans antialiased">
       
-      {/* HEADER: Ação na Engrenagem */}
-      <div className="flex items-center gap-4 mb-10">
-        <div className="relative">
-          <button onClick={() => setShowConfigModal(true)} className="p-2 bg-white border border-black rounded-full hover:bg-black hover:text-white transition-all">
-            <Settings size={20} />
-          </button>
+      {/* HEADER CLEAN */}
+      <div className="flex items-center justify-between mb-12 border-2 border-black rounded-[40px] p-8 h-44">
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full border-2 border-black flex items-center justify-center text-3xl font-bold bg-gray-50">A</div>
+            <button onClick={() => setShowPerfilModal(true)} className="absolute -top-2 -left-2 bg-white border border-black rounded-full p-2 hover:bg-black hover:text-white transition-all">
+              <Settings size={18} />
+            </button>
+            <ChevronDown size={22} className="absolute -right-6 top-1/2 -translate-y-1/2 text-black/20" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold uppercase italic">Editar Cliente</h3>
+            <p className="text-sm opacity-40 uppercase font-medium">Nome do Cliente</p>
+          </div>
+        </div>
+        <div className="flex-1 border-2 border-dashed border-gray-100 h-full mx-10 rounded-[30px] flex items-center justify-center text-gray-300 italic font-medium">
+          Adicionar foto do dispositivo
         </div>
       </div>
 
-      {/* GRADE DO CALENDÁRIO (SIMPLIFICADA) */}
-      <div className="grid grid-cols-7 gap-4">
-        {[...Array(31)].map((_, i) => {
+      {/* TÍTULO MÊS --- ANO */}
+      <div className="flex justify-between items-center mb-10 border-b-2 border-black pb-4">
+        <div className="flex items-center gap-4">
+          <ChevronLeft size={45} className="cursor-pointer" />
+          <h1 className="text-8xl font-black italic uppercase tracking-tighter">Fevereiro</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <h1 className="text-8xl font-light opacity-10">2026</h1>
+          <ChevronRight size={45} className="cursor-pointer" />
+        </div>
+      </div>
+
+      {/* CALENDÁRIO HORIZONTAL */}
+      <div className="flex gap-4 overflow-x-auto pb-10 no-scrollbar">
+        {[...Array(20)].map((_, i) => {
           const dia = i + 1;
-          const temEvento = eventos.find(e => e.dia === dia);
+          const evento = eventos.find(e => e.dia === dia);
           return (
             <div 
-              key={dia}
+              key={dia} 
               onClick={() => handleDiaClick(dia)}
-              className="h-32 bg-white rounded-[25px] border border-black/5 p-4 cursor-pointer hover:shadow-lg transition-all"
+              className={`min-w-[160px] h-[160px] rounded-[35px] border-2 p-6 cursor-pointer transition-all flex flex-col justify-between
+                ${diaSelecionado === dia ? 'border-[#f5886c] bg-[#fef3f0]' : 'border-black'}`}
             >
-              <span className="font-bold opacity-20">{dia}</span>
-              {temEvento && (
-                <div style={{ backgroundColor: temEvento.cor }} className="w-3 h-3 rounded-full mt-2" />
-              )}
+              <span className="font-bold text-xl uppercase italic">Dia {dia}</span>
+              {evento && <div className="w-4 h-4 rounded-full" style={{ backgroundColor: evento.cor }} />}
             </div>
           );
         })}
       </div>
 
-      {/* --- CAMADA DE MODAIS (FLUTUANTES) --- */}
+      {/* --- MODAIS FLUTUANTES (OVERLAYS) --- */}
       <AnimatePresence>
         
-        {/* 1. MODAL DE CONFIGURAÇÃO (ENGRENAGEM) */}
-        {showConfigModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/10 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white p-10 rounded-[40px] border-2 border-black w-full max-w-md shadow-2xl">
-              <div className="flex justify-between mb-6">
-                <h2 className="font-bold text-2xl uppercase italic">Editar Cliente</h2>
-                <X onClick={() => setShowConfigModal(false)} className="cursor-pointer" />
+        {/* MODAL EDITAR CLIENTE */}
+        {showPerfilModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/5 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-lg shadow-[20px_20px_0px_0px_black]">
+              <div className="flex justify-between mb-8">
+                <h2 className="text-4xl font-bold italic uppercase">Editar Cliente</h2>
+                <X className="cursor-pointer" onClick={() => setShowPerfilModal(false)} />
               </div>
-              {/* Conteúdo do Modal aqui */}
-              <button onClick={() => setShowConfigModal(false)} className="w-full bg-black text-white py-3 rounded-full font-bold">SALVAR ALTERAÇÕES</button>
+              <div className="space-y-6">
+                <input className="w-full border-b-2 border-black py-2 outline-none text-xl" placeholder="Nome do Cliente" />
+                <button className="font-bold text-lg mt-6" onClick={() => setShowPerfilModal(false)}>SALVAR</button>
+              </div>
             </motion.div>
           </div>
         )}
 
-        {/* 2. MODAL DE EVENTOS (NOVO OU EDITAR) */}
+        {/* MODAL EVENTO (NOVO/EDITAR) */}
         {showEventModal && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/10 backdrop-blur-sm">
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="bg-white p-10 rounded-[45px] border-2 border-black w-full max-w-lg shadow-2xl relative">
-              
-              <h2 className="text-4xl font-black italic uppercase mb-8 border-b-2 border-black/10 pb-4">
-                {tempEvento.id ? 'Editar Evento' : 'Novo Evento'}
-              </h2>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Título do Evento</label>
-                  <input 
-                    className="w-full text-2xl font-bold italic outline-none bg-transparent"
-                    value={tempEvento.titulo}
-                    onChange={(e) => setTempEvento({...tempEvento, titulo: e.target.value})}
-                    placeholder="DIGITE AQUI..."
-                  />
-                </div>
-
-                <div className="flex gap-3 mb-6">
-                  {['#f5886c', '#1260c7', '#ffce0a'].map(c => (
-                    <div 
-                      key={c} 
-                      onClick={() => setTempEvento({...tempEvento, cor: c})}
-                      style={{ backgroundColor: c }} 
-                      className={`w-8 h-8 rounded-full border border-black cursor-pointer ${tempEvento.cor === c ? 'scale-125' : 'opacity-40'}`}
-                    />
+          <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/5 backdrop-blur-sm">
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+              className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-xl shadow-[20px_20px_0px_0px_black]">
+              <div className="flex justify-between items-center mb-10">
+                <h3 className="text-4xl font-bold italic uppercase">{tempEvento.id ? 'Editar Evento' : 'Novo Evento'}</h3>
+                <div className="flex gap-2">
+                  {Object.values(cores).map(c => (
+                    <div key={c} onClick={() => setTempEvento({...tempEvento, cor: c})}
+                      className={`w-6 h-6 rounded-full border border-black cursor-pointer ${tempEvento.cor === c ? 'scale-125' : 'opacity-20'}`}
+                      style={{ backgroundColor: c }} />
                   ))}
                 </div>
-
-                {/* BOTÕES DE AÇÃO */}
-                <div className="flex gap-8 pt-6 font-bold uppercase italic text-sm tracking-widest">
-                  <button onClick={handleSalvar} className="hover:text-blue-600 transition-colors">SALVAR</button>
-                  {tempEvento.id && (
-                    <button onClick={handleExcluir} className="text-red-500 hover:underline">EXCLUIR</button>
-                  )}
-                  <button onClick={() => setShowEventModal(false)} className="opacity-20 hover:opacity-100">FECHAR</button>
+              </div>
+              <div className="space-y-8">
+                <input 
+                  className="w-full text-5xl font-bold italic border-b-2 border-black/10 outline-none uppercase bg-transparent"
+                  placeholder="TÍTULO..."
+                  value={tempEvento.titulo}
+                  onChange={(e) => setTempEvento({...tempEvento, titulo: e.target.value})}
+                />
+                <div className="bg-blue-600 p-6 rounded-[25px] text-white font-mono text-xl underline">
+                  {tempEvento.whatsapp}
+                </div>
+                <div className="flex justify-between pt-6 font-bold tracking-widest uppercase">
+                  <button onClick={handleSalvar}>SALVAR</button>
+                  {tempEvento.id && <button onClick={handleExcluir} className="text-red-500">EXCLUIR</button>}
+                  <button onClick={() => setShowEventModal(false)} className="opacity-20">FECHAR</button>
                 </div>
               </div>
             </motion.div>
