@@ -1,133 +1,106 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import React from 'react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 export default function AgendaPage() {
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [isEditing, setIsEditing] = useState(true);
-
-  // Cores principais definidas no seu projeto
-  const colors = {
+  // Suas cores de marcação
+  const brandColors = {
     orange: '#f5886c',
     blue: '#1260c7',
     yellow: '#ffce0a'
   };
 
   return (
-    <div className="min-h-screen bg-white p-8 text-black font-sans">
+    <div className="w-full max-w-[1200px] mx-auto p-4 md:p-8 bg-[#fdfaf5] min-h-screen text-black">
       
-      {/* 1. CABEÇALHO: EDITAR CLIENTE */}
-      <header className="border-2 border-black rounded-[2rem] p-6 mb-12 flex items-center gap-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full border-2 border-black flex items-center justify-center text-2xl font-bold">
-              A
-            </div>
-            <Settings className="absolute -top-2 -left-2 w-5 h-5 cursor-pointer" />
-            <ChevronDown className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 cursor-pointer" />
+      {/* SEÇÃO SUPERIOR - EDITAR CLIENTE */}
+      <div className="border-2 border-black rounded-3xl p-6 mb-10 flex flex-col md:flex-row items-center gap-6 bg-white shadow-sm">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 rounded-full border-2 border-black flex items-center justify-center text-2xl font-bold relative">
+            A
+            <Settings className="absolute -top-1 -left-1 w-5 h-5 bg-white rounded-full p-0.5" />
+            <ChevronDown className="absolute -right-1 top-1/2 w-5 h-5" />
           </div>
         </div>
-
-        <div className="flex-1">
-          <h2 className="text-xl font-bold mb-2">Editar Cliente</h2>
-          <div className="text-sm space-y-1 text-gray-600">
-            <p>Nome do Cliente</p>
-            <p>WhatsApp ID (ChatId)</p>
-            <p>Email do Google</p>
-          </div>
+        
+        <div className="flex-1 text-center md:text-left leading-relaxed">
+          <h2 className="font-bold text-lg">Editar Cliente</h2>
+          <p className="text-sm">Nome do Cliente</p>
+          <p className="text-sm font-mono text-gray-500">WhatsApp ID (ChatId)</p>
+          <p className="text-sm">Email do Google</p>
         </div>
 
-        <div className="flex-1 border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-50 transition">
+        <div className="flex-1 border-2 border-dashed border-gray-400 rounded-2xl h-24 flex items-center justify-center text-gray-400 text-sm italic p-4 text-center">
           Adicionar foto do dispositivo
-        </div>
-      </header>
-
-      {/* 2. NAVEGAÇÃO DO MÊS */}
-      <div className="flex items-center justify-between mb-8 px-4">
-        <div className="flex items-center gap-4">
-          <ChevronLeft className="w-8 h-8 cursor-pointer" />
-          <h1 className="text-5xl font-black tracking-tighter">MÊS</h1>
-        </div>
-        <div className="flex items-center gap-4 text-5xl font-light">
-          <span>2026</span>
-          <ChevronRight className="w-8 h-8 cursor-pointer" />
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      {/* TÍTULO E NAVEGAÇÃO */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-2">
+          <ChevronLeft className="w-10 h-10 cursor-pointer" />
+          <h1 className="text-5xl font-black italic tracking-tighter">MÊS</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-5xl font-light">2026</span>
+          <ChevronRight className="w-10 h-10 cursor-pointer" />
+        </div>
+      </div>
+
+      {/* CORPO DO CALENDÁRIO E PAINÉIS */}
+      <div className="flex flex-col xl:flex-row gap-8 items-start">
         
-        {/* 3. CALENDÁRIO (DIA A DIA) */}
+        {/* GRID DE DIAS (CALENDÁRIO) */}
         <div className="flex-1">
-          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+          <div className="flex flex-wrap gap-4">
             {[1, 2, 3, 4, 5].map((dia) => (
-              <div 
-                key={dia}
-                onClick={() => setSelectedDays([dia])}
-                className={`min-w-[120px] h-[120px] border-2 border-black rounded-[1.5rem] p-4 cursor-pointer transition-all ${selectedDays.includes(dia) ? 'bg-gray-100 scale-105' : 'bg-white'}`}
-              >
-                <span className="font-bold text-lg uppercase block">DIA {dia}</span>
+              <div key={dia} className="w-32 h-32 border-2 border-black rounded-[2rem] p-4 bg-white hover:bg-orange-50 cursor-pointer transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <p className="font-bold text-sm uppercase">DIA {dia}</p>
                 <div className="flex items-center gap-1 mt-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.orange }}></span>
-                  <span className="text-xs text-gray-500 italic">evento</span>
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: brandColors.orange }}></span>
+                  <span className="text-[10px] italic">evento</span>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-center font-medium italic">Clicar e arrastar</p>
+          <p className="mt-6 font-medium italic text-gray-600">--- Clicar e arrastar ---</p>
         </div>
 
-        {/* 4. PAINÉIS LATERAIS (EDITAR / NOVO) */}
-        <div className="flex flex-col sm:flex-row gap-6">
+        {/* PAINÉIS LATERAIS */}
+        <div className="flex flex-col md:flex-row gap-6 w-full xl:w-auto">
           
-          {/* PAINEL EDITAR EVENTO */}
-          <div className="w-full sm:w-72 border-2 border-black rounded-[2rem] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold uppercase text-sm">Editar Evento</h3>
-              <div className="flex gap-1">
-                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: colors.orange }}></div>
-                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: colors.blue }}></div>
-                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: colors.yellow }}></div>
-                <PlusCircle className="w-3 h-3 cursor-pointer" />
+          {/* PAINEL EDITAR */}
+          <div className="w-full md:w-64 border-2 border-black rounded-[2.5rem] p-6 bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex justify-between items-center mb-4 border-b pb-2 border-black">
+              <h3 className="font-bold text-xs uppercase">Editar Evento</h3>
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brandColors.orange }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brandColors.blue }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brandColors.yellow }}></div>
+                <Plus className="w-3 h-3" />
               </div>
             </div>
-
-            <div className="space-y-3 text-sm">
-              <div><label className="block text-gray-400">Início</label> <p className="font-medium">Título</p></div>
-              <div><label className="block text-gray-400 italic font-light">TipoExterno (Notificar)Interno</label></div>
-              <div>
-                <label className="block text-gray-400">WhatsApp ID</label>
-                <p className="font-mono text-xs text-blue-600">4599992869@u.s</p>
-              </div>
-              <div><label className="block text-gray-400">Conteúdo Secundário</label></div>
-            </div>
-
-            <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 text-[10px] font-bold">
-              <button className="hover:text-red-500">SALVAR</button>
-              <button className="hover:text-red-500">EXCLUIR</button>
-              <button className="hover:text-gray-500">FECHAR</button>
+            <div className="space-y-3 text-sm font-medium">
+              <p>Início</p>
+              <p>Título</p>
+              <p className="text-[10px] text-gray-500 italic font-normal">TipoExterno (Notificar) Interno</p>
+              <p className="text-xs font-mono text-blue-600 break-all">4599992869@u.s</p>
+              <p className="text-gray-400 text-xs">Conteúdo Secundário</p>
             </div>
           </div>
 
-          <span className="flex items-center justify-center font-bold text-gray-400">OU</span>
+          <div className="hidden xl:flex items-center font-bold text-gray-300">OU</div>
 
-          {/* PAINEL NOVO EVENTO */}
-          <div className="w-full sm:w-72 border-2 border-black rounded-[2rem] p-6">
-            <h3 className="font-bold uppercase text-sm mb-4">Novo Evento</h3>
-            <div className="space-y-3 text-sm">
-              <p className="text-gray-400">Início</p>
-              <p className="text-gray-400">Título</p>
-              <p className="text-gray-400 italic font-light">TipoExterno (Notificar)Interno</p>
-              <p className="text-gray-400 italic">WhatsApp ID</p>
-              <p className="font-mono text-xs text-gray-300">4599992869@u.s</p>
-              <p className="text-gray-400">Conteúdo Secundário</p>
-            </div>
-
-            <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 text-[10px] font-bold text-gray-400">
-              <button>SALVAR</button>
-              <button>EXCLUIR</button>
-              <button>FECHAR</button>
-            </div>
+          {/* PAINEL NOVO */}
+          <div className="w-full md:w-64 border-2 border-black rounded-[2.5rem] p-6 bg-white opacity-60">
+             <h3 className="font-bold text-xs uppercase mb-4">Novo Evento</h3>
+             <div className="space-y-4 text-sm text-gray-400 italic">
+               <p>Início</p>
+               <p>Título</p>
+               <p>TipoExterno...</p>
+               <p>WhatsApp ID</p>
+             </div>
           </div>
 
         </div>
