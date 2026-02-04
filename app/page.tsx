@@ -1,94 +1,128 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
-export default function AgendaPage() {
-  const colors = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a', black: '#000000' };
+export default function AgendaMarketing() {
+  const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null);
 
-  // Estilos base para garantir o visual do template
-  const cardStyle = { border: '2px solid black', borderRadius: '30px', padding: '20px', backgroundColor: 'white' };
-  const flexRow = { display: 'flex', flexDirection: 'row' as const, alignItems: 'center', gap: '20px' };
+  // Suas cores principais de marcação
+  const cores = {
+    laranja: '#f5886c',
+    azul: '#1260c7',
+    amarelo: '#ffce0a'
+  };
 
   return (
-    <div style={{ padding: '40px', fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="min-h-screen bg-[#fdfaf5] p-4 md:p-10 text-black font-sans">
       
-      {/* CABEÇALHO - EDITAR CLIENTE */}
-      <div style={{ ...cardStyle, ...flexRow, marginBottom: '40px', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', relative: 'true' } as any}>
-            A
+      {/* 1. CABEÇALHO: EDITAR CLIENTE */}
+      <header className="border-2 border-black rounded-[2.5rem] bg-white p-6 mb-10 flex flex-col md:flex-row items-center gap-6 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full border-2 border-black flex items-center justify-center text-xl font-bold">A</div>
+            <Settings className="absolute -top-1 -left-1 w-5 h-5 bg-white border border-black rounded-full p-0.5" />
+            <ChevronDown className="absolute -right-1 top-1/2 w-4 h-4" />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontWeight: 'bold' }}>Editar Cliente</h3>
-            <p style={{ fontSize: '12px', margin: '2px 0' }}>Nome do Cliente</p>
-            <p style={{ fontSize: '12px', margin: '2px 0' }}>WhatsApp ID (ChatId)</p>
+            <h2 className="font-bold text-lg">Editar Cliente</h2>
+            <div className="text-[12px] leading-tight text-gray-600">
+              <p>Nome do Cliente</p>
+              <p>WhatsApp ID (ChatId)</p>
+              <p>Email do Google</p>
+            </div>
           </div>
         </div>
-        <div style={{ flex: 1, border: '2px dashed #ccc', height: '80px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', marginLeft: '40px' }}>
+        <div className="flex-1 border-2 border-dashed border-gray-300 rounded-2xl h-20 flex items-center justify-center text-gray-400 text-sm italic">
           Adicionar foto do dispositivo
         </div>
+      </header>
+
+      {/* 2. NAVEGAÇÃO DO MÊS */}
+      <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-2">
+        <div className="flex items-center gap-2">
+          <ChevronLeft className="w-10 h-10 cursor-pointer hover:scale-110 transition" />
+          <h1 className="text-5xl font-black italic tracking-tighter">MÊS</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-5xl font-light">2026</span>
+          <ChevronRight className="w-10 h-10 cursor-pointer hover:scale-110 transition" />
+        </div>
       </div>
 
-      {/* TÍTULO MÊS / 2026 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <ChevronLeft size={40} />
-          <h1 style={{ fontSize: '60px', margin: 0, fontWeight: '900' }}>MÊS</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h1 style={{ fontSize: '60px', margin: 0, fontWeight: '300' }}>2026</h1>
-          <ChevronRight size={40} />
-        </div>
-      </div>
-
-      {/* GRID DE DIAS E PAINÉIS LATERAIS */}
-      <div style={{ display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
+      {/* 3. GRID DO CALENDÁRIO E PAINÉIS */}
+      <div className="flex flex-col xl:flex-row gap-8">
         
-        {/* CALENDÁRIO */}
-        <div style={{ flex: 2 }}>
-          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-            {[1, 2, 3, 4, 5].map(dia => (
-              <div key={dia} style={{ ...cardStyle, width: '120px', height: '120px', textAlign: 'center' }}>
-                <p style={{ fontWeight: 'bold', margin: '0 0 10px 0' }}>DIA {dia}</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colors.orange }}></div>
-                  <span style={{ fontSize: '10px', fontStyle: 'italic' }}>evento</span>
+        {/* CALENDÁRIO HORIZONTAL */}
+        <div className="flex-1 overflow-hidden">
+          <div className="flex gap-4 overflow-x-auto pb-6 snap-x">
+            {[...Array(31)].map((_, i) => (
+              <div 
+                key={i}
+                onClick={() => setDiaSelecionado(i + 1)}
+                className={`min-w-[130px] h-[130px] border-2 border-black rounded-[1.8rem] p-4 cursor-pointer transition-all snap-start
+                  ${diaSelecionado === i + 1 ? 'bg-orange-50 scale-105 border-orange-400' : 'bg-white hover:bg-gray-50'}
+                `}
+              >
+                <p className="font-bold text-sm uppercase">DIA {i + 1}</p>
+                <div className="flex items-center gap-1.5 mt-3">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cores.laranja }}></span>
+                  <span className="text-[10px] italic font-medium">evento</span>
                 </div>
               </div>
             ))}
           </div>
-          <p style={{ marginTop: '20px', textAlign: 'center', fontWeight: 'bold' }}>{"<--- Clicar e arrastar --->"}</p>
+          <p className="mt-4 text-center font-bold text-gray-500 italic tracking-widest">
+            {"<--- Clicar e arrastar --->"}
+          </p>
         </div>
 
-        {/* PAINÉIS DE EVENTO */}
-        <div style={{ display: 'flex', gap: '20px' }}>
-          <div style={{ ...cardStyle, width: '250px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '12px' }}>EDITAR EVENTO</span>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: colors.orange }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: colors.blue }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: colors.yellow }}></div>
+        {/* 4. PAINÉIS LATERAIS (MODAIS) */}
+        <div className="flex flex-col md:flex-row gap-6 shrink-0">
+          
+          {/* EDITAR EVENTO */}
+          <div className="w-full md:w-[280px] border-2 border-black rounded-[2.2rem] p-6 bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex justify-between items-center mb-5 border-b border-black pb-2">
+              <h3 className="font-bold text-xs uppercase tracking-tighter">EDITAR EVENTO</h3>
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: cores.laranja }}></div>
+                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: cores.azul }}></div>
+                <div className="w-3 h-3 rounded-full cursor-pointer" style={{ backgroundColor: cores.amarelo }}></div>
+                <Plus className="w-3 h-3 cursor-pointer" />
               </div>
             </div>
-            <div style={{ fontSize: '13px', lineHeight: '2' }}>
+            
+            <div className="space-y-4 text-sm font-medium">
               <p>Início</p>
               <p>Título</p>
-              <p style={{ color: '#666' }}>WhatsApp ID</p>
-              <p style={{ fontWeight: 'bold', fontSize: '11px' }}>4599992869@u.s</p>
+              <p className="text-[10px] text-gray-400 italic font-normal">TipoExterno (Notificar) Interno</p>
+              <div>
+                <p className="text-[11px] text-gray-400">WhatsApp ID</p>
+                <p className="font-mono text-[10px] text-blue-600">4599992869@u.s</p>
+              </div>
+              <p className="text-gray-400 text-xs">Conteúdo Secundário</p>
             </div>
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold' }}>
-              <span>SALVAR</span> <span>EXCLUIR</span> <span>FECHAR</span>
+
+            <div className="flex justify-between mt-8 pt-4 border-t border-gray-100 text-[10px] font-bold">
+              <button className="hover:text-orange-500 transition">SALVAR</button>
+              <button className="hover:text-red-500 transition">EXCLUIR</button>
+              <button className="hover:text-gray-400 transition">FECHAR</button>
             </div>
           </div>
 
-          <div style={{ alignSelf: 'center', fontWeight: 'bold' }}>OU</div>
+          <div className="hidden xl:flex items-center font-black text-gray-300">OU</div>
 
-          <div style={{ ...cardStyle, width: '250px', opacity: 0.5 }}>
-            <span style={{ fontWeight: 'bold', fontSize: '12px' }}>NOVO EVENTO</span>
-            {/* ... Conteúdo similar ao anterior ... */}
+          {/* NOVO EVENTO (ESTADO DESATIVADO) */}
+          <div className="w-full md:w-[280px] border-2 border-black rounded-[2.2rem] p-6 bg-white opacity-40">
+            <h3 className="font-bold text-xs uppercase mb-4">NOVO EVENTO</h3>
+            <div className="space-y-4 text-sm text-gray-300 italic">
+               <p>Início</p>
+               <p>Título</p>
+               <p>TipoExterno...</p>
+               <p>WhatsApp ID</p>
+             </div>
           </div>
+
         </div>
       </div>
     </div>
