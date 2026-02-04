@@ -2,31 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fundo Bege Suave do Rascunho */
+/* Definindo os pesos da Causten baseados na sua solicitação */
 body {
-  @apply bg-[#f4ece1] text-black antialiased font-sans p-4;
+  background-color: #ffffff;
+  color: #000000;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Quadrados dos Dias: Cantos bem arredondados e sem linhas finas */
-.fc-daygrid-day-frame {
-  @apply m-2 rounded-[30px] border-none bg-white shadow-sm transition-transform hover:scale-105 !important;
+.font-causten-bold {
+  font-family: 'Causten', sans-serif;
+  font-weight: 700; /* Negrito para títulos */
 }
 
-.fc-theme-standard td, .fc-theme-standard th {
-  @apply border-none !important; /* Remove as linhas de grade finas */
+.font-causten-normal {
+  font-family: 'Causten', sans-serif;
+  font-weight: 400; /* Normal para informações */
 }
 
-/* Cabeçalho do Calendário (dom, seg...) */
-.fc-col-header-cell {
-  @apply pb-4 font-black uppercase text-sm tracking-widest !important;
-}
-
-/* Modal e Cards Principais */
-.bubble-card {
-  @apply bg-white rounded-[50px] border-[3px] border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)];
-}
-
-/* Estilo do número do dia */
-.fc-daygrid-day-number {
-  @apply font-black italic text-4xl opacity-10 p-4 !important;
+/* Scrollbar invisível para o calendário horizontal */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
