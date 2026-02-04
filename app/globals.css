@@ -2,31 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-[#f4ece1] text-black font-sans antialiased;
-  }
+body {
+  background-color: #f4ece1; /* Fundo bege suave da imagem */
+  color: #000;
+  font-family: 'Inter', sans-serif;
 }
 
-/* CONTAINER ESTILO RASCUNHO */
-.sketch-border {
-  @apply border-[6px] border-black bg-white shadow-[12px_12px_0px_0px_rgba(0,0,0,1)];
+/* Containers com cantos super arredondados e sombra suave */
+.bubble-card {
+  @apply bg-white rounded-[40px] shadow-sm border border-gray-100;
 }
 
-/* BOTÕES E INPUTS NEO-BRUTALISTAS */
-.neo-input {
-  @apply bg-transparent border-b-4 border-black outline-none font-black italic uppercase text-3xl py-2 placeholder:opacity-20;
+/* Estilização das células do FullCalendar para parecerem quadrados arredondados */
+.fc-daygrid-day-frame {
+  @apply m-1 rounded-3xl border border-gray-100 bg-white transition-all hover:bg-gray-50 !important;
 }
 
-/* CALENDÁRIO CUSTOMIZADO */
-.fc {
-  @apply bg-white p-8 sketch-border rounded-[60px] !important;
+.fc-day-today .fc-daygrid-day-frame {
+  @apply bg-yellow-50 border-yellow-200 !important;
 }
 
-.fc-daygrid-day-number {
-  @apply font-black italic text-6xl opacity-10 p-4 !important;
-}
-
-.fc-col-header-cell-cushion {
-  @apply font-black uppercase text-xl !important;
+/* Esconder cabeçalho padrão do FullCalendar para usar o nosso customizado */
+.fc-header-toolbar {
+  display: none !important;
 }
