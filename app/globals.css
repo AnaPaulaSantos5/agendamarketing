@@ -2,27 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Importando a fonte Causten (supondo que os arquivos estejam em public/fonts) */
-@font-face {
-  font-family: 'Causten';
-  src: url('/fonts/Causten-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
+/* Estilo Base da Foto 3 */
+body {
+  @apply bg-[#f4ece1] text-black antialiased font-sans;
 }
 
-@font-face {
-  font-family: 'Causten';
-  src: url('/fonts/Causten-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
+/* Bordas Grossas e Sombras (Neo-Brutalismo) */
+.neo-card {
+  @apply border-[6px] border-black bg-white shadow-[12px_12px_0px_0px_rgba(0,0,0,1)];
 }
 
-/* Aplicando a fonte em todo o site e no calendário */
-:root {
-  --fc-button-bg-color: #1a1a1a;
-  --fc-button-border-color: #1a1a1a;
+/* Personalização do Calendário Estilo "Bolha" */
+.fc-theme-standard .fc-scrollgrid {
+  @apply border-[6px] border-black rounded-[40px] overflow-hidden !important;
 }
 
-body, .fc {
-  font-family: 'Causten', sans-serif !important;
+.fc-daygrid-day-number {
+  @apply font-black italic text-4xl opacity-10 p-4 !important;
 }
