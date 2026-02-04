@@ -5,58 +5,66 @@ import daygridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AgendaMarketing() {
+export default function TemplateFinal() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("");
 
   return (
-    <div className="p-10 max-w-7xl mx-auto space-y-12">
+    <div className="min-h-screen p-12 space-y-16 max-w-[1400px] mx-auto">
       
-      {/* HEADER: EDITAR CLIENTE */}
-      <header className="neo-card rounded-[60px] p-8 flex items-center justify-between h-40">
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full border-4 border-black flex items-center justify-center text-4xl font-black">A</div>
-          <div className="border-4 border-black rounded-[25px] p-4 bg-white shadow-[4px_4px_0px_0px_black]">
-            <h1 className="font-black text-2xl uppercase italic">Editar Cliente</h1>
+      {/* HEADER SUPERIOR (BORDAS ARREDONDADAS) */}
+      <header className="bg-white neo-border rounded-[70px] neo-shadow p-10 flex items-center justify-between h-44">
+        <div className="flex items-center gap-8">
+          <div className="w-24 h-24 rounded-full border-6 border-black flex items-center justify-center text-5xl font-black">A</div>
+          <div className="neo-border rounded-[30px] p-4 px-10 neo-shadow-sm">
+            <h1 className="font-black text-3xl uppercase italic leading-none">Editar Cliente</h1>
           </div>
         </div>
-        <span className="font-bold underline italic cursor-pointer">Adicionar foto do dispositivo</span>
+        <button className="font-black italic underline text-xl">Adicionar foto do dispositivo</button>
       </header>
 
-      {/* TIMELINE: MÊS 2026 */}
-      <div className="flex items-center gap-6">
-        <h2 className="text-9xl font-black italic uppercase tracking-tighter">Mês</h2>
-        <div className="flex-1 h-4 bg-black rounded-full"></div>
-        <h2 className="text-9xl font-black italic opacity-10 tracking-tighter">2026</h2>
+      {/* TIMELINE (MÊS 2026) */}
+      <div className="flex items-center gap-10">
+        <h2 className="text-[12rem] font-black italic uppercase tracking-tighter leading-none">Mês</h2>
+        <div className="flex-1 h-6 bg-black rounded-full"></div>
+        <h2 className="text-[12rem] font-black italic opacity-5 tracking-tighter leading-none">2026</h2>
       </div>
 
-      {/* CALENDÁRIO */}
-      <main className="bg-white rounded-[50px] p-6 neo-card">
+      {/* CALENDÁRIO (OCUPA A ÁREA PRINCIPAL) */}
+      <main className="relative">
         <FullCalendar 
           plugins={[daygridPlugin, interactionPlugin]} 
           initialView="dayGridMonth"
           headerToolbar={false}
-          dateClick={(arg: any) => { setSelectedDate(arg.dateStr); setModalOpen(true); }}
+          locale="pt-br"
+          dateClick={() => setModalOpen(true)}
         />
       </main>
 
-      {/* MODAL DE EVENTO (FOTO 3) */}
+      {/* MODAL CENTRALIZADO (ESTILO BALÃO DO TEMPLATE) */}
       <AnimatePresence>
         {modalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/30 backdrop-blur-md">
             <motion.div 
-              initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }}
-              className="neo-card rounded-[70px] p-12 max-w-lg w-full relative"
+              initial={{ scale: 0.8, y: 100 }} animate={{ scale: 1, y: 0 }}
+              className="bg-white neo-border rounded-[80px] neo-shadow p-16 max-w-2xl w-full relative"
             >
-              <h3 className="text-5xl font-black italic uppercase mb-8 border-b-4 border-black pb-4">Novo Evento</h3>
-              <div className="space-y-6 font-bold italic">
-                <input placeholder="TÍTULO" className="w-full text-4xl bg-transparent border-b-4 border-black outline-none" />
-                <div className="bg-[#fff9c4] border-4 border-black p-6 rounded-[30px] shadow-[8px_8px_0px_0px_black] -rotate-1">
-                  <p className="text-blue-600 underline text-xl font-mono">WhatsApp ID: 4599992869@u.s</p>
+              <div className="flex justify-between items-center mb-10 border-b-8 border-black pb-4">
+                <h3 className="text-6xl font-black italic uppercase tracking-tighter">Post Agenda</h3>
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#f5886c] border-4 border-black"></div>
+                  <div className="w-10 h-10 rounded-full bg-[#1260c7] border-4 border-black"></div>
+                  <div className="w-10 h-10 rounded-full bg-[#ffce0a] border-4 border-black"></div>
                 </div>
-                <div className="flex gap-8 pt-6">
-                  <button className="text-3xl font-black hover:underline decoration-yellow-400">SALVAR</button>
-                  <button onClick={() => setModalOpen(false)} className="text-3xl font-black opacity-30">FECHAR</button>
+              </div>
+
+              <div className="space-y-8 font-black italic uppercase">
+                <input placeholder="TÍTULO..." className="w-full text-7xl bg-transparent border-b-8 border-black outline-none placeholder:opacity-20" />
+                <div className="bg-[#fff9c4] neo-border rounded-[40px] p-8 neo-shadow-sm rotate-[-2deg]">
+                  <p className="text-3xl text-blue-700 underline font-mono">4599992869@u.s</p>
+                </div>
+                <div className="flex gap-10 text-5xl pt-10">
+                  <button className="hover:underline decoration-[10px] decoration-yellow-400">SALVAR</button>
+                  <button onClick={() => setModalOpen(false)} className="opacity-20">FECHAR</button>
                 </div>
               </div>
             </motion.div>
