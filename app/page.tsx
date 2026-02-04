@@ -1,213 +1,155 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { Settings, X, Plus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AgendaPage() {
-  // --- ESTADOS DE DADOS ---
-  const [diaAtivo, setDiaAtivo] = useState<number>(1);
-  const [modoEdicao, setModoEdicao] = useState(true);
-  const [showPerfilModal, setShowPerfilModal] = useState(false);
-  const [mesIndex, setMesIndex] = useState(1); // 1 = Fevereiro
-  const [anoAtual, setAnoAtual] = useState(2026);
-  const [corSelecionada, setCorSelecionada] = useState('#f5886c');
+// Simulação de Banco de Dados de Eventos
+const eventosIniciais = [
+  { id: '1', dia: 1, titulo: 'Reunião Marketing', cor: '#f5886c', whatsapp: '4599992869@u.s' }
+];
 
-  const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+export default function AgendaFuncional() {
+  // --- ESTADOS DE CONTROLE ---
+  const [eventos, setEventos] = useState(eventosIniciais);
+  const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null);
+  
+  // Modais
+  const [showConfigModal, setShowConfigModal] = useState(false); // Modal da Engrenagem
+  const [showEventModal, setShowEventModal] = useState(false);   // Modal de Eventos (Novo/Editar)
+  
+  // Dados do Formulário
+  const [tempEvento, setTempEvento] = useState({ id: '', titulo: '', whatsapp: '', cor: '#f5886c' });
 
-  const colors = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a', black: '#000000' };
+  // --- AÇÕES ---
 
-  // Funções de Navegação
-  const proximoMes = () => {
-    if (mesIndex === 11) { setMesIndex(0); setAnoAtual(anoAtual + 1); } 
-    else { setMesIndex(mesIndex + 1); }
+  // 1. Ao clicar em um dia do calendário
+  const handleDiaClick = (dia: number) => {
+    setDiaSelecionado(dia);
+    const eventoExistente = eventos.find(e => e.dia === dia);
+
+    if (eventoExistente) {
+      // MODO EDIÇÃO: Carrega dados existentes
+      setTempEvento(eventoExistente);
+    } else {
+      // MODO NOVO: Reseta o formulário
+      setTempEvento({ id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
+    }
+    setShowEventModal(true);
   };
-  const mesAnterior = () => {
-    if (mesIndex === 0) { setMesIndex(11); setAnoAtual(anoAtual - 1); } 
-    else { setMesIndex(mesIndex - 1); }
+
+  // 2. Salvar ou Atualizar
+  const handleSalvar = () => {
+    if (tempEvento.id) {
+      // Atualiza existente
+      setEventos(eventos.map(e => e.id === tempEvento.id ? { ...tempEvento } : e));
+    } else {
+      // Cria novo
+      const novo = { ...tempEvento, id: Date.now().toString(), dia: diaSelecionado! };
+      setEventos([...eventos, novo]);
+    }
+    setShowEventModal(false);
   };
 
-  const cardStyle: React.CSSProperties = { 
-    border: '2px solid black', 
-    borderRadius: '35px', 
-    padding: '24px', 
-    backgroundColor: 'white',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+  // 3. Excluir Evento
+  const handleExcluir = () => {
+    setEventos(eventos.filter(e => e.id !== tempEvento.id));
+    setShowEventModal(false);
   };
 
   return (
-    <div className="p-10 max-w-[1450px] mx-auto bg-white min-h-screen font-sans antialiased">
+    <div className="min-h-screen bg-[#f4ece1] p-10 font-sans">
       
-      {/* CABEÇALHO - PERFIL E ENGRENAGEM */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '50px', height: '180px' }}>
-        <div className="flex items-center gap-8 min-w-[380px]">
-          <div className="relative">
-            <div className="w-24 h-24 rounded-full border-2 border-black flex items-center justify-center text-4xl font-black bg-gray-50">
-              A
-            </div>
-            <button 
-              onClick={() => setShowPerfilModal(true)}
-              className="absolute -top-2 -left-2 bg-white border border-black rounded-full p-2 hover:bg-black hover:text-white transition-all"
+      {/* HEADER: Ação na Engrenagem */}
+      <div className="flex items-center gap-4 mb-10">
+        <div className="relative">
+          <button onClick={() => setShowConfigModal(true)} className="p-2 bg-white border border-black rounded-full hover:bg-black hover:text-white transition-all">
+            <Settings size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* GRADE DO CALENDÁRIO (SIMPLIFICADA) */}
+      <div className="grid grid-cols-7 gap-4">
+        {[...Array(31)].map((_, i) => {
+          const dia = i + 1;
+          const temEvento = eventos.find(e => e.dia === dia);
+          return (
+            <div 
+              key={dia}
+              onClick={() => handleDiaClick(dia)}
+              className="h-32 bg-white rounded-[25px] border border-black/5 p-4 cursor-pointer hover:shadow-lg transition-all"
             >
-              <Settings size={22} />
-            </button>
-            <ChevronDown size={24} className="absolute -right-5 top-1/2 -translate-y-1/2 cursor-pointer text-black/20" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-3xl font-black uppercase italic tracking-tighter">Editar Cliente</h3>
-            <p className="text-sm font-medium opacity-40 uppercase tracking-widest">Configurações de Perfil</p>
-          </div>
-        </div>
-
-        {/* ÁREA DE FOTO DISPOSITIVO */}
-        <div className="flex-1 border-2 border-dashed border-black/10 h-full rounded-[30px] flex items-center justify-center text-black/20 font-bold italic text-xl hover:border-black hover:text-black transition-all cursor-pointer">
-          Adicionar foto do dispositivo
-        </div>
+              <span className="font-bold opacity-20">{dia}</span>
+              {temEvento && (
+                <div style={{ backgroundColor: temEvento.cor }} className="w-3 h-3 rounded-full mt-2" />
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* TÍTULO MÊS / ANO COM LINHA DE CONEXÃO */}
-      <div className="flex justify-between items-center mb-12 group">
-        <div className="flex items-center gap-8">
-          <ChevronLeft size={55} strokeWidth={3} className="cursor-pointer hover:scale-125 transition-transform" onClick={mesAnterior} />
-          <h1 className="text-9xl font-black italic tracking-tighter uppercase leading-none">{meses[mesIndex]}</h1>
-        </div>
-        <div className="flex-1 mx-16 h-1 bg-black rounded-full" />
-        <div className="flex items-center gap-8">
-          <h1 className="text-9xl font-light tracking-tighter uppercase leading-none opacity-10">{anoAtual}</h1>
-          <ChevronRight size={55} strokeWidth={3} className="cursor-pointer hover:scale-125 transition-transform" onClick={proximoMes} />
-        </div>
-      </div>
-
-      {/* CALENDÁRIO HORIZONTAL (SISTEMA DE BOLHAS) */}
-      <div className="mb-14">
-        <div className="flex gap-6 overflow-x-auto pb-8 no-scrollbar scroll-smooth">
-          {[...Array(20)].map((_, i) => {
-            const dia = i + 1;
-            const isSelected = diaAtivo === dia;
-            return (
-              <div 
-                key={dia} 
-                onClick={() => { setDiaAtivo(dia); setModoEdicao(true); }}
-                style={{ 
-                  ...cardStyle, 
-                  minWidth: '170px', 
-                  height: '170px', 
-                  borderColor: isSelected ? corSelecionada : 'black',
-                  backgroundColor: isSelected ? `${corSelecionada}10` : 'white',
-                  transform: isSelected ? 'translateY(-10px)' : 'none',
-                  boxShadow: isSelected ? `0 15px 30px -10px ${corSelecionada}40` : 'none'
-                }}
-                className="cursor-pointer group"
-              >
-                <p className="font-black text-2xl mb-4 italic uppercase">Dia {dia}</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: isSelected ? corSelecionada : '#eee' }} />
-                  <span className="text-xs font-bold italic opacity-30 group-hover:opacity-100 transition-opacity uppercase">Status</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ÁREA DE MODAIS LADO A LADO */}
-      <div className="flex gap-12 items-start">
-        
-        {/* PAINEL EDITAR EVENTO */}
-        <div style={{ 
-          ...cardStyle, 
-          width: '500px', 
-          boxShadow: modoEdicao ? '15px 15px 0px black' : 'none',
-          opacity: modoEdicao ? 1 : 0.3,
-          pointerEvents: modoEdicao ? 'auto' : 'none'
-        }}>
-          <div className="flex justify-between items-center mb-10">
-            <span className="font-black text-2xl italic uppercase tracking-tighter">Editar Evento</span>
-            <div className="flex gap-3 items-center">
-              {Object.entries(colors).map(([name, code]) => (
-                <div 
-                  key={name} 
-                  onClick={() => setCorSelecionada(code)}
-                  style={{ backgroundColor: code }} 
-                  className={`w-7 h-7 rounded-full border-2 border-black cursor-pointer transition-transform ${corSelecionada === code ? 'scale-125' : 'hover:scale-110'}`} 
-                />
-              ))}
-              <Plus size={24} className="ml-4 cursor-pointer text-black/30 hover:text-black" onClick={() => setModoEdicao(false)} />
-            </div>
-          </div>
-          
-          <div className="space-y-8 font-bold italic">
-            <div className="border-b-2 border-black/5 pb-2">
-              <p className="text-[10px] opacity-20 uppercase mb-1">Início</p>
-              <input className="w-full bg-transparent text-xl outline-none" defaultValue={`Dia ${diaAtivo} de ${meses[mesIndex]}`} />
-            </div>
-            <div className="border-b-2 border-black/5 pb-2">
-              <p className="text-[10px] opacity-20 uppercase mb-1">Título</p>
-              <input className="w-full bg-transparent text-3xl outline-none placeholder:opacity-20 uppercase" placeholder="Nome do Evento" />
-            </div>
-            <div style={{ backgroundColor: corSelecionada }} className="p-6 rounded-[25px] text-white shadow-[6px_6px_0px_0px_rgba(0,0,0,0.1)]">
-              <p className="text-xs uppercase font-black mb-1">WhatsApp ID</p>
-              <p className="text-2xl font-mono underline">4599992869@u.s</p>
-            </div>
-          </div>
-
-          <div className="mt-12 flex justify-between font-black text-sm tracking-widest italic">
-            <button className="hover:underline decoration-4">SALVAR</button>
-            <button className="opacity-20 hover:opacity-100">EXCLUIR</button>
-            <button className="opacity-20 hover:opacity-100">FECHAR</button>
-          </div>
-        </div>
-
-        <div className="self-center font-black text-4xl opacity-5 italic select-none">OU</div>
-
-        {/* PAINEL NOVO EVENTO */}
-        <div 
-          onClick={() => setModoEdicao(false)}
-          style={{ 
-            ...cardStyle, 
-            width: '500px', 
-            opacity: !modoEdicao ? 1 : 0.3, 
-            boxShadow: !modoEdicao ? '15px 15px 0px black' : 'none',
-            cursor: 'pointer'
-          }}
-          className="group"
-        >
-          <span className="font-black text-2xl block mb-10 italic uppercase tracking-tighter">Novo Evento</span>
-          <div className="space-y-6 opacity-30 italic group-hover:opacity-100 transition-opacity">
-            <p className="text-3xl border-b-2 border-black/5">Início</p>
-            <p className="text-3xl border-b-2 border-black/5">Título</p>
-            <p className="text-xl">WhatsApp ID...</p>
-          </div>
-        </div>
-      </div>
-
-      {/* MODAL DE PERFIL (ABRE PELA ENGRENAGEM) */}
+      {/* --- CAMADA DE MODAIS (FLUTUANTES) --- */}
       <AnimatePresence>
-        {showPerfilModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/10 backdrop-blur-md p-6">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              style={{ ...cardStyle, width: '550px', boxShadow: '25px 25px 0px black' }}>
-              <div className="flex justify-between items-center mb-10 pb-4 border-b-4 border-black">
-                <h2 className="text-5xl font-black italic uppercase tracking-tighter">Editar Cliente</h2>
-                <X className="cursor-pointer hover:rotate-90 transition-transform" onClick={() => setShowPerfilModal(false)} />
+        
+        {/* 1. MODAL DE CONFIGURAÇÃO (ENGRENAGEM) */}
+        {showConfigModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/10 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white p-10 rounded-[40px] border-2 border-black w-full max-w-md shadow-2xl">
+              <div className="flex justify-between mb-6">
+                <h2 className="font-bold text-2xl uppercase italic">Editar Cliente</h2>
+                <X onClick={() => setShowConfigModal(false)} className="cursor-pointer" />
               </div>
-              <div className="flex flex-col gap-10">
-                <div className="space-y-2">
-                  <p className="text-xs font-black uppercase opacity-30">Nome do Cliente</p>
-                  <input className="w-full border-b-4 border-black bg-transparent text-3xl font-black italic outline-none" placeholder="Ana Paula..." />
+              {/* Conteúdo do Modal aqui */}
+              <button onClick={() => setShowConfigModal(false)} className="w-full bg-black text-white py-3 rounded-full font-bold">SALVAR ALTERAÇÕES</button>
+            </motion.div>
+          </div>
+        )}
+
+        {/* 2. MODAL DE EVENTOS (NOVO OU EDITAR) */}
+        {showEventModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/10 backdrop-blur-sm">
+            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="bg-white p-10 rounded-[45px] border-2 border-black w-full max-w-lg shadow-2xl relative">
+              
+              <h2 className="text-4xl font-black italic uppercase mb-8 border-b-2 border-black/10 pb-4">
+                {tempEvento.id ? 'Editar Evento' : 'Novo Evento'}
+              </h2>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Título do Evento</label>
+                  <input 
+                    className="w-full text-2xl font-bold italic outline-none bg-transparent"
+                    value={tempEvento.titulo}
+                    onChange={(e) => setTempEvento({...tempEvento, titulo: e.target.value})}
+                    placeholder="DIGITE AQUI..."
+                  />
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-black uppercase opacity-30">WhatsApp ID</p>
-                  <input className="w-full border-b-4 border-black bg-transparent text-3xl font-black italic outline-none" placeholder="ID do Chat" />
+
+                <div className="flex gap-3 mb-6">
+                  {['#f5886c', '#1260c7', '#ffce0a'].map(c => (
+                    <div 
+                      key={c} 
+                      onClick={() => setTempEvento({...tempEvento, cor: c})}
+                      style={{ backgroundColor: c }} 
+                      className={`w-8 h-8 rounded-full border border-black cursor-pointer ${tempEvento.cor === c ? 'scale-125' : 'opacity-40'}`}
+                    />
+                  ))}
                 </div>
-                <div className="flex gap-10 pt-6 font-black text-2xl italic tracking-tighter uppercase">
-                  <button className="hover:underline decoration-8 decoration-yellow-400">Salvar Alterações</button>
-                  <button onClick={() => setShowPerfilModal(false)} className="opacity-20 hover:opacity-100">Cancelar</button>
+
+                {/* BOTÕES DE AÇÃO */}
+                <div className="flex gap-8 pt-6 font-bold uppercase italic text-sm tracking-widest">
+                  <button onClick={handleSalvar} className="hover:text-blue-600 transition-colors">SALVAR</button>
+                  {tempEvento.id && (
+                    <button onClick={handleExcluir} className="text-red-500 hover:underline">EXCLUIR</button>
+                  )}
+                  <button onClick={() => setShowEventModal(false)} className="opacity-20 hover:opacity-100">FECHAR</button>
                 </div>
               </div>
             </motion.div>
           </div>
         )}
+
       </AnimatePresence>
     </div>
   );
