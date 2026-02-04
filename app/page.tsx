@@ -1,71 +1,68 @@
 "use client";
+import React, { useState } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import daygridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { useSession } from "next-auth/react";
-import { useState } from "react";
-// ... outros imports
-
-export default function MarketingAgenda() {
-  const { data: session, status } = useSession();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  // Se estiver carregando a sessão, mostramos um loading simples
-  if (status === "loading") return <div className="h-screen flex items-center justify-center font-causten">Carregando Agenda...</div>;
+export default function AgendaMarketing() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
 
   return (
-    <div className="min-h-screen font-causten bg-[#F8FAFC]">
-      {/* Sidebar com Foto do Usuário conforme solicitado */}
-      <aside className="fixed left-0 h-full w-20 flex flex-col items-center py-6 bg-white border-r">
-        <img 
-          src={session?.user?.image || "https://ui-avatars.com/api/?name=User"} 
-          className="w-12 h-12 rounded-full cursor-pointer hover:ring-4 ring-blue-100 transition-all"
-          onClick={() => setIsProfileOpen(true)}
-          alt="Perfil"
-        />
-        {/* Playlist Spotify aqui embaixo como você pediu */}
-        <div className="mt-auto mb-4">
-           {/* Widget Spotify */}
-        </div>
-      </aside>
-
-      {/* Modal de Perfil com os dados do seu arquivo route.ts */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl border border-slate-100">
-            <div className="flex flex-col items-center mb-6">
-              <img src={session?.user?.image || ""} className="w-20 h-20 rounded-full mb-3" />
-              <h3 className="text-xl font-black">{session?.user?.name}</h3>
-              <span className="text-[10px] bg-blue-100 text-blue-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest">
-                {session?.user?.role} - {session?.user?.perfil}
-              </span>
-            </div>
-
-            <div className="space-y-4 text-sm font-medium">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-slate-400 text-xs">E-mail</p>
-                <p>{session?.user?.email}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-slate-400 text-xs">Chat ID (WAHA)</p>
-                <p className="font-mono text-blue-600">
-                   {session?.user?.responsavelChatId || "Não vinculado"}
-                </p>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setIsProfileOpen(false)}
-              className="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-lg"
-            >
-              Fechar
-            </button>
+    <div className="p-10 max-w-7xl mx-auto space-y-12">
+      
+      {/* HEADER: EDITAR CLIENTE */}
+      <header className="neo-card rounded-[60px] p-8 flex items-center justify-between h-40">
+        <div className="flex items-center gap-6">
+          <div className="w-20 h-20 rounded-full border-4 border-black flex items-center justify-center text-4xl font-black">A</div>
+          <div className="border-4 border-black rounded-[25px] p-4 bg-white shadow-[4px_4px_0px_0px_black]">
+            <h1 className="font-black text-2xl uppercase italic">Editar Cliente</h1>
           </div>
         </div>
-      )}
+        <span className="font-bold underline italic cursor-pointer">Adicionar foto do dispositivo</span>
+      </header>
 
-      {/* Calendário Centralizado */}
-      <main className="ml-20 p-8">
-        {/* ... código do calendário ... */}
+      {/* TIMELINE: MÊS 2026 */}
+      <div className="flex items-center gap-6">
+        <h2 className="text-9xl font-black italic uppercase tracking-tighter">Mês</h2>
+        <div className="flex-1 h-4 bg-black rounded-full"></div>
+        <h2 className="text-9xl font-black italic opacity-10 tracking-tighter">2026</h2>
+      </div>
+
+      {/* CALENDÁRIO */}
+      <main className="bg-white rounded-[50px] p-6 neo-card">
+        <FullCalendar 
+          plugins={[daygridPlugin, interactionPlugin]} 
+          initialView="dayGridMonth"
+          headerToolbar={false}
+          dateClick={(arg: any) => { setSelectedDate(arg.dateStr); setModalOpen(true); }}
+        />
       </main>
+
+      {/* MODAL DE EVENTO (FOTO 3) */}
+      <AnimatePresence>
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }}
+              className="neo-card rounded-[70px] p-12 max-w-lg w-full relative"
+            >
+              <h3 className="text-5xl font-black italic uppercase mb-8 border-b-4 border-black pb-4">Novo Evento</h3>
+              <div className="space-y-6 font-bold italic">
+                <input placeholder="TÍTULO" className="w-full text-4xl bg-transparent border-b-4 border-black outline-none" />
+                <div className="bg-[#fff9c4] border-4 border-black p-6 rounded-[30px] shadow-[8px_8px_0px_0px_black] -rotate-1">
+                  <p className="text-blue-600 underline text-xl font-mono">WhatsApp ID: 4599992869@u.s</p>
+                </div>
+                <div className="flex gap-8 pt-6">
+                  <button className="text-3xl font-black hover:underline decoration-yellow-400">SALVAR</button>
+                  <button onClick={() => setModalOpen(false)} className="text-3xl font-black opacity-30">FECHAR</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
