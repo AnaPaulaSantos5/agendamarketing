@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, Mail, MessageSquare, LogOut, Send, CheckCircle2, XCircle } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, Mail, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -22,6 +22,10 @@ export default function AgendaPage() {
   const [showPerfilSelector, setShowPerfilSelector] = useState(false);
   const [capaImage, setCapaImage] = useState<string | null>(null);
   const [enviandoZap, setEnviandoZap] = useState(false);
+  
+  // Novo estado para controlar os eventos do dia selecionado no modal
+  const [eventosDoDiaSelecionado, setEventosDoDiaSelecionado] = useState<any[]>([]);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tempEvento, setTempEvento] = useState({
@@ -50,15 +54,13 @@ export default function AgendaPage() {
     if (savedCapa) setCapaImage(savedCapa);
     if (status === "authenticated") {
         carregarDados();
-        const interval = setInterval(carregarDados, 15000); // Atualiza feed a cada 15s
+        const interval = setInterval(carregarDados, 15000); 
         return () => clearInterval(interval);
     }
   }, [status, session, router]);
 
   const handleDispararWhatsApp = async () => {
-    // Busca o destino: prioriza o chatId do modal, senão usa o do perfil ativo
     const destino = tempEvento.chatId || perfilAtivo?.chatId;
-    
     if (!destino) return alert("Selecione um perfil com ChatID válido!");
     
     setEnviandoZap(true);
@@ -94,6 +96,32 @@ export default function AgendaPage() {
     if (res.ok) { alert("Gravado!"); setShowEventModal(false); carregarDados(); }
   };
 
+  // --- NOVA FUNÇÃO DE EXCLUIR ---
+  const handleExcluir = async () => {
+    if (!tempEvento.id) return;
+    if (!confirm("Tem certeza que deseja excluir este evento?")) return;
+
+    try {
+        // Enviaremos um DELETE (certifique-se que sua API suporta ou use POST com action)
+        // Se sua API atual só aceita POST, podemos adaptar, mas o ideal é DELETE.
+        // Vou usar DELETE aqui, se der erro 405, me avise que mudamos para POST.
+        const res = await fetch('/api/agenda', { 
+            method: 'DELETE', 
+            body: JSON.stringify({ id: tempEvento.id }) 
+        });
+
+        if (res.ok) {
+            alert("Evento excluído!");
+            setShowEventModal(false);
+            carregarDados();
+        } else {
+            alert("Erro ao excluir.");
+        }
+    } catch (e) {
+        alert("Erro de conexão.");
+    }
+  };
+
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
   const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
   const diasNoMes = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate(), [dataAtiva]);
@@ -106,32 +134,76 @@ export default function AgendaPage() {
     return d >= i && d <= f;
   };
 
+  // --- LÓGICA MELHORADA DE CLIQUES ---
+
+  // 1. Clicar no dia (Espaço vazio) -> Abre Novo Evento (mas mostra lista dos existentes)
   const handleDiaClick = (dia: number) => {
     const dataStr = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
     setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia));
-    const existente = eventos.find(e => isDiaNoPeriodo(dataStr, e.dataInicio?.split(' ')[0], e.dataFim?.split(' ')[0]));
-    if (existente) {
-      setTempEvento({ 
-        ...tempEvento, 
-        id: existente.id, 
-        titulo: existente.titulo, 
-        dataInicio: existente.dataInicio?.split(' ')[0], 
-        dataTermino: existente.dataFim?.split(' ')[0], 
-        cor: existente.cor, 
-        tipo: existente.tipo || 'externo', 
-        linkDrive: existente.linkDrive || '', 
-        conteudoSecundario: existente.conteudoSecundario || '', 
-        chatId: existente.chatId || perfilAtivo?.chatId || '' 
-      });
-    } else {
-      setTempEvento({ 
-        ...tempEvento, 
+    
+    // Busca TODOS os eventos do dia
+    const eventosDoDia = eventos.filter(e => isDiaNoPeriodo(dataStr, e.dataInicio?.split(' ')[0], e.dataFim?.split(' ')[0]));
+    setEventosDoDiaSelecionado(eventosDoDia);
+
+    // Prepara um NOVO evento por padrão
+    setTempEvento({ 
         id: '', dataInicio: dataStr, dataTermino: dataStr, titulo: '', 
         conteudoSecundario: '', perfil: perfilAtivo?.nome || '', 
-        chatId: perfilAtivo?.chatId || '', linkDrive: '' 
-      });
-    }
+        chatId: perfilAtivo?.chatId || '', linkDrive: '', 
+        cor: CORES_PASTEL[0], tipo: 'externo', horaInicio: '08:00', horaFim: '09:00'
+    });
+    
     setShowEventModal(true);
+  };
+
+  // 2. Clicar na BOLINHA -> Abre aquele evento específico
+  const handleEventoClick = (e: React.MouseEvent, evento: any) => {
+    e.stopPropagation(); // Impede que abra o "novo evento" do handleDiaClick
+
+    // Define a data ativa para o dia do evento (caso clique num evento que atravessa meses, visualmente ajuda)
+    // Mas aqui vamos focar em carregar o evento
+    setTempEvento({ 
+        ...tempEvento, 
+        id: evento.id, 
+        titulo: evento.titulo, 
+        dataInicio: evento.dataInicio?.split(' ')[0], 
+        dataTermino: evento.dataFim?.split(' ')[0], 
+        cor: evento.cor, 
+        tipo: evento.tipo || 'externo', 
+        linkDrive: evento.linkDrive || '', 
+        conteudoSecundario: evento.conteudoSecundario || '', 
+        chatId: evento.chatId || perfilAtivo?.chatId || '' 
+    });
+
+    // Também carregamos a lista do dia desse evento para navegação
+    const dataStr = evento.dataInicio?.split(' ')[0];
+    const eventosDoDia = eventos.filter(ev => isDiaNoPeriodo(dataStr, ev.dataInicio?.split(' ')[0], ev.dataFim?.split(' ')[0]));
+    setEventosDoDiaSelecionado(eventosDoDia);
+
+    setShowEventModal(true);
+  };
+
+  const selecionarEventoDaLista = (evento: any) => {
+      setTempEvento({ 
+        ...tempEvento, 
+        id: evento.id, 
+        titulo: evento.titulo, 
+        dataInicio: evento.dataInicio?.split(' ')[0], 
+        dataTermino: evento.dataFim?.split(' ')[0], 
+        cor: evento.cor, 
+        tipo: evento.tipo || 'externo', 
+        linkDrive: evento.linkDrive || '', 
+        conteudoSecundario: evento.conteudoSecundario || '', 
+        chatId: evento.chatId || perfilAtivo?.chatId || '' 
+    });
+  };
+
+  const prepararNovoNoMesmoDia = () => {
+      setTempEvento({ 
+        ...tempEvento, 
+        id: '', titulo: '', conteudoSecundario: '', linkDrive: '', 
+        // Mantém as datas
+      });
   };
 
   if (status === "loading") return <div className="h-screen grid place-items-center font-black text-2xl">Sincronizando...</div>;
@@ -243,8 +315,16 @@ export default function AgendaPage() {
             return (
               <div key={dia} onClick={() => handleDiaClick(dia)} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer transition-all hover:scale-105 flex flex-col justify-between shadow-sm ${dataAtiva.getDate() === dia ? 'bg-orange-50' : 'bg-white'}`}>
                 <span className="text-2xl font-black tracking-tighter">{dia}</span>
-                <div className="flex gap-1 flex-wrap">
-                    {evs.map((ev, idx) => <div key={idx} className="w-3 h-3 rounded-full border border-black shadow-sm" style={{ backgroundColor: ev.cor }} />)}
+                <div className="flex gap-1 flex-wrap content-start">
+                    {/* AS MARCAÇÕES AGORA SÃO CLICÁVEIS! */}
+                    {evs.map((ev, idx) => (
+                        <div 
+                            key={idx} 
+                            onClick={(e) => handleEventoClick(e, ev)} // Clique individual
+                            className="w-3 h-3 rounded-full border border-black shadow-sm cursor-pointer hover:scale-150 transition-transform" 
+                            style={{ backgroundColor: ev.cor }} 
+                        />
+                    ))}
                 </div>
               </div>
             );
@@ -290,12 +370,12 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL EVENTO */}
+      {/* MODAL EVENTO ATUALIZADO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
             <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white border-2 border-black rounded-[60px] p-12 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
-              <div className="flex justify-between items-center mb-10 border-b-2 border-black pb-4">
+              <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-4">
                 <h2 className="text-4xl font-black uppercase leading-none">{tempEvento.id ? 'Editar Registro' : 'Novo Registro'}</h2>
                 <div className="flex gap-2">
                     {CORES_PASTEL.map(c => (
@@ -304,6 +384,26 @@ export default function AgendaPage() {
                 </div>
                 <X className="cursor-pointer" onClick={() => setShowEventModal(false)} />
               </div>
+
+              {/* BARRA DE NAVEGAÇÃO DE EVENTOS DO DIA */}
+              {eventosDoDiaSelecionado.length > 0 && (
+                  <div className="mb-8 flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border-2 border-black/5 overflow-x-auto">
+                      <span className="text-[10px] font-black uppercase opacity-40 whitespace-nowrap">Eventos do dia:</span>
+                      {eventosDoDiaSelecionado.map((ev, idx) => (
+                          <div 
+                            key={idx} 
+                            onClick={() => selecionarEventoDaLista(ev)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer border transition-all ${tempEvento.id === ev.id ? 'bg-white border-black shadow-[2px_2px_0px_black]' : 'border-transparent hover:bg-white'}`}
+                          >
+                              <div className="w-3 h-3 rounded-full border border-black" style={{backgroundColor: ev.cor}} />
+                              <span className="text-xs font-bold truncate max-w-[100px]">{ev.titulo}</span>
+                          </div>
+                      ))}
+                      <button onClick={prepararNovoNoMesmoDia} className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-full hover:scale-110 transition-transform" title="Novo evento neste dia">
+                          <Plus size={16} />
+                      </button>
+                  </div>
+              )}
               
               <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-6">
@@ -354,8 +454,20 @@ export default function AgendaPage() {
                 </div>
 
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
-                  <div className="flex gap-10">
+                  <div className="flex gap-4">
                     <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-[12px] transition-all">Gravar</button>
+                    
+                    {/* BOTÃO DE EXCLUIR (LIXEIRA) */}
+                    {tempEvento.id && (
+                        <button 
+                            onClick={handleExcluir} 
+                            className="flex items-center gap-2 text-red-500 hover:scale-110 transition-transform" 
+                            title="Excluir evento"
+                        >
+                            <Trash2 size={24} />
+                        </button>
+                    )}
+
                     <button 
                         onClick={handleDispararWhatsApp} 
                         disabled={enviandoZap} 
