@@ -1,60 +1,34 @@
-import NextAuth, { JWT } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+// app/api/auth/[...nextauth]/route.ts
 
-interface CustomToken extends JWT {
-  perfil?: "Confi" | "Cecília" | "Luiza" | "Júlio";
-  responsavelChatId?: string;
-  role?: "admin" | "user";
-}
+const EMAILS_PERMITIDOS = [
+  "ana.paulinhacarneirosantos@gmail.com",
+  "cecilia@seuemail.com",
+  "luiza@seuemail.com",
+  "julio@seuemail.com"
+];
 
 const handler = NextAuth({
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
-      },
-    }),
-  ],
-
+  // ... providers (mantenha como está)
   callbacks: {
-    async jwt({ token, profile }) {
-      const customToken = token as CustomToken;
-
-      if (profile?.email) {
-        const email = profile.email.toLowerCase();
-
-        if (email === "ana.paulinhacarneirosantos@gmail.com") {
-          customToken.perfil = "Confi";
-          customToken.responsavelChatId = "55999999999";
-          customToken.role = "admin";
-        } else {
-          customToken.perfil = "Confi";
-          customToken.responsavelChatId = "";
-          customToken.role = "user";
-        }
+    async signIn({ user }) {
+      if (user.email && EMAILS_PERMITIDOS.includes(user.email.toLowerCase())) {
+        return true; // Acesso liberado
       }
-
-      return { ...token, ...customToken };
+      return "/login?error=AcessoNegado"; // Redireciona se não estiver na lista
+    },
+    
+    async jwt({ token, profile }) {
+      // ... sua lógica de JWT que já temos
+      return token;
     },
 
     async session({ session, token }) {
-      session.user.perfil = (token as CustomToken).perfil || "Confi";
-      session.user.responsavelChatId =
-        (token as CustomToken).responsavelChatId || "";
-      session.user.role = (token as CustomToken).role || "user";
-
+      // ... sua lógica de sessão que já temos
       return session;
-    },
+    }
   },
-
-  session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: '/login',
+    error: '/login', // Centraliza erros na sua página de login
+  }
 });
-
-export { handler as GET, handler as POST };
