@@ -30,7 +30,6 @@ export default function AgendaPage() {
 
   // --- 1. PROTEÇÃO DE ROTA E CARREGAMENTO DE DADOS ---
   useEffect(() => {
-    // Se não estiver logado, redireciona para o login IMEDIATAMENTE
     if (status === "unauthenticated") {
       router.replace("/login");
       return;
@@ -43,14 +42,12 @@ export default function AgendaPage() {
         if (data.events) setEventos(data.events);
         if (data.perfis) {
           setPerfis(data.perfis);
-          // Sincroniza o perfil ativo com o e-mail do Google logado
           const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
           setPerfilAtivo(logado || data.perfis[0]);
         }
       } catch (e) { console.error("Erro ao carregar dados:", e); }
     };
 
-    // Recupera a capa do localStorage (agora persistente)
     const savedCapa = localStorage.getItem('agenda_capa_marketing');
     if (savedCapa) setCapaImage(savedCapa);
 
@@ -78,16 +75,20 @@ export default function AgendaPage() {
     
     if (existente) {
       setTempEvento({
-        ...tempEvento, id: existente.id, titulo: existente.titulo,
+        ...tempEvento, 
+        id: existente.id, 
+        titulo: existente.titulo,
         dataInicio: existente.dataInicio?.split(' ')[0],
         dataTermino: existente.dataFim?.split(' ')[0],
-        cor: existente.cor, tipo: existente.tipo || 'externo',
-        perfil: existente.perfil, chatId: existente.chatId
+        cor: existente.cor, 
+        tipo: existente.tipo || 'externo',
+        linkDrive: existente.linkDrive || '' // Recupera o link se existir
       });
     } else {
       setTempEvento({
         ...tempEvento, id: '', dataInicio: dataStr, dataTermino: dataStr, titulo: '',
-        conteudoSecundario: '', perfil: perfilAtivo?.nome || '', chatId: perfilAtivo?.chatId || ''
+        conteudoSecundario: '', perfil: perfilAtivo?.nome || '', chatId: perfilAtivo?.chatId || '',
+        linkDrive: ''
       });
     }
     setShowEventModal(true);
@@ -102,13 +103,11 @@ export default function AgendaPage() {
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
     if (res.ok) { 
       setShowEventModal(false); 
-      // Recarregamento suave sem perder estado
       const updated = await fetch('/api/agenda').then(r => r.json());
       setEventos(updated.events);
     }
   };
 
-  // --- 3. RENDERS CONDICIONAIS ---
   if (status === "loading") {
     return (
       <div className="h-screen grid place-items-center bg-white font-black uppercase text-2xl">
@@ -176,7 +175,7 @@ export default function AgendaPage() {
         </AnimatePresence>
       </div>
 
-      {/* NAVEGAÇÃO - ANO NÍTIDO */}
+      {/* NAVEGAÇÃO */}
       <div className="flex justify-between items-center mb-8 border-b-2 border-black pb-4">
         <div className="flex items-center gap-4">
           <ChevronLeft size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() - 1, 1))} />
@@ -224,7 +223,7 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL EVENTO */}
+      {/* MODAL EVENTO REFORMULADO COM LINK DO DRIVE */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
@@ -238,7 +237,9 @@ export default function AgendaPage() {
                 </div>
                 <X className="cursor-pointer ml-4" onClick={() => setShowEventModal(false)} />
               </div>
+              
               <div className="space-y-8">
+                {/* CONFIGURAÇÃO DE PERFIL E TIPO */}
                 <div className="grid grid-cols-2 gap-6">
                   <select value={tempEvento.perfil} onChange={e => {
                     const p = perfis.find(it => it.nome === e.target.value);
@@ -251,6 +252,8 @@ export default function AgendaPage() {
                     <button onClick={() => setTempEvento({...tempEvento, tipo: 'interno'})} className={`flex-1 ${tempEvento.tipo === 'interno' ? 'bg-black text-white' : 'bg-white'}`}>INTERNO</button>
                   </div>
                 </div>
+
+                {/* DATAS E HORÁRIOS */}
                 <div className="bg-gray-50 p-8 rounded-[40px] border-2 border-black/5 grid grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <p className="text-[10px] font-black uppercase opacity-30 flex items-center gap-1"><CalendarIcon size={12}/> Início</p>
@@ -263,12 +266,40 @@ export default function AgendaPage() {
                     <input type="time" value={tempEvento.horaFim} onChange={e => setTempEvento({...tempEvento, horaFim: e.target.value})} className="text-3xl font-black bg-transparent w-full outline-none" />
                   </div>
                 </div>
+
+                {/* CONTEÚDOS */}
                 <div className="space-y-6">
                     <input value={tempEvento.titulo} onChange={e => setTempEvento({...tempEvento, titulo: e.target.value})} className="w-full text-4xl font-black bg-transparent outline-none uppercase border-b-2 border-black/10 py-2" placeholder="CONTEÚDO PRINCIPAL" />
                     <textarea value={tempEvento.conteudoSecundario} onChange={e => setTempEvento({...tempEvento, conteudoSecundario: e.target.value})} className="w-full text-xl font-bold bg-transparent outline-none h-24 resize-none" placeholder="Conteúdo Alternativo..." />
                 </div>
+
+                {/* CHAT ID E LINK DO DRIVE (RESTAURADO) */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-yellow-100 border-2 border-black p-4 rounded-2xl shadow-[5px_5px_0px_black] overflow-hidden">
+                    <p className="text-[9px] font-black uppercase opacity-40">WhatsApp ChatID</p>
+                    <p className="font-mono text-xs truncate underline decoration-blue-500">{tempEvento.chatId}</p>
+                  </div>
+                  <div className="border-2 border-black p-4 rounded-2xl flex flex-col justify-center bg-white shadow-[5px_5px_0px_black]">
+                    <p className="text-[9px] font-black uppercase opacity-40 mb-1">Link do Material (Drive)</p>
+                    <input 
+                      placeholder="https://drive.google.com/..." 
+                      value={tempEvento.linkDrive} 
+                      onChange={e => setTempEvento({...tempEvento, linkDrive: e.target.value})} 
+                      className="w-full font-bold text-xs outline-none bg-transparent" 
+                    />
+                  </div>
+                </div>
+
+                {/* BOTÕES DE AÇÃO */}
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
-                  <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-[12px]">Salvar na Planilha</button>
+                  <div className="flex gap-10">
+                    <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-[12px] transition-all">Gravar Registro</button>
+                    {tempEvento.id && (
+                       <button className="text-red-500 flex items-center gap-2 hover:scale-105 transition-transform">
+                         <Trash2 size={24}/> Excluir
+                       </button>
+                    )}
+                  </div>
                   <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
                 </div>
               </div>
