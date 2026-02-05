@@ -6,13 +6,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // Extrai dados do WAHA
+    // LOG PARA DEBUG: Isso vai mostrar no painel da Vercel o que exatamente o WhatsApp mandou
+    console.log("📩 WEBHOOK RECEBIDO:", JSON.stringify(body, null, 2));
+    
+    // Extrai dados do WAHA (Blinda contra formatos diferentes)
     const payload = body?.payload || {};
-    const text = payload.body || ''; 
-    const from = payload.from || ''; // Ex: 554199999999@c.us
+    
+    // O SEGREDO DO TEXTO: Tenta pegar de 3 lugares diferentes
+    const text = payload.body || payload._data?.body || body.text || ''; 
+    const from = payload.from || body.from || ''; // Ex: 554199999999@c.us
+    const pushName = payload.pushName || payload._data?.notifyName || '';
 
-    // Ignora mensagens de grupos ou vazias
-    if (!text || from.includes('@g.us')) return NextResponse.json({ ok: true });
+    // Ignora mensagens de grupos (@g.us), status ou vazias
+    if (!text || from.includes('@g.us') || from.includes('status@broadcast')) {
+        return NextResponse.json({ ok: true });
+    }
 
     // Conecta na Planilha
     const auth = new JWT({
@@ -27,34 +35,43 @@ export async function POST(req: NextRequest) {
     const perfilSheet = doc.sheetsByTitle['Perfil'];
     const perfisRows = await perfilSheet.getRows();
     
-    // Tenta achar alguém com esse número (removemos caracteres não numéricos para comparar)
+    // Limpa o número para comparar (remove + e espaços)
     const numeroLimpo = from.replace(/\D/g, ''); 
+    
     const perfilEncontrado = perfisRows.find(row => {
         const chatDb = row.get('ChatId')?.replace(/\D/g, '') || '';
-        return chatDb.includes(numeroLimpo) || numeroLimpo.includes(chatDb);
+        // Verifica se um contém o outro (para evitar erros de 55 na frente)
+        return chatDb && (chatDb.includes(numeroLimpo) || numeroLimpo.includes(chatDb));
     });
 
-    const nomeFinal = perfilEncontrado ? perfilEncontrado.get('Perfil') : `Cliente (${from.split('@')[0]})`;
+    // Se achou no perfil, usa o nome do perfil. Se não, usa o nome do Zap ou "Cliente"
+    const nomeFinal = perfilEncontrado ? perfilEncontrado.get('Perfil') : (pushName || `Cliente (${numeroLimpo.slice(-4)})`);
 
-    // 2. PROCESSA A RESPOSTA (Aceita tudo, mas destaca 1 e 2)
+    // 2. PROCESSA A RESPOSTA (Aceita 1/2 ou Sim/Não)
     let respostaFinal = text;
-    if (text.trim() === '1') respostaFinal = 'SIM';
-    if (text.trim() === '2') respostaFinal = 'NÃO';
+    const textoLimpo = text.trim().toLowerCase();
+    if (textoLimpo === '1' || textoLimpo === 'sim' || textoLimpo === 'confirmar') respostaFinal = 'SIM';
+    if (textoLimpo === '2' || textoLimpo === 'não' || textoLimpo === 'nao') respostaFinal = 'NÃO';
 
-    // 3. SALVA NO FEED
+    // 3. SALVA NO FEED (Com Data do Brasil)
     const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
+    
+    // Arruma o fuso horário para Brasil/São Paulo
+    const dataHoraBrasil = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
     await feedSheet.addRow({
       Tipo: 'RESPOSTA',
       Nome: nomeFinal,
       Telefone: from,
-      Evento: '-', // Resposta não tem evento vinculado direto
+      Evento: '-', // Resposta espontânea não tem evento vinculado
       Resposta: respostaFinal,
-      Data: new Date().toLocaleString('pt-BR')
+      Data: dataHoraBrasil
     });
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  } catch (err: any) {
+    console.error("❌ ERRO WEBHOOK:", err);
+    // Retorna OK mesmo com erro para o WhatsApp não ficar reenviando a mensagem infinitamente
+    return NextResponse.json({ ok: true }); 
   }
 }
