@@ -1,20 +1,10 @@
-import NextAuth, { JWT } from "next-auth";
+import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-
-// Defina o tipo exatamente como está no seu arquivo global de tipos
-type PerfilNomes = "Confi" | "Cecília" | "Luiza" | "Júlio";
 
 const EMAILS_PERMITIDOS = [
   "ana.paulinhacarneirosantos@gmail.com",
-  // adicione os outros aqui
+  // Adicione os outros aqui
 ];
-
-// Corrigindo a extensão da interface para bater com o global
-interface CustomToken extends JWT {
-  perfil?: PerfilNomes;
-  responsavelChatId?: string;
-  role?: "admin" | "user";
-}
 
 const handler = NextAuth({
   providers: [
@@ -31,21 +21,21 @@ const handler = NextAuth({
       return "/login?error=AcessoNegado";
     },
     async jwt({ token, profile }) {
-      const customToken = token as CustomToken;
       if (profile?.email) {
         const email = profile.email.toLowerCase();
-        // Aqui garantimos que o valor atribuído seja um dos tipos aceitos
-        customToken.perfil = "Confi"; 
-        customToken.role = email === "ana.paulinhacarneirosantos@gmail.com" ? "admin" : "user";
+        // Atribuição direta para evitar erro de interface incompatível
+        token.perfil = "Confi"; 
+        token.role = email === "ana.paulinhacarneirosantos@gmail.com" ? "admin" : "user";
+        token.responsavelChatId = email === "ana.paulinhacarneirosantos@gmail.com" ? "55999999999" : "";
       }
-      return customToken;
+      return token;
     },
     async session({ session, token }) {
-      const customToken = token as CustomToken;
       if (session.user) {
-        session.user.perfil = customToken.perfil || "Confi";
-        session.user.responsavelChatId = customToken.responsavelChatId || "";
-        session.user.role = customToken.role || "user";
+        // Passando os dados do token para a sessão
+        (session.user as any).perfil = token.perfil;
+        (session.user as any).role = token.role;
+        (session.user as any).responsavelChatId = token.responsavelChatId;
       }
       return session;
     },
