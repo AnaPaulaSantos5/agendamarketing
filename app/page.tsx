@@ -28,10 +28,14 @@ export default function AgendaPage() {
     horaInicio: '08:00', horaFim: '09:00'
   });
 
-  // PROTEÇÃO E CARREGAMENTO
+  // --- 1. PROTEÇÃO DE ROTA E CARREGAMENTO DE DADOS ---
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-    
+    // Se não estiver logado, redireciona para o login IMEDIATAMENTE
+    if (status === "unauthenticated") {
+      router.replace("/login");
+      return;
+    }
+
     const carregarDados = async () => {
       try {
         const res = await fetch('/api/agenda');
@@ -39,18 +43,21 @@ export default function AgendaPage() {
         if (data.events) setEventos(data.events);
         if (data.perfis) {
           setPerfis(data.perfis);
+          // Sincroniza o perfil ativo com o e-mail do Google logado
           const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
           setPerfilAtivo(logado || data.perfis[0]);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Erro ao carregar dados:", e); }
     };
 
+    // Recupera a capa do localStorage (agora persistente)
     const savedCapa = localStorage.getItem('agenda_capa_marketing');
     if (savedCapa) setCapaImage(savedCapa);
+
     if (status === "authenticated") carregarDados();
   }, [status, session, router]);
 
-  // LÓGICA DE CALENDÁRIO
+  // --- 2. LÓGICA DO CALENDÁRIO ---
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
   const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
   const diasNoMes = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate(), [dataAtiva]);
@@ -93,10 +100,24 @@ export default function AgendaPage() {
       dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}`,
     };
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
-    if (res.ok) { setShowEventModal(false); window.location.reload(); }
+    if (res.ok) { 
+      setShowEventModal(false); 
+      // Recarregamento suave sem perder estado
+      const updated = await fetch('/api/agenda').then(r => r.json());
+      setEventos(updated.events);
+    }
   };
 
-  if (status === "loading") return <div className="h-screen grid place-items-center font-black uppercase">Carregando...</div>;
+  // --- 3. RENDERS CONDICIONAIS ---
+  if (status === "loading") {
+    return (
+      <div className="h-screen grid place-items-center bg-white font-black uppercase text-2xl">
+        Sincronizando Agenda...
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") return null;
 
   return (
     <div className="p-5 max-w-[1400px] mx-auto bg-white min-h-screen font-sans no-scrollbar">
@@ -122,7 +143,7 @@ export default function AgendaPage() {
           <div className="flex items-center gap-6">
             <div className="relative">
               <div className="w-24 h-24 rounded-full border-2 border-black bg-white flex items-center justify-center text-4xl font-black shadow-lg uppercase overflow-hidden">
-                {session?.user?.image ? <img src={session.user.image} /> : (perfilAtivo?.nome?.charAt(0) || 'A')}
+                {session?.user?.image ? <img src={session.user.image} alt="Perfil" /> : (perfilAtivo?.nome?.charAt(0) || 'A')}
               </div>
               <button onClick={() => setShowPerfilModal(true)} className="absolute -top-2 -left-2 bg-white border-2 border-black rounded-full p-2 hover:bg-black hover:text-white transition-all">
                 <Settings size={20} />
@@ -136,7 +157,10 @@ export default function AgendaPage() {
               <ChevronDown className="opacity-40" />
             </div>
           </div>
-          <button onClick={() => signOut()} className="bg-white border-2 border-black p-4 rounded-2xl hover:bg-red-50 flex items-center gap-2 font-bold uppercase text-xs">
+          <button 
+            onClick={() => signOut({ callbackUrl: '/login' })} 
+            className="bg-white border-2 border-black p-4 rounded-2xl hover:bg-red-50 flex items-center gap-2 font-bold uppercase text-xs"
+          >
             <LogOut size={18} /> Sair
           </button>
         </div>
@@ -162,7 +186,7 @@ export default function AgendaPage() {
         <ChevronRight size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 1))} />
       </div>
 
-      {/* CALENDÁRIO */}
+      {/* CALENDÁRIO GRID */}
       <div className="grid grid-cols-7 gap-4">
         {diasSemana.map(d => <div key={d} className="text-center font-black opacity-20 text-xs uppercase">{d}</div>)}
         {Array.from({ length: primeiroDiaSemana }).map((_, i) => <div key={i} />)}
@@ -191,15 +215,17 @@ export default function AgendaPage() {
               <X className="absolute top-8 right-8 cursor-pointer" onClick={() => setShowPerfilModal(false)} />
               <h2 className="text-4xl font-black uppercase tracking-tighter mb-8 border-b-2 border-black pb-4">Configurar Perfil</h2>
               <div className="space-y-6">
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input readOnly value={perfilAtivo?.nome} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-gray-50" /></div>
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-gray-50"><MessageSquare size={20} className="opacity-30" /><input readOnly value={perfilAtivo?.chatId} className="w-full bg-transparent font-mono font-bold" /></div></div>
+                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input readOnly value={perfilAtivo?.nome} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-gray-50 cursor-not-allowed" /></div>
+                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-gray-50"><MessageSquare size={20} className="opacity-30" /><input readOnly value={perfilAtivo?.chatId} className="w-full bg-transparent font-mono font-bold outline-none" /></div></div>
                 <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Google E-mail</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-gray-50"><Mail size={20} className="opacity-30" /><input readOnly value={session?.user?.email || ""} className="w-full bg-transparent font-bold" /></div></div>
               </div>
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
 
-        {/* MODAL EVENTO */}
+      {/* MODAL EVENTO */}
+      <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
             <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white border-2 border-black rounded-[60px] p-12 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -243,7 +269,7 @@ export default function AgendaPage() {
                 </div>
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
                   <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-[12px]">Salvar na Planilha</button>
-                  <button onClick={() => setShowEventModal(false)} className="opacity-20">Voltar</button>
+                  <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
                 </div>
               </div>
             </motion.div>
