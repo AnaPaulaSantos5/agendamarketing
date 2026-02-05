@@ -18,6 +18,7 @@ export async function GET() {
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     const events = rowsAgenda.map(row => ({
+      // O ID é a combinação de Título + Data para podermos achar depois
       id: row.get('Conteudo_Principal') + row.get('Data_Inicio'),
       dataInicio: row.get('Data_Inicio'),
       dataFim: row.get('Data_Fim'),
@@ -38,7 +39,7 @@ export async function GET() {
       email: row.get('Email')
     }));
 
-    // 3. NOVO: Puxar histórico do WhatsApp_Feed
+    // 3. Puxar histórico do WhatsApp_Feed
     const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const rowsFeed = await feedSheet.getRows();
     const feed = rowsFeed.map(row => ({
@@ -48,7 +49,7 @@ export async function GET() {
       Evento: row.get('Evento'),
       Resposta: row.get('Resposta'),
       Data: row.get('Data')
-    })).reverse().slice(0, 15); // Pega os 15 mais recentes
+    })).reverse().slice(0, 20); // Aumentei para 20
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -75,14 +76,14 @@ export async function POST(req: NextRequest) {
       Link_Drive: data.linkDrive || ''
     });
 
-    // 2. Salvar na aba Tarefas (Se Externo)
+    // 2. Salvar na aba Tarefas (Para o Robô disparar depois)
+    // Só salva em tarefas se for Externo, pois interno não manda zap
     if (data.tipo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       await tarefasSheet.addRow({
-        Bloco_ID: `ID-${Date.now()}`,
         Titulo: data.titulo,
         Responsavel: data.perfil,
-        Data: data.dataInicio,
+        Data: data.dataInicio, // Formato esperado: YYYY-MM-DD HH:mm
         Status: 'Pendente',
         LinkDrive: data.linkDrive || '',
         Notificar: 'Sim',
@@ -93,6 +94,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Erro no POST Agenda:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// --- AQUI ESTÁ A CORREÇÃO DO EXCLUIR ---
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json(); // Recebe o ID
+    await doc.loadInfo();
+    
+    // 1. Apagar da Agenda
+    const agendaSheet = doc.sheetsByTitle['Agenda'];
+    const rows = await agendaSheet.getRows();
+    
+    // Procura a linha que gera o mesmo ID (Titulo + Data)
+    const rowToDelete = rows.find(row => 
+        (row.get('Conteudo_Principal') + row.get('Data_Inicio')) === data.id
+    );
+
+    if (rowToDelete) {
+        await rowToDelete.delete();
+    }
+
+    // 2. Opcional: Tentar apagar da aba Tarefas também para não disparar mensagem de evento cancelado
+    // (Lógica simplificada: procura pelo mesmo titulo e data)
+    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+    const tarefasRows = await tarefasSheet.getRows();
+    const tarefaToDelete = tarefasRows.find(row => 
+         row.get('Titulo') === rowToDelete?.get('Conteudo_Principal') && 
+         row.get('Data') === rowToDelete?.get('Data_Inicio')
+    );
+    if (tarefaToDelete) {
+        await tarefaToDelete.delete();
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Erro no DELETE:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
