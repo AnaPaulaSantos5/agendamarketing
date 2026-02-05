@@ -1,22 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseResposta } from '@/lib/whatsapp/parser';
-// Importe aqui sua lógica de salvar na planilha (Google Spreadsheet)
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  
-  // O WAHA envia eventos. Queremos o 'message.upsert' ou 'message'
-  const text = body?.payload?.body; // Depende da versão do WAHA
-  const from = body?.payload?.from;
+  try {
+    const body = await req.json();
+    
+    // O WAHA envia o texto da resposta e o número de quem enviou
+    const text = body?.payload?.body; 
+    const from = body?.payload?.from; // ex: 554199999999@c.us
 
-  const resposta = parseResposta(text);
+    const respostaProcessada = parseResposta(text);
 
-  if (resposta === 'SIM') {
-     // 1. Salvar na Planilha na aba Feed: "Luiza pediu ajuda!"
-     // 2. Opcional: Enviar um alerta para o SEU número (Marketing)
-  } else if (resposta === 'NAO') {
-     // Salvar no Feed: "Luiza informou que está tudo OK."
+    if (respostaProcessada) {
+      const auth = new JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+      const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
+      await doc.loadInfo();
+      const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
+
+      // Salva a resposta no Feed
+      await feedSheet.addRow({
+        Tipo: 'RESPOSTA',
+        Nome: 'Sistema (Identificação via ID)', // Podemos buscar o nome na aba Perfil depois
+        Telefone: from,
+        Evento: '-',
+        Resposta: respostaProcessada,
+        Data: new Date().toLocaleString('pt-BR')
+      });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("Erro no Webhook:", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }
