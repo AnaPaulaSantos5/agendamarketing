@@ -8,7 +8,7 @@ declare module "next-auth" {
       image?: string;
       perfil: "Confi" | "Cecília" | "Luiza" | "Júlio";
       responsavelChatId: string;
-      role?: "admin" | "user";
+      role: "admin" | "user";
     };
   }
 
