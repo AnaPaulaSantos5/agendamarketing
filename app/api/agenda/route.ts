@@ -22,9 +22,11 @@ export async function GET() {
       dataInicio: row.get('Data_Inicio'),
       dataFim: row.get('Data_Fim'),
       titulo: row.get('Conteudo_Principal'),
+      conteudoSecundario: row.get('Conteudo_Secundario'),
       cor: row.get('Tipo_Evento'),
       tipo: row.get('Tipo'),
-      perfil: row.get('Perfil')
+      perfil: row.get('Perfil'),
+      linkDrive: row.get('Link_Drive') || ''
     }));
 
     // 2. Puxar Perfis da aba Perfil
@@ -36,8 +38,21 @@ export async function GET() {
       email: row.get('Email')
     }));
 
-    return NextResponse.json({ events, perfis });
+    // 3. NOVO: Puxar histórico do WhatsApp_Feed
+    const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
+    const rowsFeed = await feedSheet.getRows();
+    const feed = rowsFeed.map(row => ({
+      Tipo: row.get('Tipo'),
+      Nome: row.get('Nome'),
+      Telefone: row.get('Telefone'),
+      Evento: row.get('Evento'),
+      Resposta: row.get('Resposta'),
+      Data: row.get('Data')
+    })).reverse().slice(0, 15); // Pega os 15 mais recentes
+
+    return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
+    console.error("Erro na API Agenda:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -47,7 +62,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     await doc.loadInfo();
 
-    // Salvar na aba Agenda
+    // 1. Salvar na aba Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
       Data_Inicio: data.dataInicio,
@@ -55,11 +70,12 @@ export async function POST(req: NextRequest) {
       Tipo_Evento: data.cor,
       Tipo: data.tipo,
       Conteudo_Principal: data.titulo,
-      Conteudo_Secundario: data.conteudoSecundario,
-      Perfil: data.perfil
+      Conteudo_Secundario: data.conteudoSecundario || '',
+      Perfil: data.perfil,
+      Link_Drive: data.linkDrive || ''
     });
 
-    // Salvar na aba Tarefas (Se Externo)
+    // 2. Salvar na aba Tarefas (Se Externo)
     if (data.tipo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       await tarefasSheet.addRow({
@@ -76,6 +92,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error("Erro no POST Agenda:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
