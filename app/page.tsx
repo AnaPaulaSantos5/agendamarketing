@@ -1,194 +1,177 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Camera, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface Evento {
-  id: string;
-  dataKey: string; 
-  titulo: string;
-  cor: string;
-  whatsapp: string;
-}
+// --- CONFIGURAÇÃO DE PERFIS ---
+const PERFIS = [
+  { nome: "Confi", chatId: "12036302@g.us" },
+  { nome: "Luiza", chatId: "4599992869@u.s" },
+  { nome: "Júlio", chatId: "5541998877@c.us" },
+  { nome: "Cecília", chatId: "5541887766@u.s" }
+];
+
+const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe'];
 
 export default function AgendaPage() {
-  const [eventos, setEventos] = useState<Evento[]>([]);
-  const [dataAtiva, setDataAtiva] = useState(new Date(2026, 1, 4)); 
-  const [showPerfilModal, setShowPerfilModal] = useState(false);
+  const [eventos, setEventos] = useState<any[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [tempEvento, setTempEvento] = useState({ id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
-  
-  const [capaImage, setCapaImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [modoEdicao, setModoEdicao] = useState(false);
 
-  const colors = { orange: '#f5886c', blue: '#1260c7', yellow: '#ffce0a' };
-  const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
-  const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  // --- ESTADO DO FORMULÁRIO ---
+  const [form, setForm] = useState({
+    id: '',
+    inicio: '08:00',
+    fim: '09:00',
+    titulo: '', // Conteúdo Principal
+    conteudoSecundario: '',
+    linkDrive: '',
+    perfil: PERFIS[0].nome,
+    chatId: PERFIS[0].chatId,
+    tipo: 'externo', // 'interno' | 'externo'
+    cor: CORES_PASTEL[0]
+  });
 
-  const diasNoMes = useMemo(() => {
-    return new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate();
-  }, [dataAtiva]);
-
-  const primeiroDiaSemana = useMemo(() => {
-    return new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), 1).getDay();
-  }, [dataAtiva]);
-
-  const mudarMes = (direcao: number) => {
-    setDataAtiva(prev => new Date(prev.getFullYear(), prev.getMonth() + direcao, 1));
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setCapaImage(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDiaClick = (dia: number) => {
-    const dataKey = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
-    const existente = eventos.find(e => e.dataKey === dataKey);
-    setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia));
-    setTempEvento(existente ? { ...existente } : { id: '', titulo: '', whatsapp: '4599992869@u.s', cor: '#f5886c' });
-    setShowEventModal(true);
+  // Atualiza ChatID automaticamente ao mudar o perfil
+  const handlePerfilChange = (nome: string) => {
+    const p = PERFIS.find(item => item.nome === nome);
+    setForm({ ...form, perfil: nome, chatId: p?.chatId || '' });
   };
 
   const handleSalvar = () => {
-    const dataKey = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dataAtiva.getDate()}`;
-    if (tempEvento.id) {
-      setEventos(eventos.map(e => e.id === tempEvento.id ? { ...tempEvento, dataKey } : e));
-    } else {
-      setEventos([...eventos, { ...tempEvento, id: Date.now().toString(), dataKey }]);
-    }
+    // Aqui você conectará com sua planilha depois
+    console.log("Dados prontos para envio:", form);
     setShowEventModal(false);
   };
 
-  const cardStyle: React.CSSProperties = { border: '2px solid black', borderRadius: '30px', padding: '20px', backgroundColor: 'white' };
+  const cardStyle: React.CSSProperties = { border: '2px solid black', borderRadius: '35px', padding: '25px', backgroundColor: 'white' };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '1400px', margin: '0 auto', backgroundColor: 'white', minHeight: '100vh' }}>
+    <div className="p-10 font-sans max-w-[1400px] mx-auto bg-white min-h-screen">
       
-      {/* CABEÇALHO COM CAPA QUE OCUPA O ESPAÇO MAIOR */}
-      <div style={{ 
-        ...cardStyle, 
-        position: 'relative',
-        marginBottom: '40px', 
-        height: '320px', 
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'flex-end',
-        padding: '30px'
-      }}>
-        
-        {/* ÁREA DA CAPA (FUNDO TOTAL) */}
-        <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" style={{ display: 'none' }} />
-        <div 
-          onClick={() => fileInputRef.current?.click()}
-          style={{ 
-            position: 'absolute',
-            inset: 0,
-            cursor: 'pointer',
-            zIndex: 0,
-            backgroundImage: capaImage ? `url(${capaImage})` : 'none',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundColor: '#f9f9f9',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          {!capaImage && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ccc' }}>
-              <Camera size={48} />
-              <span style={{ fontWeight: 'bold', marginTop: '10px' }}>Adicionar foto do dispositivo</span>
-            </div>
-          )}
-        </div>
-
-        {/* PERFIL FLUTUANTE SOBRE A CAPA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1, position: 'relative' }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '3px solid black', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', fontWeight: 'bold', backgroundColor: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
-              A
-            </div>
-            <Settings size={26} onClick={(e) => { e.stopPropagation(); setShowPerfilModal(true); }} style={{ position: 'absolute', top: -5, left: -5, background: 'white', borderRadius: '50%', border: '2px solid black', padding: '3px', cursor: 'pointer' }} />
-            <ChevronDown size={26} style={{ position: 'absolute', right: -15, top: '40%', cursor: 'pointer', color: 'black', background: 'white', borderRadius: '50%', border: '1px solid black' }} />
-          </div>
-          <div style={{ background: 'white', padding: '10px 20px', borderRadius: '20px', border: '2px solid black', boxShadow: '4px 4px 0px black' }}>
-            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>Editar Cliente</h3>
-          </div>
-        </div>
-      </div>
-
-      {/* TÍTULO MÊS / ANO */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <ChevronLeft size={45} className="cursor-pointer" onClick={() => mudarMes(-1)} />
-          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '900', letterSpacing: '-5px' }}>{meses[dataAtiva.getMonth()]}</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <h1 style={{ fontSize: '75px', margin: 0, fontWeight: '300' }}>{dataAtiva.getFullYear()}</h1>
-          <ChevronRight size={45} className="cursor-pointer" onClick={() => mudarMes(1)} />
-        </div>
-      </div>
-
-      {/* CALENDÁRIO GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', marginBottom: '10px', textAlign: 'center' }}>
-        {diasSemana.map(d => <div key={d} style={{ fontWeight: '900', fontSize: '14px', opacity: 0.3 }}>{d}</div>)}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '15px' }}>
-        {Array.from({ length: primeiroDiaSemana }).map((_, i) => <div key={`empty-${i}`} />)}
-        {Array.from({ length: diasNoMes }, (_, i) => {
-          const dia = i + 1;
-          const key = `${dataAtiva.getFullYear()}-${dataAtiva.getMonth() + 1}-${dia}`;
-          const evento = eventos.find(e => e.dataKey === key);
-          const isAtivo = dataAtiva.getDate() === dia;
-
-          return (
-            <div key={dia} onClick={() => handleDiaClick(dia)} style={{ ...cardStyle, height: '160px', textAlign: 'center', cursor: 'pointer', borderColor: isAtivo ? colors.orange : 'black', backgroundColor: isAtivo ? '#fef3f0' : 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <p style={{ fontWeight: 'bold', margin: '0 0 10px 0', fontSize: '20px' }}>{dia}</p>
-              {evento && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}><div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: evento.cor }}></div><span style={{ fontSize: '11px', fontStyle: 'italic', fontWeight: 'bold' }}>evento</span></div>}
-            </div>
-          );
-        })}
-      </div>
+      {/* (Cabeçalho e Calendário Grid omitidos aqui para focar no Modal, mantenha os que já temos) */}
+      <button onClick={() => setShowEventModal(true)} className="bg-black text-white p-4 rounded-full font-bold">Abrir Modal de Teste</button>
 
       <AnimatePresence>
-        {showPerfilModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} style={{ ...cardStyle, width: '500px', boxShadow: '20px 20px 0px black' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-                <h2 style={{ fontSize: '30px', fontWeight: '900', fontStyle: 'italic' }}>EDITAR CLIENTE</h2>
-                <X style={{ cursor: 'pointer' }} onClick={() => setShowPerfilModal(false)} />
-              </div>
-              <input style={{ width: '100%', border: 'none', borderBottom: '2px solid black', padding: '10px 0', outline: 'none', fontSize: '18px' }} placeholder="Nome do Cliente" />
-              <button onClick={() => setShowPerfilModal(false)} style={{ marginTop: '30px', fontWeight: 'bold', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px' }}>SALVAR</button>
-            </motion.div>
-          </div>
-        )}
-
         {showEventModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110 }}>
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} style={{ ...cardStyle, width: '500px', boxShadow: '20px 20px 0px black' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-                <h3 style={{ fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic' }}>{tempEvento.id ? 'EDITAR EVENTO' : 'NOVO EVENTO'}</h3>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {Object.values(colors).map(c => (
-                    <div key={c} onClick={() => setTempEvento({...tempEvento, cor: c})} style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: c, border: '1px solid black', cursor: 'pointer', opacity: tempEvento.cor === c ? 1 : 0.3 }} />
-                  ))}
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white border-[3px] border-black rounded-[50px] p-12 w-full max-w-2xl shadow-[20px_20px_0px_0px_rgba(0,0,0,1)] relative overflow-y-auto max-h-[90vh] no-scrollbar"
+            >
+              <div className="flex justify-between items-center mb-10 border-b-4 border-black pb-4">
+                <h2 className="text-4xl font-black italic uppercase tracking-tighter">
+                  {modoEdicao ? 'Editar Evento' : 'Novo Registro'}
+                </h2>
+                <X className="cursor-pointer hover:rotate-90 transition-transform" onClick={() => setShowEventModal(false)} />
+              </div>
+
+              <div className="space-y-8">
+                {/* SELEÇÃO DE PERFIL E TIPO */}
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold opacity-30 uppercase mb-2">Responsável (Perfil)</p>
+                    <select 
+                      value={form.perfil} 
+                      onChange={(e) => handlePerfilChange(e.target.value)}
+                      className="w-full border-2 border-black rounded-2xl p-3 font-bold bg-gray-50 outline-none"
+                    >
+                      {PERFIS.map(p => <option key={p.nome} value={p.nome}>{p.nome}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold opacity-30 uppercase mb-2">Visibilidade</p>
+                    <div className="flex border-2 border-black rounded-2xl overflow-hidden h-[52px]">
+                      <button 
+                        onClick={() => setForm({...form, tipo: 'externo'})}
+                        className={`flex-1 font-bold text-xs uppercase ${form.tipo === 'externo' ? 'bg-blue-600 text-white' : 'bg-white text-black'}`}
+                      >Externo</button>
+                      <button 
+                        onClick={() => setForm({...form, tipo: 'interno'})}
+                        className={`flex-1 font-bold text-xs uppercase ${form.tipo === 'interno' ? 'bg-black text-white' : 'bg-white text-black'}`}
+                      >Interno</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <input style={{ width: '100%', border: 'none', borderBottom: '2px solid black', padding: '10px 0', fontSize: '24px', fontWeight: 'bold', outline: 'none', marginBottom: '20px', textTransform: 'uppercase' }} placeholder="TÍTULO DO EVENTO" value={tempEvento.titulo} onChange={(e) => setTempEvento({...tempEvento, titulo: e.target.value})} />
-              <div style={{ background: '#fff9c4', border: '2px solid black', padding: '20px', borderRadius: '20px' }}>
-                <p style={{ margin: 0, fontSize: '18px', color: '#1260c7', textDecoration: 'underline', fontWeight: 'bold' }}>{tempEvento.whatsapp}</p>
-              </div>
-              <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                <button onClick={handleSalvar} style={{ fontSize: '16px', cursor: 'pointer' }}>SALVAR</button>
-                <button onClick={() => setShowEventModal(false)} style={{ opacity: 0.3, fontSize: '16px', cursor: 'pointer' }}>FECHAR</button>
+
+                {/* HORÁRIOS (PERÍODO) */}
+                <div className="flex gap-6 items-center bg-gray-50 p-6 rounded-[30px] border-2 border-black/5">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold opacity-30 uppercase mb-1">Início</p>
+                    <input type="time" value={form.inicio} onChange={e => setForm({...form, inicio: e.target.value})} className="bg-transparent text-2xl font-black outline-none w-full" />
+                  </div>
+                  <div className="w-10 h-[2px] bg-black/20 mt-4"></div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold opacity-30 uppercase mb-1">Término</p>
+                    <input type="time" value={form.fim} onChange={e => setForm({...form, fim: e.target.value})} className="bg-transparent text-2xl font-black outline-none w-full" />
+                  </div>
+                </div>
+
+                {/* CONTEÚDO PRINCIPAL (TÍTULO) */}
+                <div className="border-b-2 border-black/10 pb-2">
+                  <p className="text-[10px] font-bold opacity-30 uppercase mb-1">Conteúdo Principal (Título)</p>
+                  <input 
+                    placeholder="O que será postado?" 
+                    className="w-full text-3xl font-bold italic outline-none bg-transparent uppercase"
+                    value={form.titulo}
+                    onChange={e => setForm({...form, titulo: e.target.value})}
+                  />
+                </div>
+
+                {/* CONTEÚDO SECUNDÁRIO */}
+                <div className="border-b-2 border-black/10 pb-2">
+                  <p className="text-[10px] font-bold opacity-30 uppercase mb-1">Conteúdo Alternativo</p>
+                  <textarea 
+                    placeholder="Caso não consiga postar o principal..." 
+                    className="w-full text-lg font-medium outline-none bg-transparent h-20 resize-none"
+                    value={form.conteudoSecundario}
+                    onChange={e => setForm({...form, conteudoSecundario: e.target.value})}
+                  />
+                </div>
+
+                {/* LINK DRIVE E CHATID */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#fff9c4] border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black]">
+                    <p className="text-[9px] font-bold opacity-40 uppercase">WhatsApp ID (Auto)</p>
+                    <p className="font-mono text-sm truncate">{form.chatId}</p>
+                  </div>
+                  <div className="border-2 border-black p-4 rounded-2xl bg-white">
+                    <p className="text-[9px] font-bold opacity-40 uppercase">Link do Drive</p>
+                    <input 
+                      placeholder="https://..." 
+                      className="w-full text-xs outline-none bg-transparent overflow-hidden" 
+                      value={form.linkDrive}
+                      onChange={e => setForm({...form, linkDrive: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                {/* SELETOR DE CORES EXPANDIDO */}
+                <div className="flex items-center justify-between pt-4">
+                  <div className="flex gap-2 items-center flex-wrap">
+                    {CORES_PASTEL.map(c => (
+                      <div 
+                        key={c} 
+                        onClick={() => setForm({...form, cor: c})}
+                        style={{ backgroundColor: c }} 
+                        className={`w-8 h-8 rounded-full border-2 border-black cursor-pointer transition-transform ${form.cor === c ? 'scale-125 shadow-lg' : 'opacity-60 hover:opacity-100'}`}
+                      />
+                    ))}
+                    <button className="w-8 h-8 rounded-full border-2 border-black border-dashed flex items-center justify-center hover:bg-gray-100">
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* BOTÕES DE AÇÃO */}
+                <div className="flex justify-between items-center pt-8 border-t-2 border-black/5 font-black italic uppercase tracking-widest text-lg">
+                  <div className="flex gap-10">
+                    <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-8">Salvar</button>
+                    {modoEdicao && <button className="text-red-500">Excluir</button>}
+                  </div>
+                  <button onClick={() => setShowEventModal(false)} className="opacity-20 hover:opacity-100 transition-opacity">Fechar</button>
+                </div>
               </div>
             </motion.div>
           </div>
