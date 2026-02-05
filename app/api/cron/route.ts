@@ -43,13 +43,12 @@ export async function GET() {
                 
                 // Se a data do evento for inválida, pula
                 if (isNaN(dataEvento.getTime())) {
-                    console.log(`Data inválida na linha ${row.rowIndex}: ${dataEventoStr}`);
+                    // CORREÇÃO AQUI: Usamos (row as any) para o TypeScript aceitar o rowIndex
+                    console.log(`Data inválida na linha ${(row as any).rowIndex}: ${dataEventoStr}`);
                     continue;
                 }
 
                 // COMPARAÇÃO UNIVERSAL:
-                // O Javascript converte tudo para milissegundos universais.
-                // Se o momento do evento (Brasil) for MENOR ou IGUAL ao momento agora (Mundo), dispara.
                 if (dataEvento <= agora) {
                      const chatId = row.get('ResponsavelChatId');
                      const nome = row.get('Responsavel');
@@ -58,18 +57,14 @@ export async function GET() {
                      if (chatId) {
                         console.log(`🚀 Disparando para ${nome} (${titulo})`);
 
-                        // Constrói a mensagem bonita
                         const msg = buildWhatsAppMessage({
                             nome: nome,
                             conteudoPrincipal: titulo,
                             linkDrive: row.get('LinkDrive')
                         });
 
-                        // Envia (usando sua função existente)
-                        // Atenção: Confirme se sendWhatsAppMessage aceita (chatId, texto, nome, titulo)
                         await sendWhatsAppMessage(chatId, msg, nome, titulo);
                         
-                        // Marca como enviado para não repetir
                         row.set('Status', 'Enviado');
                         await row.save();
                         disparados++;
