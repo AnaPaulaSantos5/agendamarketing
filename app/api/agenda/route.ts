@@ -27,7 +27,8 @@ export async function GET() {
       cor: row.get('Tipo_Evento'),
       tipo: row.get('Tipo'),
       perfil: row.get('Perfil'),
-      linkDrive: row.get('Link_Drive') || ''
+      // CORREÇÃO: Nome exato da coluna no Excel (LinkDrive)
+      linkDrive: row.get('LinkDrive') || '' 
     }));
 
     // 2. Puxar Perfis da aba Perfil
@@ -49,7 +50,7 @@ export async function GET() {
       Evento: row.get('Evento'),
       Resposta: row.get('Resposta'),
       Data: row.get('Data')
-    })).reverse().slice(0, 20); // Aumentei para 20
+    })).reverse().slice(0, 20);
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -73,19 +74,20 @@ export async function POST(req: NextRequest) {
       Conteudo_Principal: data.titulo,
       Conteudo_Secundario: data.conteudoSecundario || '',
       Perfil: data.perfil,
-      Link_Drive: data.linkDrive || ''
+      // CORREÇÃO: Gravando na coluna LinkDrive (sem underline)
+      LinkDrive: data.linkDrive || '' 
     });
 
     // 2. Salvar na aba Tarefas (Para o Robô disparar depois)
-    // Só salva em tarefas se for Externo, pois interno não manda zap
     if (data.tipo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       await tarefasSheet.addRow({
         Titulo: data.titulo,
         Responsavel: data.perfil,
-        Data: data.dataInicio, // Formato esperado: YYYY-MM-DD HH:mm
+        Data: data.dataInicio,
         Status: 'Pendente',
-        LinkDrive: data.linkDrive || '',
+        // Aqui já estava correto, mantivemos
+        LinkDrive: data.linkDrive || '', 
         Notificar: 'Sim',
         ResponsavelChatId: data.chatId
       });
@@ -98,35 +100,36 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// --- AQUI ESTÁ A CORREÇÃO DO EXCLUIR ---
 export async function DELETE(req: NextRequest) {
   try {
-    const data = await req.json(); // Recebe o ID
+    const data = await req.json();
     await doc.loadInfo();
     
     // 1. Apagar da Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
-    // Procura a linha que gera o mesmo ID (Titulo + Data)
     const rowToDelete = rows.find(row => 
         (row.get('Conteudo_Principal') + row.get('Data_Inicio')) === data.id
     );
 
     if (rowToDelete) {
-        await rowToDelete.delete();
-    }
+        // Salvamos os dados antes de deletar para poder achar na aba Tarefas depois
+        const titulo = rowToDelete.get('Conteudo_Principal');
+        const dataInicio = rowToDelete.get('Data_Inicio');
 
-    // 2. Opcional: Tentar apagar da aba Tarefas também para não disparar mensagem de evento cancelado
-    // (Lógica simplificada: procura pelo mesmo titulo e data)
-    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-    const tarefasRows = await tarefasSheet.getRows();
-    const tarefaToDelete = tarefasRows.find(row => 
-         row.get('Titulo') === rowToDelete?.get('Conteudo_Principal') && 
-         row.get('Data') === rowToDelete?.get('Data_Inicio')
-    );
-    if (tarefaToDelete) {
-        await tarefaToDelete.delete();
+        await rowToDelete.delete();
+
+        // 2. Apagar da aba Tarefas
+        const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+        const tarefasRows = await tarefasSheet.getRows();
+        const tarefaToDelete = tarefasRows.find(row => 
+             row.get('Titulo') === titulo && 
+             row.get('Data') === dataInicio
+        );
+        if (tarefaToDelete) {
+            await tarefaToDelete.delete();
+        }
     }
 
     return NextResponse.json({ success: true });
