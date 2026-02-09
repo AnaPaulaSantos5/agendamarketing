@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
-// Configuração de autenticação (Mantida igual)
 const serviceAccountAuth = new JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
   key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -11,27 +10,44 @@ const serviceAccountAuth = new JWT({
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, serviceAccountAuth);
 
+// --- FUNÇÃO AJUDANTE PARA ACHAR COLUNAS (USADA NO GET) ---
+// Ela pega uma linha e procura o valor de uma coluna baseado em parte do nome
+function lerColunaInteligente(row: any, parteDoNome: string) {
+    const objetoLinha = row.toObject(); // Transforma a linha em objeto JS
+    const chaves = Object.keys(objetoLinha);
+    // Procura a primeira chave que contem o nome (ignora maiúsculas/espaços)
+    const chaveEncontrada = chaves.find(chave => chave.toLowerCase().includes(parteDoNome.toLowerCase()));
+    return chaveEncontrada ? objetoLinha[chaveEncontrada] : '';
+}
+
 export async function GET() {
   try {
     await doc.loadInfo();
+    
+    // --- 1. LEITURA DA AGENDA (AGORA COM BUSCA INTELIGENTE) ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     
-    // --- 1. LEITURA DA AGENDA (Simples e Direta) ---
     const events = rowsAgenda.map(row => {
-        // Gera ID juntando Titulo e Data (Sem inventar moda)
-        const idGerado = (row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '');
+        // Usa a função inteligente para achar as colunas, não importa como estão escritas
+        const titulo = lerColunaInteligente(row, 'Conteudo') || lerColunaInteligente(row, 'Titulo');
+        const dataIni = lerColunaInteligente(row, 'Data_Inicio') || lerColunaInteligente(row, 'Data Inicio');
+        
+        // ID: Titulo + Data
+        const idGerado = (titulo || '') + (dataIni || '');
+
         return {
             id: idGerado,
-            dataInicio: row.get('Data_Inicio'),
-            dataFim: row.get('Data_Fim'),
-            titulo: row.get('Conteudo_Principal'),
-            conteudoSecundario: row.get('Conteudo_Secundario'),
-            cor: row.get('Tipo_Evento'),
-            tipo: row.get('Tipo'),
-            perfil: row.get('Perfil'),
-            // Tenta ler com ou sem underline pra garantir
-            linkDrive: row.get('LinkDrive') || row.get('Link_Drive') || '' 
+            dataInicio: dataIni,
+            dataFim: lerColunaInteligente(row, 'Data_Fim') || lerColunaInteligente(row, 'Data Fim'),
+            titulo: titulo,
+            conteudoSecundario: lerColunaInteligente(row, 'Secundario'),
+            cor: lerColunaInteligente(row, 'Tipo_Evento') || lerColunaInteligente(row, 'Cor'),
+            tipo: lerColunaInteligente(row, 'Tipo'),
+            perfil: lerColunaInteligente(row, 'Perfil'),
+            
+            // AQUI É A SOLUÇÃO: Pega qualquer coluna que tenha "Link" no nome (LinkDrive, Link Drive, Link_Drive...)
+            linkDrive: lerColunaInteligente(row, 'Link') 
         };
     });
 
@@ -66,11 +82,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    console.log("📝 POST INICIADO. Tipo:", data.tipo, "| Titulo:", data.titulo);
+    console.log("📝 POST:", data.titulo);
 
     await doc.loadInfo();
 
-    // 1. Salvar na Agenda (Isso já funciona, mantemos)
+    // 1. Salvar na Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
       Data_Inicio: data.dataInicio,
@@ -82,58 +98,43 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil,
       LinkDrive: data.linkDrive || '' 
     });
-    console.log("✅ Salvo na Agenda.");
 
     // 2. Salvar na Tarefas (LÓGICA BLINDADA)
-    // Normaliza o tipo para minúsculo e sem espaço
     const tipoNormalizado = data.tipo ? String(data.tipo).toLowerCase().trim() : '';
     
     if (tipoNormalizado === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       
-      if (!tarefasSheet) {
-          console.error("❌ CRÍTICO: Aba 'Tarefas' não encontrada!");
-          throw new Error("Aba Tarefas sumiu.");
+      if (tarefasSheet) {
+          await tarefasSheet.loadHeaderRow();
+          const headers = tarefasSheet.headerValues;
+          
+          // Busca dinâmica de colunas para escrita
+          const buscaNomeColuna = (parte: string) => headers.find(h => h.toLowerCase().includes(parte.toLowerCase()));
+
+          const novaLinha: any = {};
+          
+          // Mapeia os campos procurando partes do nome
+          const colBloco = buscaNomeColuna('Bloco');
+          const colTitulo = buscaNomeColuna('Titulo');
+          const colResp = buscaNomeColuna('Responsavel');
+          const colData = buscaNomeColuna('Data');
+          const colStatus = buscaNomeColuna('Status');
+          const colLink = buscaNomeColuna('Link'); // Acha LinkDrive
+          const colNotif = buscaNomeColuna('Notificar');
+          const colChat = buscaNomeColuna('Chat');
+
+          if (colBloco) novaLinha[colBloco] = `ID${Date.now()}`;
+          if (colTitulo) novaLinha[colTitulo] = data.titulo;
+          if (colResp) novaLinha[colResp] = data.perfil;
+          if (colData) novaLinha[colData] = data.dataInicio;
+          if (colStatus) novaLinha[colStatus] = 'Pendente';
+          if (colLink) novaLinha[colLink] = data.linkDrive || '';
+          if (colNotif) novaLinha[colNotif] = 'Sim';
+          if (colChat) novaLinha[colChat] = data.chatId;
+
+          await tarefasSheet.addRow(novaLinha);
       }
-
-      // CARREGA OS CABEÇALHOS REAIS DA PLANILHA
-      await tarefasSheet.loadHeaderRow();
-      const headers = tarefasSheet.headerValues;
-      console.log("📋 Cabeçalhos Reais da Planilha:", headers);
-
-      // FUNÇÃO INTELIGENTE: Procura a coluna que parece com o nome que queremos
-      // Ex: Se procurar 'Titulo', acha ' Titulo ' ou 'Titulo'
-      const buscaColuna = (parteDoNome: string) => {
-          return headers.find(h => h.toLowerCase().includes(parteDoNome.toLowerCase()));
-      };
-
-      // Monta a linha usando os nomes REAIS que encontrou
-      const novaLinha: any = {};
-      
-      const colBloco = buscaColuna('Bloco');      // Acha Bloco_ID ou Bloco ID
-      const colTitulo = buscaColuna('Titulo');    // Acha Titulo ou Título
-      const colResp = buscaColuna('Responsavel'); // Acha Responsavel
-      const colData = buscaColuna('Data');        // Acha Data
-      const colStatus = buscaColuna('Status');    // Acha Status
-      const colLink = buscaColuna('Link');        // Acha LinkDrive
-      const colNotif = buscaColuna('Notificar');  // Acha Notificar
-      const colChat = buscaColuna('Chat');        // Acha ResponsavelChatId
-
-      if (colBloco) novaLinha[colBloco] = `ID${Date.now()}`;
-      if (colTitulo) novaLinha[colTitulo] = data.titulo;
-      if (colResp) novaLinha[colResp] = data.perfil;
-      if (colData) novaLinha[colData] = data.dataInicio;
-      if (colStatus) novaLinha[colStatus] = 'Pendente';
-      if (colLink) novaLinha[colLink] = data.linkDrive || '';
-      if (colNotif) novaLinha[colNotif] = 'Sim';
-      if (colChat) novaLinha[colChat] = data.chatId;
-
-      console.log("🚀 Tentando gravar linha montada:", novaLinha);
-      
-      await tarefasSheet.addRow(novaLinha);
-      console.log("✅ SUCESSO: Salvo na aba Tarefas!");
-    } else {
-        console.log(`⚠️ Ignorado: Tipo '${tipoNormalizado}' não é 'externo'.`);
     }
 
     return NextResponse.json({ success: true });
@@ -152,13 +153,18 @@ export async function DELETE(req: NextRequest) {
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
-    const rowToDelete = rows.find(row => 
-        ((row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '')) === data.id
-    );
+    // Busca inteligente no delete
+    const rowToDelete = rows.find(row => {
+        const titulo = lerColunaInteligente(row, 'Conteudo') || lerColunaInteligente(row, 'Titulo');
+        const dataIni = lerColunaInteligente(row, 'Data_Inicio') || lerColunaInteligente(row, 'Data Inicio');
+        const idLinha = (titulo || '') + (dataIni || '');
+        return idLinha === data.id;
+    });
 
     if (rowToDelete) {
-        const tituloSalvo = rowToDelete.get('Conteudo_Principal');
-        const dataSalva = rowToDelete.get('Data_Inicio');
+        // Pega os dados antes de apagar para usar na busca da tarefa
+        const tituloSalvo = lerColunaInteligente(rowToDelete, 'Conteudo') || lerColunaInteligente(rowToDelete, 'Titulo');
+        const dataSalva = lerColunaInteligente(rowToDelete, 'Data_Inicio') || lerColunaInteligente(rowToDelete, 'Data Inicio');
 
         await rowToDelete.delete();
 
@@ -167,10 +173,10 @@ export async function DELETE(req: NextRequest) {
         if (tarefasSheet) {
              await tarefasSheet.loadHeaderRow();
              const headers = tarefasSheet.headerValues;
-             const buscaColuna = (parte: string) => headers.find(h => h.toLowerCase().includes(parte.toLowerCase()));
+             const buscaNomeColuna = (parte: string) => headers.find(h => h.toLowerCase().includes(parte.toLowerCase()));
              
-             const colTitulo = buscaColuna('Titulo');
-             const colData = buscaColuna('Data');
+             const colTitulo = buscaNomeColuna('Titulo');
+             const colData = buscaNomeColuna('Data');
 
              if (colTitulo && colData) {
                  const tarefasRows = await tarefasSheet.getRows();
