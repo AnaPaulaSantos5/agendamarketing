@@ -19,8 +19,7 @@ export async function GET() {
     const rowsAgenda = await agendaSheet.getRows();
     
     const events = rowsAgenda.map(row => {
-        // ID SIMPLES: Apenas junta o texto, sem inventar moda. 
-        // Isso garante que o front sempre ache o evento.
+        // ID SIMPLES (Titulo + Data)
         const idGerado = (row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '');
 
         return {
@@ -32,7 +31,7 @@ export async function GET() {
             cor: row.get('Tipo_Evento'),
             tipo: row.get('Tipo'),
             perfil: row.get('Perfil'),
-            linkDrive: row.get('LinkDrive') || '' // Sua coluna correta
+            linkDrive: row.get('LinkDrive') || '' 
         };
     });
 
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     await doc.loadInfo();
 
-    // 1. Salvar na Agenda (Colunas originais)
+    // 1. Salvar na Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
       Data_Inicio: data.dataInicio,
@@ -82,23 +81,21 @@ export async function POST(req: NextRequest) {
       LinkDrive: data.linkDrive || '' 
     });
 
-    // 2. Salvar na Tarefas (Colunas que você confirmou)
-    // Bloco_ID | Titulo | Responsavel | Data | Status | LinkDrive | Notificar | ResponsavelChatId
+    // 2. Salvar na Tarefas (AGORA SEM ESPAÇOS!)
     if (data.tipo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       
-      // Gera ID numérico simples
       const blocoId = `ID${Date.now()}`;
 
       await tarefasSheet.addRow({
-        Bloco_ID: blocoId,
-        Titulo: data.titulo,
-        Responsavel: data.perfil,
-        Data: data.dataInicio,
-        Status: 'Pendente',
-        LinkDrive: data.linkDrive || '',
-        Notificar: 'Sim',
-        ResponsavelChatId: data.chatId
+        'Bloco_ID': blocoId,
+        'Titulo': data.titulo,      // Limpo (sem espaço antes)
+        'Responsavel': data.perfil,
+        'Data': data.dataInicio,    // Limpo (sem espaço antes)
+        'Status': 'Pendente',       // Limpo (sem espaço depois)
+        'LinkDrive': data.linkDrive || '',
+        'Notificar': 'Sim',
+        'ResponsavelChatId': data.chatId
       });
     }
 
@@ -111,20 +108,18 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const data = await req.json(); // Recebe o ID simples
+    const data = await req.json(); 
     await doc.loadInfo();
     
     // --- APAGAR DA AGENDA ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
-    // Procura usando a mesma lógica simples do GET
     const rowToDelete = rows.find(row => 
         ((row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '')) === data.id
     );
 
     if (rowToDelete) {
-        // Guarda dados para apagar da tarefa depois
         const tituloSalvo = rowToDelete.get('Conteudo_Principal');
         const dataSalva = rowToDelete.get('Data_Inicio');
 
@@ -134,7 +129,7 @@ export async function DELETE(req: NextRequest) {
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
         const tarefasRows = await tarefasSheet.getRows();
         
-        // Procura na aba Tarefas
+        // Procura na aba Tarefas (usando nomes limpos)
         const tarefaToDelete = tarefasRows.find(row => 
              row.get('Titulo') === tituloSalvo && 
              row.get('Data') === dataSalva
