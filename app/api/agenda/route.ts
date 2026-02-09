@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
+// Configuração de autenticação (Mantida igual)
 const serviceAccountAuth = new JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
   key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -13,12 +14,12 @@ const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, serviceAccountAu
 export async function GET() {
   try {
     await doc.loadInfo();
-    
-    // --- 1. LER AGENDA ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     
+    // --- 1. LEITURA DA AGENDA (Simples e Direta) ---
     const events = rowsAgenda.map(row => {
+        // Gera ID juntando Titulo e Data (Sem inventar moda)
         const idGerado = (row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '');
         return {
             id: idGerado,
@@ -29,11 +30,12 @@ export async function GET() {
             cor: row.get('Tipo_Evento'),
             tipo: row.get('Tipo'),
             perfil: row.get('Perfil'),
-            linkDrive: row.get('LinkDrive') || '' 
+            // Tenta ler com ou sem underline pra garantir
+            linkDrive: row.get('LinkDrive') || row.get('Link_Drive') || '' 
         };
     });
 
-    // --- 2. LER PERFIL ---
+    // --- 2. LEITURA DE PERFIL ---
     const perfilSheet = doc.sheetsByTitle['Perfil'];
     const rowsPerfil = await perfilSheet.getRows();
     const perfis = rowsPerfil.map(row => ({
@@ -42,7 +44,7 @@ export async function GET() {
       email: row.get('Email')
     }));
 
-    // --- 3. LER FEED ---
+    // --- 3. LEITURA DO FEED ---
     const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const rowsFeed = await feedSheet.getRows();
     const feed = rowsFeed.map(row => ({
@@ -56,7 +58,7 @@ export async function GET() {
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
-    console.error("Erro Geral API:", error);
+    console.error("❌ Erro Geral API:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -64,13 +66,11 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    
-    // Normaliza para garantir que não falhe por letra maiúscula
-    const tipoEvento = data.tipo ? data.tipo.toLowerCase().trim() : '';
+    console.log("📝 POST INICIADO. Tipo:", data.tipo, "| Titulo:", data.titulo);
 
     await doc.loadInfo();
 
-    // 1. Salvar na Agenda (Mantemos o padrão que já funciona)
+    // 1. Salvar na Agenda (Isso já funciona, mantemos)
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
       Data_Inicio: data.dataInicio,
@@ -82,35 +82,63 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil,
       LinkDrive: data.linkDrive || '' 
     });
+    console.log("✅ Salvo na Agenda.");
 
-    // 2. Salvar na Tarefas (MÉTODO BRUTO - ARRAY)
-    if (tipoEvento === 'externo') {
+    // 2. Salvar na Tarefas (LÓGICA BLINDADA)
+    // Normaliza o tipo para minúsculo e sem espaço
+    const tipoNormalizado = data.tipo ? String(data.tipo).toLowerCase().trim() : '';
+    
+    if (tipoNormalizado === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       
       if (!tarefasSheet) {
-          throw new Error("Aba 'Tarefas' não encontrada na planilha!");
+          console.error("❌ CRÍTICO: Aba 'Tarefas' não encontrada!");
+          throw new Error("Aba Tarefas sumiu.");
       }
 
-      const blocoId = `ID${Date.now()}`;
+      // CARREGA OS CABEÇALHOS REAIS DA PLANILHA
+      await tarefasSheet.loadHeaderRow();
+      const headers = tarefasSheet.headerValues;
+      console.log("📋 Cabeçalhos Reais da Planilha:", headers);
 
-      // AQUI ESTÁ O TRUQUE: Passamos um ARRAY, não um objeto.
-      // Ele vai gravar na ordem exata das colunas:
-      // 1:Bloco_ID, 2:Titulo, 3:Responsavel, 4:Data, 5:Status, 6:LinkDrive, 7:Notificar, 8:ChatId
-      await tarefasSheet.addRow([
-        blocoId,                // Coluna A
-        data.titulo,            // Coluna B
-        data.perfil,            // Coluna C
-        data.dataInicio,        // Coluna D
-        'Pendente',             // Coluna E
-        data.linkDrive || '',   // Coluna F
-        'Sim',                  // Coluna G
-        data.chatId             // Coluna H
-      ]);
+      // FUNÇÃO INTELIGENTE: Procura a coluna que parece com o nome que queremos
+      // Ex: Se procurar 'Titulo', acha ' Titulo ' ou 'Titulo'
+      const buscaColuna = (parteDoNome: string) => {
+          return headers.find(h => h.toLowerCase().includes(parteDoNome.toLowerCase()));
+      };
+
+      // Monta a linha usando os nomes REAIS que encontrou
+      const novaLinha: any = {};
+      
+      const colBloco = buscaColuna('Bloco');      // Acha Bloco_ID ou Bloco ID
+      const colTitulo = buscaColuna('Titulo');    // Acha Titulo ou Título
+      const colResp = buscaColuna('Responsavel'); // Acha Responsavel
+      const colData = buscaColuna('Data');        // Acha Data
+      const colStatus = buscaColuna('Status');    // Acha Status
+      const colLink = buscaColuna('Link');        // Acha LinkDrive
+      const colNotif = buscaColuna('Notificar');  // Acha Notificar
+      const colChat = buscaColuna('Chat');        // Acha ResponsavelChatId
+
+      if (colBloco) novaLinha[colBloco] = `ID${Date.now()}`;
+      if (colTitulo) novaLinha[colTitulo] = data.titulo;
+      if (colResp) novaLinha[colResp] = data.perfil;
+      if (colData) novaLinha[colData] = data.dataInicio;
+      if (colStatus) novaLinha[colStatus] = 'Pendente';
+      if (colLink) novaLinha[colLink] = data.linkDrive || '';
+      if (colNotif) novaLinha[colNotif] = 'Sim';
+      if (colChat) novaLinha[colChat] = data.chatId;
+
+      console.log("🚀 Tentando gravar linha montada:", novaLinha);
+      
+      await tarefasSheet.addRow(novaLinha);
+      console.log("✅ SUCESSO: Salvo na aba Tarefas!");
+    } else {
+        console.log(`⚠️ Ignorado: Tipo '${tipoNormalizado}' não é 'externo'.`);
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Erro POST:", error);
+    console.error("❌ ERRO NO POST:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -137,17 +165,21 @@ export async function DELETE(req: NextRequest) {
         // --- APAGAR DA TAREFA ---
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
         if (tarefasSheet) {
-            const tarefasRows = await tarefasSheet.getRows();
-            // Procura na aba Tarefas (Aqui precisamos do nome para achar e apagar)
-            // Se der erro aqui, é porque o nome da coluna ainda está diferente
-            const tarefaToDelete = tarefasRows.find(row => 
-                row.get('Titulo') === tituloSalvo && 
-                row.get('Data') === dataSalva
-            );
-            
-            if (tarefaToDelete) {
-                await tarefaToDelete.delete();
-            }
+             await tarefasSheet.loadHeaderRow();
+             const headers = tarefasSheet.headerValues;
+             const buscaColuna = (parte: string) => headers.find(h => h.toLowerCase().includes(parte.toLowerCase()));
+             
+             const colTitulo = buscaColuna('Titulo');
+             const colData = buscaColuna('Data');
+
+             if (colTitulo && colData) {
+                 const tarefasRows = await tarefasSheet.getRows();
+                 const tarefaToDelete = tarefasRows.find(row => 
+                    row.get(colTitulo) === tituloSalvo && 
+                    row.get(colData) === dataSalva
+                 );
+                 if (tarefaToDelete) await tarefaToDelete.delete();
+             }
         }
     }
 
