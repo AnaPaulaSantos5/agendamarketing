@@ -10,56 +10,47 @@ const serviceAccountAuth = new JWT({
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, serviceAccountAuth);
 
-// --- FUNÇÃO QUE CAÇA O DADO NÃO IMPORTA O NOME DA COLUNA ---
-function encontrarValorInteligente(linhaRaw: any, palavrasChave: string[]) {
-    // Transforma a linha do Google num objeto simples do Javascript
-    const dados = linhaRaw.toObject();
-    const chaves = Object.keys(dados);
-
-    // 1. Tenta achar pelo nome da coluna (ex: procura algo que tenha "Link" no nome)
-    for (const palavra of palavrasChave) {
-        const chaveEncontrada = chaves.find(chave => 
-            chave.toLowerCase().includes(palavra.toLowerCase())
-        );
-        if (chaveEncontrada && dados[chaveEncontrada]) {
-            return dados[chaveEncontrada];
-        }
-    }
-    return '';
-}
-
 export async function GET() {
   try {
     await doc.loadInfo();
+    
+    // --- 1. LEITURA DA AGENDA (AGORA INTELIGENTE) ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     
-    // --- AQUI ACONTECE A MÁGICA DO GET ---
     const events = rowsAgenda.map(row => {
+        // Converte a linha inteira para um objeto simples para podermos procurar as chaves
+        const rawData = row.toObject();
         
-        // Puxa os dados usando a busca inteligente
-        const titulo = encontrarValorInteligente(row, ['Conteudo', 'Titulo']);
-        const dataIni = encontrarValorInteligente(row, ['Data_Inicio', 'Data Inicio', 'Inicio']);
+        // FUNÇÃO DE BUSCA: Procura o valor ignorando maiúsculas/espaços
+        const buscarValor = (parteDoNome: string) => {
+            const chaveEncontrada = Object.keys(rawData).find(key => 
+                key.toLowerCase().includes(parteDoNome.toLowerCase())
+            );
+            return chaveEncontrada ? rawData[chaveEncontrada] : '';
+        };
+
+        const titulo = buscarValor('Conteudo') || buscarValor('Titulo'); // Procura Conteudo_Principal ou Titulo
+        const dataIni = buscarValor('Data_Inicio') || buscarValor('Data Inicio');
         
-        // Tenta achar o link procurando por "Link", "Drive" ou "Url"
-        const linkAchado = encontrarValorInteligente(row, ['Link', 'Drive', 'Url']);
+        // ID: Titulo + Data
+        const idGerado = (titulo || '') + (dataIni || '');
 
         return {
-            id: (titulo || '') + (dataIni || ''), // ID gerado na hora
+            id: idGerado,
             dataInicio: dataIni,
-            dataFim: encontrarValorInteligente(row, ['Data_Fim', 'Data Fim', 'Termino']),
+            dataFim: buscarValor('Data_Fim') || buscarValor('Data Fim'),
             titulo: titulo,
-            conteudoSecundario: encontrarValorInteligente(row, ['Secundario', 'Descricao']),
-            cor: encontrarValorInteligente(row, ['Tipo_Evento', 'Cor']),
-            tipo: encontrarValorInteligente(row, ['Tipo']),
-            perfil: encontrarValorInteligente(row, ['Perfil', 'Responsavel']),
-            
-            // O Link agora VAI vir, não importa o nome da coluna
-            linkDrive: linkAchado 
+            conteudoSecundario: buscarValor('Secundario'),
+            cor: buscarValor('Tipo_Evento') || buscarValor('Cor'),
+            tipo: buscarValor('Tipo'),
+            perfil: buscarValor('Perfil'),
+            // AQUI ESTÁ A MÁGICA: Pega qualquer coluna que tenha "Link" no nome
+            linkDrive: buscarValor('Link') || '' 
         };
     });
 
-    // --- PERFIS ---
+    // --- 2. LEITURA DE PERFIL ---
     const perfilSheet = doc.sheetsByTitle['Perfil'];
     const rowsPerfil = await perfilSheet.getRows();
     const perfis = rowsPerfil.map(row => ({
@@ -68,7 +59,7 @@ export async function GET() {
       email: row.get('Email')
     }));
 
-    // --- FEED ---
+    // --- 3. LEITURA DO FEED ---
     const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const rowsFeed = await feedSheet.getRows();
     const feed = rowsFeed.map(row => ({
@@ -87,7 +78,6 @@ export async function GET() {
   }
 }
 
-// --- MANTIVE SEU POST QUE JÁ ESTÁ FUNCIONANDO ---
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
@@ -106,62 +96,98 @@ export async function POST(req: NextRequest) {
       LinkDrive: data.linkDrive || '' 
     });
 
-    // 2. Salvar na Tarefas (Se for externo)
-    if (data.tipo && String(data.tipo).toLowerCase().trim() === 'externo') {
+    // 2. Salvar na Tarefas (LÓGICA BLINDADA DO ÚLTIMO PASSO)
+    const tipoNormalizado = data.tipo ? String(data.tipo).toLowerCase().trim() : '';
+    
+    if (tipoNormalizado === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+      
       if (tarefasSheet) {
-          // Grava por posição (Array) para garantir que salva certo
-          // Bloco_ID | Titulo | Responsavel | Data | Status | LinkDrive | Notificar | ChatId
-          await tarefasSheet.addRow([
-             `ID${Date.now()}`,
-             data.titulo,
-             data.perfil,
-             data.dataInicio,
-             'Pendente',
-             data.linkDrive || '',
-             'Sim',
-             data.chatId
-          ]);
+          await tarefasSheet.loadHeaderRow();
+          const headers = tarefasSheet.headerValues;
+          
+          // Busca dinâmica de colunas
+          const buscaColuna = (parte: string) => headers.find(h => h.toLowerCase().includes(parte.toLowerCase()));
+
+          const novaLinha: any = {};
+          const colBloco = buscaColuna('Bloco');
+          const colTitulo = buscaColuna('Titulo');
+          const colResp = buscaColuna('Responsavel');
+          const colData = buscaColuna('Data');
+          const colStatus = buscaColuna('Status');
+          const colLink = buscaColuna('Link');
+          const colNotif = buscaColuna('Notificar');
+          const colChat = buscaColuna('Chat');
+
+          if (colBloco) novaLinha[colBloco] = `ID${Date.now()}`;
+          if (colTitulo) novaLinha[colTitulo] = data.titulo;
+          if (colResp) novaLinha[colResp] = data.perfil;
+          if (colData) novaLinha[colData] = data.dataInicio;
+          if (colStatus) novaLinha[colStatus] = 'Pendente';
+          if (colLink) novaLinha[colLink] = data.linkDrive || '';
+          if (colNotif) novaLinha[colNotif] = 'Sim';
+          if (colChat) novaLinha[colChat] = data.chatId;
+
+          await tarefasSheet.addRow(novaLinha);
       }
     }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error("❌ ERRO NO POST:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// --- MANTIVE SEU DELETE ---
 export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json(); 
     await doc.loadInfo();
+    
+    // --- APAGAR DA AGENDA ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
+    // Busca inteligente também no delete
     const rowToDelete = rows.find(row => {
-        const titulo = encontrarValorInteligente(row, ['Conteudo', 'Titulo']);
-        const dataIni = encontrarValorInteligente(row, ['Data_Inicio', 'Data Inicio']);
-        return ((titulo || '') + (dataIni || '')) === data.id;
+        const raw = row.toObject();
+        // Recria a lógica de busca do GET
+        const busca = (p: string) => { const k = Object.keys(raw).find(x => x.toLowerCase().includes(p.toLowerCase())); return k ? raw[k] : ''; };
+        
+        const idLinha = (busca('Conteudo') || busca('Titulo') || '') + (busca('Data_Inicio') || busca('Data Inicio') || '');
+        return idLinha === data.id;
     });
 
     if (rowToDelete) {
-        const tituloSalvo = encontrarValorInteligente(rowToDelete, ['Conteudo', 'Titulo']);
-        const dataSalva = encontrarValorInteligente(rowToDelete, ['Data_Inicio', 'Data Inicio']);
+        const raw = rowToDelete.toObject();
+        const busca = (p: string) => { const k = Object.keys(raw).find(x => x.toLowerCase().includes(p.toLowerCase())); return k ? raw[k] : ''; };
+        
+        const tituloSalvo = busca('Conteudo') || busca('Titulo');
+        const dataSalva = busca('Data_Inicio') || busca('Data Inicio');
+
         await rowToDelete.delete();
 
-        // Tenta apagar da Tarefa também
+        // --- APAGAR DA TAREFA ---
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
         if (tarefasSheet) {
-             const tarefasRows = await tarefasSheet.getRows();
-             const tarefaToDelete = tarefasRows.find(row => {
-                 // Busca simples na tarefa
-                 const tTitulo = row.get('Titulo') || row.get(' Titulo'); 
-                 const tData = row.get('Data') || row.get(' Data');
-                 return tTitulo === tituloSalvo && tData === dataSalva;
-             });
-             if (tarefaToDelete) await tarefaToDelete.delete();
+             await tarefasSheet.loadHeaderRow();
+             const headers = tarefasSheet.headerValues;
+             const buscaCol = (p: string) => headers.find(h => h.toLowerCase().includes(p.toLowerCase()));
+             
+             const colTitulo = buscaCol('Titulo');
+             const colData = buscaCol('Data');
+
+             if (colTitulo && colData) {
+                 const tarefasRows = await tarefasSheet.getRows();
+                 const tarefaToDelete = tarefasRows.find(row => 
+                    row.get(colTitulo) === tituloSalvo && 
+                    row.get(colData) === dataSalva
+                 );
+                 if (tarefaToDelete) await tarefaToDelete.delete();
+             }
         }
     }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
