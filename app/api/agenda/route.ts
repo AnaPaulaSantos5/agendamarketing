@@ -19,16 +19,17 @@ export async function GET() {
     const rowsAgenda = await agendaSheet.getRows();
     
     const events = rowsAgenda
-      // FILTRO DE SEGURANÇA: Só pega linhas que têm título e data preenchidos
+      // Filtra linhas vazias para não quebrar
       .filter(row => row.get('Conteudo_Principal') && row.get('Data_Inicio'))
       .map(row => {
           const titulo = row.get('Conteudo_Principal');
           const data = row.get('Data_Inicio');
-          // ID BLINDADO: Garante que o ID seja uma string única
-          const idGerado = `${titulo}${data}`;
+          
+          // ID ROBUSTO: Remove espaços e caracteres estranhos para garantir que o botão Excluir funcione
+          const safeId = `${titulo}-${data}`.replace(/[^a-zA-Z0-9]/g, '');
 
           return {
-              id: idGerado,
+              id: safeId, // O ID que o botão Excluir usa
               dataInicio: data,
               dataFim: row.get('Data_Fim'),
               titulo: titulo,
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     // 1. Salvar na aba Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
-      Data_Inicio: data.dataInicio,
+      Data_Inicio: data.dataInicio, // Ex: 2026-02-09 14:00
       Data_Fim: data.dataFim,
       Tipo_Evento: data.cor,
       Tipo: data.tipo,
@@ -86,15 +87,21 @@ export async function POST(req: NextRequest) {
       LinkDrive: data.linkDrive || '' 
     });
 
-    // 2. Salvar na aba Tarefas
+    // 2. Salvar na aba Tarefas (CORRIGIDO)
+    // Só salva se for externo
     if (data.tipo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+      
+      // Gera um ID único para o bloco
+      const blocoID = `TASK-${Date.now()}`;
+
       await tarefasSheet.addRow({
+        Bloco_ID: blocoID, // <--- ADICIONADO (Faltava isso!)
         Titulo: data.titulo,
         Responsavel: data.perfil,
         Data: data.dataInicio,
         Status: 'Pendente',
-        LinkDrive: data.linkDrive || '', 
+        LinkDrive: data.linkDrive || '',
         Notificar: 'Sim',
         ResponsavelChatId: data.chatId
       });
@@ -102,36 +109,42 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error("Erro no POST:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const data = await req.json(); // Recebe o ID
+    const data = await req.json(); // Recebe o ID seguro
     await doc.loadInfo();
     
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
-    // Busca a linha usando a mesma lógica blindada de ID
-    const rowToDelete = rows.find(row => 
-        `${row.get('Conteudo_Principal')}${row.get('Data_Inicio')}` === data.id
-    );
+    // Recria a lógica do ID seguro para encontrar a linha
+    const rowToDelete = rows.find(row => {
+        const currentId = `${row.get('Conteudo_Principal')}-${row.get('Data_Inicio')}`.replace(/[^a-zA-Z0-9]/g, '');
+        return currentId === data.id;
+    });
 
     if (rowToDelete) {
         const titulo = rowToDelete.get('Conteudo_Principal');
         const dataInicio = rowToDelete.get('Data_Inicio');
 
+        // Deleta da Agenda
         await rowToDelete.delete();
 
-        // Tenta apagar da aba Tarefas também
+        // Tenta apagar da aba Tarefas também (pelo Título e Data)
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
         const tarefasRows = await tarefasSheet.getRows();
+        
+        // Procura na aba Tarefas alguém com mesmo Título e Data
         const tarefaToDelete = tarefasRows.find(row => 
              row.get('Titulo') === titulo && 
              row.get('Data') === dataInicio
         );
+        
         if (tarefaToDelete) {
             await tarefaToDelete.delete();
         }
