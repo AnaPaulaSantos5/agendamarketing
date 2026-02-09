@@ -19,9 +19,7 @@ export async function GET() {
     const rowsAgenda = await agendaSheet.getRows();
     
     const events = rowsAgenda.map(row => {
-        // ID SIMPLES (Titulo + Data)
         const idGerado = (row.get('Conteudo_Principal') || '') + (row.get('Data_Inicio') || '');
-
         return {
             id: idGerado,
             dataInicio: row.get('Data_Inicio'),
@@ -66,9 +64,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+    
+    // Normaliza para garantir que não falhe por letra maiúscula
+    const tipoEvento = data.tipo ? data.tipo.toLowerCase().trim() : '';
+
     await doc.loadInfo();
 
-    // 1. Salvar na Agenda
+    // 1. Salvar na Agenda (Mantemos o padrão que já funciona)
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
       Data_Inicio: data.dataInicio,
@@ -81,22 +83,29 @@ export async function POST(req: NextRequest) {
       LinkDrive: data.linkDrive || '' 
     });
 
-    // 2. Salvar na Tarefas (AGORA SEM ESPAÇOS!)
-    if (data.tipo === 'externo') {
+    // 2. Salvar na Tarefas (MÉTODO BRUTO - ARRAY)
+    if (tipoEvento === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       
+      if (!tarefasSheet) {
+          throw new Error("Aba 'Tarefas' não encontrada na planilha!");
+      }
+
       const blocoId = `ID${Date.now()}`;
 
-      await tarefasSheet.addRow({
-        'Bloco_ID': blocoId,
-        'Titulo': data.titulo,      // Limpo (sem espaço antes)
-        'Responsavel': data.perfil,
-        'Data': data.dataInicio,    // Limpo (sem espaço antes)
-        'Status': 'Pendente',       // Limpo (sem espaço depois)
-        'LinkDrive': data.linkDrive || '',
-        'Notificar': 'Sim',
-        'ResponsavelChatId': data.chatId
-      });
+      // AQUI ESTÁ O TRUQUE: Passamos um ARRAY, não um objeto.
+      // Ele vai gravar na ordem exata das colunas:
+      // 1:Bloco_ID, 2:Titulo, 3:Responsavel, 4:Data, 5:Status, 6:LinkDrive, 7:Notificar, 8:ChatId
+      await tarefasSheet.addRow([
+        blocoId,                // Coluna A
+        data.titulo,            // Coluna B
+        data.perfil,            // Coluna C
+        data.dataInicio,        // Coluna D
+        'Pendente',             // Coluna E
+        data.linkDrive || '',   // Coluna F
+        'Sim',                  // Coluna G
+        data.chatId             // Coluna H
+      ]);
     }
 
     return NextResponse.json({ success: true });
@@ -127,16 +136,18 @@ export async function DELETE(req: NextRequest) {
 
         // --- APAGAR DA TAREFA ---
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-        const tarefasRows = await tarefasSheet.getRows();
-        
-        // Procura na aba Tarefas (usando nomes limpos)
-        const tarefaToDelete = tarefasRows.find(row => 
-             row.get('Titulo') === tituloSalvo && 
-             row.get('Data') === dataSalva
-        );
-        
-        if (tarefaToDelete) {
-            await tarefaToDelete.delete();
+        if (tarefasSheet) {
+            const tarefasRows = await tarefasSheet.getRows();
+            // Procura na aba Tarefas (Aqui precisamos do nome para achar e apagar)
+            // Se der erro aqui, é porque o nome da coluna ainda está diferente
+            const tarefaToDelete = tarefasRows.find(row => 
+                row.get('Titulo') === tituloSalvo && 
+                row.get('Data') === dataSalva
+            );
+            
+            if (tarefaToDelete) {
+                await tarefaToDelete.delete();
+            }
         }
     }
 
