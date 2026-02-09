@@ -14,22 +14,19 @@ export async function GET() {
   try {
     await doc.loadInfo();
     
-    // 1. Puxar Eventos da aba Agenda
+    // --- AGENDA ---
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
-    
     const events = rowsAgenda
-      // Filtra linhas vazias para não quebrar
       .filter(row => row.get('Conteudo_Principal') && row.get('Data_Inicio'))
       .map(row => {
           const titulo = row.get('Conteudo_Principal');
           const data = row.get('Data_Inicio');
-          
-          // ID ROBUSTO: Remove espaços e caracteres estranhos para garantir que o botão Excluir funcione
+          // ID Seguro
           const safeId = `${titulo}-${data}`.replace(/[^a-zA-Z0-9]/g, '');
 
           return {
-              id: safeId, // O ID que o botão Excluir usa
+              id: safeId,
               dataInicio: data,
               dataFim: row.get('Data_Fim'),
               titulo: titulo,
@@ -41,7 +38,7 @@ export async function GET() {
           };
       });
 
-    // 2. Puxar Perfis
+    // --- PERFIL ---
     const perfilSheet = doc.sheetsByTitle['Perfil'];
     const rowsPerfil = await perfilSheet.getRows();
     const perfis = rowsPerfil.map(row => ({
@@ -50,7 +47,7 @@ export async function GET() {
       email: row.get('Email')
     }));
 
-    // 3. Puxar Feed
+    // --- FEED ---
     const feedSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const rowsFeed = await feedSheet.getRows();
     const feed = rowsFeed.map(row => ({
@@ -64,7 +61,7 @@ export async function GET() {
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
-    console.error("Erro na API Agenda:", error);
+    console.error("Erro GET Agenda:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -72,12 +69,14 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+    console.log("📝 POST RECEBIDO. Tipo:", data.tipo); // LOG 1
+
     await doc.loadInfo();
 
-    // 1. Salvar na aba Agenda
+    // 1. Salvar na Agenda
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     await agendaSheet.addRow({
-      Data_Inicio: data.dataInicio, // Ex: 2026-02-09 14:00
+      Data_Inicio: data.dataInicio,
       Data_Fim: data.dataFim,
       Tipo_Evento: data.cor,
       Tipo: data.tipo,
@@ -86,43 +85,57 @@ export async function POST(req: NextRequest) {
       Perfil: data.perfil,
       LinkDrive: data.linkDrive || '' 
     });
+    console.log("✅ Salvo na aba Agenda");
 
-    // 2. Salvar na aba Tarefas (CORRIGIDO)
-    // Só salva se for externo
-    if (data.tipo === 'externo') {
+    // 2. Salvar na Tarefas (COM DIAGNÓSTICO)
+    // Limpa o tipo para evitar erros de maiúscula/espaço
+    const tipoLimpo = data.tipo ? data.tipo.toString().toLowerCase().trim() : '';
+    
+    if (tipoLimpo === 'externo') {
       const tarefasSheet = doc.sheetsByTitle['Tarefas'];
       
-      // Gera um ID único para o bloco
-      const blocoID = `TASK-${Date.now()}`;
+      if (!tarefasSheet) {
+          console.error("❌ ERRO CRÍTICO: Aba 'Tarefas' não encontrada! Verifique o nome na planilha.");
+      } else {
+          // LOG DOS CABEÇALHOS: Isso vai mostrar o que o Google está vendo
+          await tarefasSheet.loadHeaderRow(); 
+          console.log("📋 CABEÇALHOS ENCONTRADOS EM TAREFAS:", tarefasSheet.headerValues);
 
-      await tarefasSheet.addRow({
-        Bloco_ID: blocoID, // <--- ADICIONADO (Faltava isso!)
-        Titulo: data.titulo,
-        Responsavel: data.perfil,
-        Data: data.dataInicio,
-        Status: 'Pendente',
-        LinkDrive: data.linkDrive || '',
-        Notificar: 'Sim',
-        ResponsavelChatId: data.chatId
-      });
+          const novaLinha = {
+            Bloco_ID: `TASK-${Date.now()}`,
+            Titulo: data.titulo,
+            Responsavel: data.perfil,
+            Data: data.dataInicio,
+            Status: 'Pendente',
+            LinkDrive: data.linkDrive || '',
+            Notificar: 'Sim',
+            ResponsavelChatId: data.chatId
+          };
+
+          console.log("🚀 Tentando inserir linha:", novaLinha);
+          await tarefasSheet.addRow(novaLinha);
+          console.log("✅ Inserção em Tarefas concluída.");
+      }
+    } else {
+        console.log(`⏭️ Pulando Tarefas pois tipo é '${tipoLimpo}' (não é 'externo')`);
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Erro no POST:", error);
+    console.error("❌ ERRO NO POST:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const data = await req.json(); // Recebe o ID seguro
+    const data = await req.json();
     await doc.loadInfo();
     
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rows = await agendaSheet.getRows();
     
-    // Recria a lógica do ID seguro para encontrar a linha
+    // Busca linha pelo ID Seguro
     const rowToDelete = rows.find(row => {
         const currentId = `${row.get('Conteudo_Principal')}-${row.get('Data_Inicio')}`.replace(/[^a-zA-Z0-9]/g, '');
         return currentId === data.id;
@@ -132,21 +145,17 @@ export async function DELETE(req: NextRequest) {
         const titulo = rowToDelete.get('Conteudo_Principal');
         const dataInicio = rowToDelete.get('Data_Inicio');
 
-        // Deleta da Agenda
         await rowToDelete.delete();
 
-        // Tenta apagar da aba Tarefas também (pelo Título e Data)
+        // Apaga da Tarefas
         const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-        const tarefasRows = await tarefasSheet.getRows();
-        
-        // Procura na aba Tarefas alguém com mesmo Título e Data
-        const tarefaToDelete = tarefasRows.find(row => 
-             row.get('Titulo') === titulo && 
-             row.get('Data') === dataInicio
-        );
-        
-        if (tarefaToDelete) {
-            await tarefaToDelete.delete();
+        if (tarefasSheet) {
+            const tarefasRows = await tarefasSheet.getRows();
+            const tarefaToDelete = tarefasRows.find(row => 
+                row.get('Titulo') === titulo && 
+                row.get('Data') === dataInicio
+            );
+            if (tarefaToDelete) await tarefaToDelete.delete();
         }
     }
 
