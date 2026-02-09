@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, Mail, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -38,7 +38,10 @@ export default function AgendaPage() {
     try {
       const res = await fetch('/api/agenda');
       const data = await res.json();
-      if (data.events) setEventos(data.events);
+      if (data.events) {
+          console.log("Eventos carregados (Verifique linkDrive):", data.events);
+          setEventos(data.events);
+      }
       if (data.feed) setFeed(data.feed);
       if (data.perfis) {
         setPerfis(data.perfis);
@@ -86,27 +89,43 @@ export default function AgendaPage() {
     } catch (e) { alert("Erro de conexão com o servidor"); } finally { setEnviandoZap(false); }
   };
 
+  // --- NOVA LÓGICA INTELIGENTE DE SALVAR ---
   const handleSalvar = async () => {
+    // 1. SE FOR EDIÇÃO (já tem ID), DELETAMOS O ANTIGO PRIMEIRO
+    if (tempEvento.id) {
+        try {
+            console.log("Modo Edição: Removendo antigo evento...", tempEvento.id);
+            await fetch('/api/agenda', { 
+                method: 'DELETE', 
+                body: JSON.stringify({ id: tempEvento.id }) 
+            });
+        } catch (e) {
+            console.error("Erro ao tentar limpar evento antigo:", e);
+        }
+    }
+
+    // 2. CRIAMOS O NOVO (Seja novo ou recriando o editado)
     const payload = { 
       ...tempEvento, 
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
       dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}` 
     };
+    
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
-    if (res.ok) { alert("Gravado!"); setShowEventModal(false); carregarDados(); }
+    
+    if (res.ok) { 
+        alert("Gravado com sucesso!"); 
+        setShowEventModal(false); 
+        carregarDados(); 
+    } else {
+        alert("Erro ao gravar novo evento.");
+    }
   };
 
-  // --- NOVA FUNÇÃO DE EXCLUIR ---
   const handleExcluir = async () => {
     if (!tempEvento.id) return;
     if (!confirm("Tem certeza que deseja excluir este evento?")) return;
 
-    // Usaremos POST para deletar, assumindo que sua API trata isso, 
-    // ou se preferir criar um DELETE no route.ts, avise.
-    // Aqui vou simular enviando um campo 'action: delete' ou apenas removendo via lógica.
-    // Como seu route POST atual apenas adiciona, precisamos garantir que ele saiba excluir
-    // ou você precisará adicionar o método DELETE no route.ts.
-    // Vou assumir que você adicionará o DELETE no route.ts (mando abaixo).
     try {
         const res = await fetch('/api/agenda', { 
             method: 'DELETE', 
@@ -134,7 +153,6 @@ export default function AgendaPage() {
     return d >= i && d <= f;
   };
 
-  // CLICAR NO DIA (ABRE NOVO, MAS MOSTRA LISTA)
   const handleDiaClick = (dia: number) => {
     const dataStr = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
     setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia));
@@ -152,19 +170,24 @@ export default function AgendaPage() {
     setShowEventModal(true);
   };
 
-  // CLICAR NA BOLINHA (ABRE O EVENTO)
+  // --- CARREGAMENTO DO EVENTO (CORRIGIDO LINK) ---
   const handleEventoClick = (e: React.MouseEvent, evento: any) => {
     e.stopPropagation(); 
+    
+    console.log("Abrindo evento:", evento); // Debug no console do navegador
+
     setTempEvento({ 
-        ...tempEvento, 
         id: evento.id, 
         titulo: evento.titulo, 
         dataInicio: evento.dataInicio?.split(' ')[0], 
         dataTermino: evento.dataFim?.split(' ')[0], 
+        horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
+        horaFim: evento.dataFim?.split(' ')[1] || '09:00',
         cor: evento.cor, 
         tipo: evento.tipo || 'externo', 
-        linkDrive: evento.linkDrive || '', 
+        linkDrive: evento.linkDrive || '', // <--- AQUI GARANTE QUE O LINK VEM
         conteudoSecundario: evento.conteudoSecundario || '', 
+        perfil: evento.perfil || perfilAtivo?.nome || '', 
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
     
@@ -176,12 +199,17 @@ export default function AgendaPage() {
 
   const selecionarEventoDaLista = (evento: any) => {
       setTempEvento({ 
-        ...tempEvento, 
-        id: evento.id, titulo: evento.titulo, 
+        id: evento.id, 
+        titulo: evento.titulo, 
         dataInicio: evento.dataInicio?.split(' ')[0], 
         dataTermino: evento.dataFim?.split(' ')[0], 
-        cor: evento.cor, tipo: evento.tipo || 'externo', 
-        linkDrive: evento.linkDrive || '', conteudoSecundario: evento.conteudoSecundario || '', 
+        horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
+        horaFim: evento.dataFim?.split(' ')[1] || '09:00',
+        cor: evento.cor, 
+        tipo: evento.tipo || 'externo', 
+        linkDrive: evento.linkDrive || '', // <--- AQUI TAMBÉM
+        conteudoSecundario: evento.conteudoSecundario || '', 
+        perfil: evento.perfil || perfilAtivo?.nome || '',
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
   };
