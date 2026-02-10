@@ -58,7 +58,7 @@ export async function GET() {
         email: getVal(r, 'Email') 
     }));
 
-    // 2. CARREGA E FILTRA O FEED (Ajustado para sua planilha)
+    // 2. CARREGA E FILTRA O FEED (Lógica de Prioridade)
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
     
@@ -67,31 +67,34 @@ export async function GET() {
         Nome: getVal(r, 'Nome'), 
         Evento: getVal(r, 'Evento'), 
         Resposta: getVal(r, 'Resposta'), 
-        Data: getVal(r, 'Data'),
-        Telefone: getVal(r, 'Telefone')
+        Data: getVal(r, 'Data')
     }))
     .filter(item => {
-        const tipo = String(item.Tipo || '').toUpperCase().trim();
-        const evento = String(item.Evento || '').toLowerCase().trim();
         const resposta = String(item.Resposta || '').toUpperCase().trim();
+        const evento = String(item.Evento || '').toLowerCase().trim();
+        const nome = String(item.Nome || '').toLowerCase().trim();
 
-        // FILTRO 1: Se for uma RESPOSTA (Tipo = RESPOSTA)
-        if (tipo === 'RESPOSTA') {
-            // SÓ deixa passar se a resposta for SIM ou NÃO. 
-            // Se for traço (-), ignora, pois é log vazio do webhook.
-            return (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO');
+        // REGRAS DE OURO:
+        
+        // 1. Se tem SIM ou NÃO na resposta, MOSTRA SEMPRE (é o cliente falando)
+        if (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO') {
+            item.Tipo = 'RESPOSTA'; // Forçamos o tipo para garantir que o site use o ícone de check
+            return true;
         }
 
-        // FILTRO 2: Se for um ENVIO (Tipo = ENVIO)
-        if (tipo === 'ENVIO') {
-            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'teste whatsapp'];
-            // Só deixa passar se o evento for real e não for lixo
-            return !lixo.includes(evento) && evento.length > 2;
+        // 2. Se for um log de sistema (Confi/Sistema) e não tiver evento real, descarta
+        if (nome.includes('confi') || nome.includes('sistema')) {
+            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum'];
+            if (lixo.includes(evento) || evento.length < 3) return false;
+            
+            item.Tipo = 'ENVIO';
+            return true;
         }
 
-        return true;
+        // 3. Se caiu aqui e não tem resposta nem evento válido, descarta
+        return false;
     })
-    .reverse().slice(0, 25); // Mostra as 25 atividades mais recentes
+    .reverse().slice(0, 20);
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -99,52 +102,52 @@ export async function GET() {
   }
 }
 
-// POST e DELETE mantidos iguais...
+// POST e DELETE permanecem iguais...
 export async function POST(req: NextRequest) {
-  try {
-    const data = await req.json();
-    await doc.loadInfo();
-    const agendaSheet = doc.sheetsByTitle['Agenda'];
-    await agendaSheet.addRow({
-      'Data_Inicio': data.dataInicio,
-      'Data_Fim': data.dataFim,
-      'Tipo_Evento': data.cor,
-      'Tipo': data.tipo,
-      'Conteudo_Principal': data.titulo,
-      'Conteudo_Secundario': data.conteudoSecundario || '',
-      'Perfil': data.perfil
-    });
-    if (String(data.tipo).toLowerCase().trim() === 'externo') {
-      const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-      await tarefasSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
+    try {
+      const data = await req.json();
+      await doc.loadInfo();
+      const agendaSheet = doc.sheetsByTitle['Agenda'];
+      await agendaSheet.addRow({
+        'Data_Inicio': data.dataInicio,
+        'Data_Fim': data.dataFim,
+        'Tipo_Evento': data.cor,
+        'Tipo': data.tipo,
+        'Conteudo_Principal': data.titulo,
+        'Conteudo_Secundario': data.conteudoSecundario || '',
+        'Perfil': data.perfil
+      });
+      if (String(data.tipo).toLowerCase().trim() === 'externo') {
+        const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+        await tarefasSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
+      }
+      return NextResponse.json({ success: true });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 }
 
 export async function DELETE(req: NextRequest) {
-  try {
-    const data = await req.json();
-    await doc.loadInfo();
-    const agendaSheet = doc.sheetsByTitle['Agenda'];
-    const rows = await agendaSheet.getRows();
-    const rowToDelete = rows.find(row => {
-        const idLinha = (getVal(row, 'Conteudo_Principal') + getVal(row, 'Data_Inicio')).replace(/\s/g, '').toLowerCase();
-        return idLinha === data.id;
-    });
-    if (rowToDelete) {
-        const t = getVal(rowToDelete, 'Conteudo_Principal');
-        const d = getVal(rowToDelete, 'Data_Inicio');
-        await rowToDelete.delete();
-        const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-        const rowsT = await tarefasSheet.getRows();
-        const rowT = rowsT.find(r => getVal(r, 'Titulo') === t && getVal(r, 'Data') === d);
-        if (rowT) await rowT.delete();
+    try {
+      const data = await req.json();
+      await doc.loadInfo();
+      const agendaSheet = doc.sheetsByTitle['Agenda'];
+      const rows = await agendaSheet.getRows();
+      const rowToDelete = rows.find(row => {
+          const idLinha = (getVal(row, 'Conteudo_Principal') + getVal(row, 'Data_Inicio')).replace(/\s/g, '').toLowerCase();
+          return idLinha === data.id;
+      });
+      if (rowToDelete) {
+          const t = getVal(rowToDelete, 'Conteudo_Principal');
+          const d = getVal(rowToDelete, 'Data_Inicio');
+          await rowToDelete.delete();
+          const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+          const rowsT = await tarefasSheet.getRows();
+          const rowT = rowsT.find(r => getVal(r, 'Titulo') === t && getVal(r, 'Data') === d);
+          if (rowT) await rowT.delete();
+      }
+      return NextResponse.json({ success: true });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 }
