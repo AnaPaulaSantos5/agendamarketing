@@ -24,7 +24,6 @@ export async function GET() {
   try {
     await doc.loadInfo();
     
-    // 1. CARREGA AGENDA E TAREFAS
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -33,9 +32,13 @@ export async function GET() {
     const events = rowsAgenda.map(row => {
         const titulo = getVal(row, 'Conteudo_Principal');
         const dataIni = getVal(row, 'Data_Inicio');
-        const tarefaCorrespondente = rowsTarefas.find(r => 
-            getVal(r, 'Titulo') === titulo && getVal(r, 'Data') === dataIni
-        );
+        
+        // Busca na aba Tarefas comparando Título e Data (removendo espaços extras)
+        const tarefaCorrespondente = rowsTarefas.find(r => {
+            const tTitulo = getVal(r, 'Titulo').trim();
+            const tData = getVal(r, 'Data').trim();
+            return tTitulo === titulo.trim() && tData === dataIni.trim();
+        });
 
         return {
             id: (titulo + dataIni).replace(/\s/g, '').toLowerCase(),
@@ -58,7 +61,6 @@ export async function GET() {
         email: getVal(r, 'Email') 
     }));
 
-    // 2. CARREGA E FILTRA O FEED (Lógica de Prioridade)
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
     
@@ -74,24 +76,17 @@ export async function GET() {
         const evento = String(item.Evento || '').toLowerCase().trim();
         const nome = String(item.Nome || '').toLowerCase().trim();
 
-        // REGRAS DE OURO:
-        
-        // 1. Se tem SIM ou NÃO na resposta, MOSTRA SEMPRE (é o cliente falando)
         if (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO') {
-            item.Tipo = 'RESPOSTA'; // Forçamos o tipo para garantir que o site use o ícone de check
+            item.Tipo = 'RESPOSTA';
             return true;
         }
 
-        // 2. Se for um log de sistema (Confi/Sistema) e não tiver evento real, descarta
         if (nome.includes('confi') || nome.includes('sistema')) {
             const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum'];
             if (lixo.includes(evento) || evento.length < 3) return false;
-            
             item.Tipo = 'ENVIO';
             return true;
         }
-
-        // 3. Se caiu aqui e não tem resposta nem evento válido, descarta
         return false;
     })
     .reverse().slice(0, 20);
@@ -102,31 +97,68 @@ export async function GET() {
   }
 }
 
-// POST e DELETE permanecem iguais...
 export async function POST(req: NextRequest) {
-    try {
-      const data = await req.json();
-      await doc.loadInfo();
-      const agendaSheet = doc.sheetsByTitle['Agenda'];
-      await agendaSheet.addRow({
-        'Data_Inicio': data.dataInicio,
-        'Data_Fim': data.dataFim,
-        'Tipo_Evento': data.cor,
-        'Tipo': data.tipo,
-        'Conteudo_Principal': data.titulo,
-        'Conteudo_Secundario': data.conteudoSecundario || '',
-        'Perfil': data.perfil
-      });
-      if (String(data.tipo).toLowerCase().trim() === 'externo') {
-        const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-        await tarefasSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
-      }
-      return NextResponse.json({ success: true });
-    } catch (error: any) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const data = await req.json();
+    await doc.loadInfo();
+    
+    const agendaSheet = doc.sheetsByTitle['Agenda'];
+    const rowsAgenda = await agendaSheet.getRows();
+
+    // 1. CHECA SE O EVENTO JÁ EXISTE (Para não duplicar na Agenda)
+    const existe = rowsAgenda.find(r => 
+        getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
+        getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
+    );
+
+    if (!existe) {
+        await agendaSheet.addRow({
+          'Data_Inicio': data.dataInicio,
+          'Data_Fim': data.dataFim,
+          'Tipo_Evento': data.cor,
+          'Tipo': data.tipo,
+          'Conteudo_Principal': data.titulo,
+          'Conteudo_Secundario': data.conteudoSecundario || '',
+          'Perfil': data.perfil
+        });
     }
+
+    // 2. TRATA A ABA TAREFAS (Onde fica o Link do Drive)
+    if (String(data.tipo).toLowerCase().trim() === 'externo') {
+      const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+      const rowsT = await tarefasSheet.getRows();
+      
+      const tarefaExistente = rowsT.find(r => 
+        getVal(r, 'Titulo').trim() === data.titulo.trim() && 
+        getVal(r, 'Data').trim() === data.dataInicio.trim()
+      );
+
+      if (tarefaExistente) {
+          // Se a tarefa já existe, apenas atualiza o Link do Drive em vez de criar nova linha
+          tarefaExistente.set('LinkDrive', data.linkDrive || '');
+          await tarefaExistente.save();
+      } else {
+          // Se não existe, cria a nova linha de tarefa
+          await tarefasSheet.addRow([
+              `ID${Date.now()}`, 
+              data.titulo, 
+              data.perfil, 
+              data.dataInicio, 
+              'Pendente', 
+              data.linkDrive || '', 
+              'Sim', 
+              data.chatId
+          ]);
+      }
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
+// DELETE permanece igual...
 export async function DELETE(req: NextRequest) {
     try {
       const data = await req.json();
