@@ -75,20 +75,26 @@ export async function GET() {
         const evento = String(item.Evento || '').toLowerCase().trim();
         const nome = String(item.Nome || '').toLowerCase().trim();
 
+        // 1. PRIORIDADE: Respostas humanas (SIM/NÃO)
         if (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO') {
             item.Tipo = 'RESPOSTA';
             return true;
         }
 
+        // 2. FILTRO DE LIMPEZA: Remove poluição de logs irrelevantes
+        // Só mostra envios que tenham um nome de evento real (mínimo 3 letras e não seja teste)
         if (nome.includes('confi') || nome.includes('sistema')) {
-            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum'];
+            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'null', 'undefined'];
             if (lixo.includes(evento) || evento.length < 3) return false;
+            
             item.Tipo = 'ENVIO';
             return true;
         }
+
         return false;
     })
-    .reverse().slice(0, 20);
+    .reverse() 
+    .slice(0, 10); // <--- LIMITE: Mostra apenas as 10 últimas atividades para manter o site limpo
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -104,7 +110,6 @@ export async function POST(req: NextRequest) {
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
 
-    // 1. CHECA SE O EVENTO JÁ EXISTE NA AGENDA
     const existeAgenda = rowsAgenda.find(r => 
         getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
         getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
@@ -122,7 +127,6 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    // 2. SEMPRE SALVA/ATUALIZA NA ABA TAREFAS (Independente de ser Interno ou Externo)
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
     const rowsT = await tarefasSheet.getRows();
     
@@ -132,13 +136,11 @@ export async function POST(req: NextRequest) {
     );
 
     if (tarefaExistente) {
-        // Atualiza o link e outras infos se já existir
         tarefaExistente.set('LinkDrive', data.linkDrive || '');
         tarefaExistente.set('Responsavel', data.perfil);
         tarefaExistente.set('ResponsavelChatId', data.chatId);
         await tarefaExistente.save();
     } else {
-        // Cria nova linha na aba Tarefas
         await tarefasSheet.addRow([
             `ID${Date.now()}`, 
             data.titulo, 
