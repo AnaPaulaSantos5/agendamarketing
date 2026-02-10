@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus, BellRing } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, Plus, BellRing } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -37,7 +37,6 @@ export default function AgendaPage() {
           cache: 'no-store',
           headers: { 'Pragma': 'no-cache' }
       });
-      
       const data = await res.json();
       if (data.events) setEventos(data.events);
       if (data.feed) setFeed(data.feed);
@@ -68,30 +67,41 @@ export default function AgendaPage() {
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
       dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}` 
     };
-    
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
-    
-    if (res.ok) { 
-        setShowEventModal(false); 
-        carregarDados(); 
-    } else {
-        alert("Erro ao salvar.");
+    if (res.ok) { setShowEventModal(false); carregarDados(); }
+  };
+
+  // NOVA FUNÇÃO PARA SALVAR PERFIL NA PLANILHA
+  const handleSalvarPerfil = async () => {
+    try {
+      const res = await fetch('/api/agenda', {
+        method: 'POST',
+        body: JSON.stringify({
+          isPerfilUpdate: true,
+          email: perfilAtivo.email,
+          nome: perfilAtivo.nome,
+          chatId: perfilAtivo.chatId
+        })
+      });
+
+      if (res.ok) {
+        alert("Perfil atualizado na planilha!");
+        setShowPerfilModal(false);
+        carregarDados();
+      } else {
+        alert("Erro ao salvar perfil.");
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   const handleExcluir = async () => {
     if (!tempEvento.id) return;
     if (!confirm("Excluir este evento?")) return;
-
     try {
-        const res = await fetch('/api/agenda', { 
-            method: 'DELETE', 
-            body: JSON.stringify({ id: tempEvento.id }) 
-        });
-        if (res.ok) {
-            setShowEventModal(false);
-            carregarDados();
-        }
+        const res = await fetch('/api/agenda', { method: 'DELETE', body: JSON.stringify({ id: tempEvento.id }) });
+        if (res.ok) { setShowEventModal(false); carregarDados(); }
     } catch (e) { console.error(e); }
   };
 
@@ -124,116 +134,43 @@ export default function AgendaPage() {
   const handleEventoClick = (e: React.MouseEvent, evento: any) => {
     e.stopPropagation(); 
     const tipoNormalizado = evento.tipo?.toLowerCase().trim() === 'interno' ? 'interno' : 'externo';
-
     setTempEvento({ 
-        id: evento.id, 
-        titulo: evento.titulo, 
+        id: evento.id, titulo: evento.titulo, 
         dataInicio: evento.dataInicio?.split(' ')[0], 
         dataTermino: evento.dataFim?.split(' ')[0], 
         horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
         horaFim: evento.dataFim?.split(' ')[1] || '09:00',
-        cor: evento.cor, 
-        tipo: tipoNormalizado, 
-        linkDrive: evento.linkDrive || '', 
+        cor: evento.cor, tipo: tipoNormalizado, linkDrive: evento.linkDrive || '', 
         conteudoSecundario: evento.conteudoSecundario || '', 
         perfil: evento.perfil || perfilAtivo?.nome || '', 
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
-    
     const dataStr = evento.dataInicio?.split(' ')[0];
     const evs = eventos.filter(ev => isDiaNoPeriodo(dataStr, ev.dataInicio?.split(' ')[0], ev.dataFim?.split(' ')[0]));
     setEventosDoDiaSelecionado(evs);
     setShowEventModal(true);
   };
 
-  const selecionarEventoDaLista = (evento: any) => {
-      const tipoNormalizado = evento.tipo?.toLowerCase().trim() === 'interno' ? 'interno' : 'externo';
-      setTempEvento({ 
-        id: evento.id, titulo: evento.titulo, 
-        dataInicio: evento.dataInicio?.split(' ')[0], 
-        dataTermino: evento.dataFim?.split(' ')[0], 
-        horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
-        horaFim: evento.dataFim?.split(' ')[1] || '09:00',
-        cor: evento.cor, 
-        tipo: tipoNormalizado, 
-        linkDrive: evento.linkDrive || '', 
-        conteudoSecundario: evento.conteudoSecundario || '', 
-        perfil: evento.perfil || perfilAtivo?.nome || '',
-        chatId: evento.chatId || perfilAtivo?.chatId || '' 
-    });
-  };
-
-  const handleDispararWhatsApp = async () => {
-    const destino = tempEvento.chatId || perfilAtivo?.chatId;
-    if (!destino) return alert("ChatID ausente!");
-    setEnviandoZap(true);
-    try {
-      const res = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome: perfilAtivo.nome,
-          responsavelChatId: destino,
-          conteudoPrincipal: tempEvento.titulo,
-          conteudoSecundario: tempEvento.conteudoSecundario,
-          linkDrive: tempEvento.linkDrive
-        })
-      });
-      if (res.ok) alert("🚀 WhatsApp enviado!");
-    } catch (e) { console.error(e); } finally { setEnviandoZap(false); }
-  };
-
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
-      
-      {/* SIDEBAR FEED REESTILIZADO */}
       <aside className="w-80 border-r-2 border-black p-6 bg-gray-50 flex flex-col h-full overflow-hidden">
-        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
-            <BellRing size={24} className="text-[#1260c7]" /> Atividade
-        </h2>
-        
-        {/* CONTAINER COM SCROLL ELEGANTE */}
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2"><BellRing size={24} className="text-[#1260c7]" /> Atividade</h2>
         <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar custom-scrollbar">
           {feed.length === 0 ? (
              <p className="text-[10px] font-bold opacity-30 uppercase text-center mt-20">Nenhuma atividade recente</p>
           ) : (
             feed.map((item, idx) => (
-              <motion.div 
-                initial={{ x: -20, opacity: 0 }} 
-                animate={{ x: 0, opacity: 1 }} 
-                key={idx} 
-                className={`bg-white border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black] transition-all hover:translate-x-1 hover:translate-y-1 hover:shadow-none`}
-              >
+              <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} key={idx} className={`bg-white border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black] transition-all hover:translate-x-1 hover:translate-y-1 hover:shadow-none`}>
                 <div className="flex justify-between items-center mb-2">
-                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border border-black uppercase ${item.Tipo === 'ENVIO' ? 'bg-[#1260c7] text-white' : 'bg-[#22c55e] text-white'}`}>
-                      {item.Tipo}
-                  </span>
+                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border border-black uppercase ${item.Tipo === 'ENVIO' ? 'bg-[#1260c7] text-white' : 'bg-[#22c55e] text-white'}`}>{item.Tipo}</span>
                   <span className="text-[8px] font-bold opacity-40">{item.Data?.split(',')[1] || item.Data?.split(' ')[1]}</span>
                 </div>
-                
                 <p className="font-black text-xs uppercase truncate mb-1">{item.Nome}</p>
-
                 {item.Tipo === 'RESPOSTA' ? (
                   <div className="flex flex-col gap-1 border-t border-black/5 pt-2 mt-2">
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                      {item.Resposta === 'SIM' ? (
-                        <>
-                          <CheckCircle2 size={14} className="text-[#1260c7]" />
-                          <span className="text-[#1260c7] font-black italic underline">Precisa de ajuda</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 size={14} className="text-[#22c55e]" />
-                          <span className="text-[#22c55e] font-black">Está de acordo</span>
-                        </>
-                      )}
-                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold">{item.Resposta === 'SIM' ? <><CheckCircle2 size={14} className="text-[#1260c7]" /><span className="text-[#1260c7] font-black italic underline">Precisa de ajuda</span></> : <><CheckCircle2 size={14} className="text-[#22c55e]" /><span className="text-[#22c55e] font-black">Está de acordo</span></>}</div>
                   </div>
-                ) : (
-                  <p className="text-[10px] opacity-70 mt-1 font-bold leading-tight">
-                    🚀 <span className="italic">{item.Evento}</span>
-                  </p>
-                )}
+                ) : <p className="text-[10px] opacity-70 mt-1 font-bold leading-tight">🚀 <span className="italic">{item.Evento}</span></p>}
               </motion.div>
             ))
           )}
@@ -278,11 +215,7 @@ export default function AgendaPage() {
             return (
               <div key={dia} onClick={() => handleDiaClick(dia)} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer transition-all hover:scale-105 flex flex-col justify-between shadow-sm ${dataAtiva.getDate() === dia ? 'bg-orange-50' : 'bg-white'}`}>
                 <span className="text-2xl font-black tracking-tighter">{dia}</span>
-                <div className="flex gap-1 flex-wrap content-start">
-                    {evs.map((ev, idx) => (
-                        <div key={idx} onClick={(e) => handleEventoClick(e, ev)} className="w-3 h-3 rounded-full border border-black shadow-sm cursor-pointer hover:scale-150 transition-transform" style={{ backgroundColor: ev.cor }} />
-                    ))}
-                </div>
+                <div className="flex gap-1 flex-wrap content-start">{evs.map((ev, idx) => <div key={idx} onClick={(e) => handleEventoClick(e, ev)} className="w-3 h-3 rounded-full border border-black shadow-sm cursor-pointer hover:scale-150 transition-transform" style={{ backgroundColor: ev.cor }} />)}</div>
               </div>
             );
           })}
@@ -303,10 +236,7 @@ export default function AgendaPage() {
                   <div className="mb-8 flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border-2 border-black/5 overflow-x-auto">
                       <span className="text-[10px] font-black uppercase opacity-40 whitespace-nowrap">Eventos do dia:</span>
                       {eventosDoDiaSelecionado.map((ev, idx) => (
-                          <div key={idx} onClick={() => selecionarEventoDaLista(ev)} className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer border transition-all ${tempEvento.id === ev.id ? 'bg-white border-black shadow-[2px_2px_0px_black]' : 'border-transparent hover:bg-white'}`}>
-                              <div className="w-3 h-3 rounded-full border border-black" style={{backgroundColor: ev.cor}} />
-                              <span className="text-xs font-bold truncate max-w-[100px]">{ev.titulo}</span>
-                          </div>
+                          <div key={idx} onClick={() => selecionarEventoDaLista(ev)} className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer border transition-all ${tempEvento.id === ev.id ? 'bg-white border-black shadow-[2px_2px_0px_black]' : 'border-transparent hover:bg-white'}`}><div className="w-3 h-3 rounded-full border border-black" style={{backgroundColor: ev.cor}} /><span className="text-xs font-bold truncate max-w-[100px]">{ev.titulo}</span></div>
                       ))}
                       <button onClick={() => setTempEvento({ ...tempEvento, id: '', titulo: '', conteudoSecundario: '', linkDrive: '' })} className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-full hover:scale-110 transition-transform"><Plus size={16} /></button>
                   </div>
@@ -315,10 +245,7 @@ export default function AgendaPage() {
               <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-6">
                   <select value={tempEvento.perfil} onChange={e => { const p = perfis.find(it => it.nome === e.target.value); setTempEvento({...tempEvento, perfil: e.target.value, chatId: p?.chatId || ''}); }} className="border-2 border-black rounded-2xl p-4 font-bold bg-gray-50 outline-none uppercase">{perfis.map(p => <option key={p.nome} value={p.nome}>{p.nome}</option>)}</select>
-                  <div className="flex border-2 border-black rounded-2xl overflow-hidden font-black text-xs h-[60px]">
-                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'externo'})} className={`flex-1 ${tempEvento.tipo === 'externo' ? 'bg-[#1260c7] text-white' : 'bg-white'}`}>EXTERNO</button>
-                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'interno'})} className={`flex-1 ${tempEvento.tipo === 'interno' ? 'bg-black text-white' : 'bg-white'}`}>INTERNO</button>
-                  </div>
+                  <div className="flex border-2 border-black rounded-2xl overflow-hidden font-black text-xs h-[60px]"><button onClick={() => setTempEvento({...tempEvento, tipo: 'externo'})} className={`flex-1 ${tempEvento.tipo === 'externo' ? 'bg-[#1260c7] text-white' : 'bg-white'}`}>EXTERNO</button><button onClick={() => setTempEvento({...tempEvento, tipo: 'interno'})} className={`flex-1 ${tempEvento.tipo === 'interno' ? 'bg-black text-white' : 'bg-white'}`}>INTERNO</button></div>
                 </div>
                 <div className="bg-gray-50 p-8 rounded-[40px] border-2 border-black/5 grid grid-cols-2 gap-8">
                   <div className="space-y-4"><p className="text-[10px] font-black uppercase opacity-30 flex items-center gap-1"><CalendarIcon size={12}/> Início</p><input type="date" value={tempEvento.dataInicio} onChange={e => setTempEvento({...tempEvento, dataInicio: e.target.value})} className="text-xl font-black bg-transparent w-full border-b border-black outline-none" /><input type="time" value={tempEvento.horaInicio} onChange={e => setTempEvento({...tempEvento, horaInicio: e.target.value})} className="text-3xl font-black bg-transparent w-full outline-none" /></div>
@@ -327,14 +254,10 @@ export default function AgendaPage() {
                 <div className="space-y-6"><input value={tempEvento.titulo} onChange={e => setTempEvento({...tempEvento, titulo: e.target.value})} className="w-full text-4xl font-black bg-transparent outline-none uppercase border-b-2 border-black/10 py-2" placeholder="CONTEÚDO PRINCIPAL" /><textarea value={tempEvento.conteudoSecundario} onChange={e => setTempEvento({...tempEvento, conteudoSecundario: e.target.value})} className="w-full text-xl font-bold bg-transparent outline-none h-24 resize-none" placeholder="Conteúdo Alternativo..." /></div>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="bg-[#ffce0a]/20 border-2 border-black p-4 rounded-2xl shadow-[5px_5px_0px_black] overflow-hidden"><p className="text-[9px] font-black uppercase opacity-40">WhatsApp ChatID</p><p className="font-mono text-xs truncate underline decoration-[#1260c7]">{tempEvento.chatId}</p></div>
-                  <div className="border-2 border-black p-4 rounded-2xl flex flex-col justify-center bg-white shadow-[5px_5px_0px_black]"><p className="text-[9px] font-black uppercase opacity-40 mb-1">Link Drive</p><input placeholder="https://..." value={tempEvento.linkDrive} onChange={e => setTempEvento({...tempEvento, linkDrive: e.target.value})} className="w-full font-bold text-xs outline-none bg-transparent" /></div>
+                  <div className="border-2 border-black p-4 rounded-2xl flex flex-col justify-center bg-white shadow-[5px_5px_0px_black]"><p className="text-[9px] font-black uppercase opacity-40 mb-1">Link Drive</p><input placeholder="https://..." value={tempEvento.linkDrive} onChange={e => setTempEvento({...tempDrive: e.target.value})} className="w-full font-bold text-xs outline-none bg-transparent" /></div>
                 </div>
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
-                  <div className="flex gap-4">
-                    <button onClick={handleSalvar} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>
-                    {tempEvento.id && <button onClick={handleExcluir} className="text-red-500 hover:scale-110"><Trash2 size={24}/></button>}
-                    <button onClick={handleDispararWhatsApp} disabled={enviandoZap} className={`flex items-center gap-2 transition-all ${enviandoZap ? 'opacity-20' : 'hover:underline decoration-[#1260c7] decoration-[12px]'}`}><Send size={24} /> {enviandoZap ? '...' : 'Disparar'}</button>
-                  </div>
+                  <div className="flex gap-4"><button onClick={handleSalvar} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>{tempEvento.id && <button onClick={() => {}} className="text-red-500 hover:scale-110"><Trash2 size={24}/></button>}<button onClick={handleDispararWhatsApp} disabled={enviandoZap} className={`flex items-center gap-2 transition-all ${enviandoZap ? 'opacity-20' : 'hover:underline decoration-[#1260c7] decoration-[12px]'}`}><Send size={24} /> {enviandoZap ? '...' : 'Disparar'}</button></div>
                   <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
                 </div>
               </div>
@@ -352,20 +275,14 @@ export default function AgendaPage() {
               <div className="space-y-6">
                 <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input type="text" value={perfilAtivo?.nome || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, nome: e.target.value})} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-white focus:bg-blue-50 outline-none" /></div>
                 <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-white focus-within:bg-blue-50"><MessageSquare size={20} className="opacity-30" /><input type="text" value={perfilAtivo?.chatId || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, chatId: e.target.value})} className="w-full bg-transparent font-mono font-bold outline-none" /></div></div>
-                <button onClick={() => { alert("Perfil alterado!"); setShowPerfilModal(false); }} className="w-full bg-black text-white p-5 rounded-3xl font-black uppercase hover:scale-[1.02] transition-all">Confirmar</button>
+                {/* BOTÃO ATUALIZADO PARA CHAMAR A FUNÇÃO handleSalvarPerfil */}
+                <button onClick={handleSalvarPerfil} className="w-full bg-black text-white p-5 rounded-3xl font-black uppercase hover:scale-[1.02] transition-all">Confirmar e Gravar na Planilha</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-      
-      {/* CSS CUSTOM PARA SCROLLBAR */}
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #000; border-radius: 10px; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
+      <style jsx global>{` .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #000; border-radius: 10px; } .no-scrollbar::-webkit-scrollbar { display: none; } `}</style>
     </div>
   );
 }
