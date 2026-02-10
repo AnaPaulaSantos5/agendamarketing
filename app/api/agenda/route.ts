@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
-// Força a Vercel a buscar dados novos sempre (mata o cache)
+// FORÇA A VERCEL A BUSCAR DADOS SEMPRE DO GOOGLE (MATA O CACHE)
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -25,7 +25,7 @@ export async function GET() {
   try {
     await doc.loadInfo();
     
-    // 1. CARREGA AGENDA E TAREFAS
+    // 1. CARREGA AGENDA E TAREFAS PARA O CALENDÁRIO
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -51,7 +51,7 @@ export async function GET() {
         };
     });
 
-    // 2. CARREGA PERFIS
+    // 2. CARREGA PERFIS PARA O SELECTOR
     const pSheet = doc.sheetsByTitle['Perfil'];
     const pRows = await pSheet.getRows();
     const perfis = pRows.map(r => ({ 
@@ -60,7 +60,7 @@ export async function GET() {
         email: getVal(r, 'Email') 
     }));
 
-    // 3. CARREGA E FILTRA O FEED (A MÁGICA ACONTECE AQUI)
+    // 3. CARREGA E FILTRA O FEED (LIMPEZA PROFUNDA)
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
     
@@ -69,24 +69,27 @@ export async function GET() {
         Nome: getVal(r, 'Nome'), 
         Evento: getVal(r, 'Evento'), 
         Resposta: getVal(r, 'Resposta'), 
-        Data: getVal(r, 'Data') 
+        Data: getVal(r, 'Data'),
+        Telefone: getVal(r, 'Telefone')
     }))
     .filter(item => {
         const tipo = String(item.Tipo || '').toUpperCase().trim();
-        const evento = String(item.Evento || '').trim();
-        const resposta = String(item.Resposta || '').trim();
+        const evento = String(item.Evento || '').toLowerCase().trim();
+        const resposta = String(item.Resposta || '').toUpperCase().trim();
+        const telefone = String(item.Telefone || '').toLowerCase();
 
-        // Se for um ENVIO
+        // FILTRO 1: Remove IDs de sistema (@lid) ou telefones vazios
+        if (telefone.includes('@lid') || !telefone) return false;
+
+        // FILTRO 2: Se for ENVIO, remove nomes de teste ou caracteres inúteis
         if (tipo === 'ENVIO') {
-            // Ignora se o nome do evento for lixo (traço, números do bot ou vazio)
-            const isLixo = !evento || evento === '-' || evento === '1' || evento === '2' || evento.length < 2;
-            return !isLixo;
+            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'teste whatsapp', 'null'];
+            if (lixo.includes(evento) || evento.length < 3) return false;
         }
 
-        // Se for uma RESPOSTA
+        // FILTRO 3: Se for RESPOSTA, remove se a resposta for um traço ou vazia
         if (tipo === 'RESPOSTA') {
-            // Ignora respostas que são apenas traço (logs vazios do webhook)
-            if (resposta === '-' || !resposta) return false;
+            if (resposta === '-' || resposta === '' || resposta === 'NULL') return false;
         }
 
         return true;
@@ -99,7 +102,6 @@ export async function GET() {
   }
 }
 
-// POST e DELETE permanecem os mesmos...
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
