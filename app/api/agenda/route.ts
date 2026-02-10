@@ -33,7 +33,6 @@ export async function GET() {
         const titulo = getVal(row, 'Conteudo_Principal');
         const dataIni = getVal(row, 'Data_Inicio');
         
-        // Busca na aba Tarefas comparando Título e Data (removendo espaços extras)
         const tarefaCorrespondente = rowsTarefas.find(r => {
             const tTitulo = getVal(r, 'Titulo').trim();
             const tData = getVal(r, 'Data').trim();
@@ -105,13 +104,13 @@ export async function POST(req: NextRequest) {
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
 
-    // 1. CHECA SE O EVENTO JÁ EXISTE (Para não duplicar na Agenda)
-    const existe = rowsAgenda.find(r => 
+    // 1. CHECA SE O EVENTO JÁ EXISTE NA AGENDA
+    const existeAgenda = rowsAgenda.find(r => 
         getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
         getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
     );
 
-    if (!existe) {
+    if (!existeAgenda) {
         await agendaSheet.addRow({
           'Data_Inicio': data.dataInicio,
           'Data_Fim': data.dataFim,
@@ -123,33 +122,33 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    // 2. TRATA A ABA TAREFAS (Onde fica o Link do Drive)
-    if (String(data.tipo).toLowerCase().trim() === 'externo') {
-      const tarefasSheet = doc.sheetsByTitle['Tarefas'];
-      const rowsT = await tarefasSheet.getRows();
-      
-      const tarefaExistente = rowsT.find(r => 
-        getVal(r, 'Titulo').trim() === data.titulo.trim() && 
-        getVal(r, 'Data').trim() === data.dataInicio.trim()
-      );
+    // 2. SEMPRE SALVA/ATUALIZA NA ABA TAREFAS (Independente de ser Interno ou Externo)
+    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+    const rowsT = await tarefasSheet.getRows();
+    
+    const tarefaExistente = rowsT.find(r => 
+      getVal(r, 'Titulo').trim() === data.titulo.trim() && 
+      getVal(r, 'Data').trim() === data.dataInicio.trim()
+    );
 
-      if (tarefaExistente) {
-          // Se a tarefa já existe, apenas atualiza o Link do Drive em vez de criar nova linha
-          tarefaExistente.set('LinkDrive', data.linkDrive || '');
-          await tarefaExistente.save();
-      } else {
-          // Se não existe, cria a nova linha de tarefa
-          await tarefasSheet.addRow([
-              `ID${Date.now()}`, 
-              data.titulo, 
-              data.perfil, 
-              data.dataInicio, 
-              'Pendente', 
-              data.linkDrive || '', 
-              'Sim', 
-              data.chatId
-          ]);
-      }
+    if (tarefaExistente) {
+        // Atualiza o link e outras infos se já existir
+        tarefaExistente.set('LinkDrive', data.linkDrive || '');
+        tarefaExistente.set('Responsavel', data.perfil);
+        tarefaExistente.set('ResponsavelChatId', data.chatId);
+        await tarefaExistente.save();
+    } else {
+        // Cria nova linha na aba Tarefas
+        await tarefasSheet.addRow([
+            `ID${Date.now()}`, 
+            data.titulo, 
+            data.perfil, 
+            data.dataInicio, 
+            'Pendente', 
+            data.linkDrive || '', 
+            'Sim', 
+            data.chatId
+        ]);
     }
     
     return NextResponse.json({ success: true });
@@ -158,7 +157,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE permanece igual...
 export async function DELETE(req: NextRequest) {
     try {
       const data = await req.json();
