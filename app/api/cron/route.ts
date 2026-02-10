@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/sender';
@@ -7,8 +7,19 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // --- 1. TRAVA DE SEGURANÇA (CRON_SECRET) ---
+    const { searchParams } = new URL(req.url);
+    const chaveRecebida = searchParams.get('key');
+    const chaveMestra = process.env.CRON_SECRET;
+
+    if (!chaveMestra || chaveRecebida !== chaveMestra) {
+      console.error("🚫 Tentativa de acesso não autorizada ao Cron!");
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    // --- 2. CONFIGURAÇÕES INICIAIS ---
     const fuso = 'America/Sao_Paulo';
     const agora = new Date();
     
@@ -17,10 +28,11 @@ export async function GET() {
       key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
+    
     const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
     await doc.loadInfo();
 
-    // 1. Saudação Inteligente (Curitiba)
+    // --- 3. SAUDAÇÃO INTELIGENTE (FUSO CURITIBA) ---
     const horaAtual = parseInt(formatInTimeZone(agora, fuso, 'H'));
     let saudacaoReal = "Olá";
     if (horaAtual >= 5 && horaAtual < 12) saudacaoReal = "Bom dia";
@@ -34,6 +46,7 @@ export async function GET() {
 
     let disparados = 0;
 
+    // --- 4. VARREDURA DE DISPAROS ---
     for (const row of rowsTarefas) {
         const dataEventoStr = row.get('Data'); 
         const status = row.get('Status');
@@ -41,20 +54,20 @@ export async function GET() {
 
         if (status === 'Pendente' && notificar === 'Sim' && dataEventoStr) {
             try {
-                // Converte data da planilha para o objeto Date real
+                // Formata a data da planilha para o padrão ISO com fuso do Brasil
                 const dataFormatada = dataEventoStr.replace(' ', 'T') + ':00-03:00';
                 const dataEvento = new Date(dataFormatada);
                 
                 if (isNaN(dataEvento.getTime())) continue;
 
-                // Chegou o momento do disparo?
+                // Verifica se já passou ou chegou a hora do disparo
                 if (dataEvento <= agora) {
                      const chatId = row.get('ResponsavelChatId');
                      const nome = row.get('Responsavel');
                      const titulo = row.get('Titulo');
 
                      if (chatId) {
-                        // Busca o conteúdo alternativo na aba Agenda para enriquecer a mensagem
+                        // Busca o conteúdo secundário na Agenda para completar a mensagem
                         const evAgenda = rowsAgenda.find(ra => ra.get('Conteudo_Principal') === titulo);
 
                         const msg = buildWhatsAppMessage({
@@ -67,17 +80,27 @@ export async function GET() {
 
                         await sendWhatsAppMessage(chatId, msg, nome, titulo);
                         
+                        // Marca como enviado para não repetir o disparo
                         row.set('Status', 'Enviado');
                         await row.save();
                         disparados++;
                      }
                 }
-            } catch (err) { console.error(`Erro na linha ${row.get('Titulo')}:`, err); }
+            } catch (err) { 
+                console.error(`Erro na linha ${row.get('Titulo')}:`, err); 
+            }
         }
     }
 
-    return NextResponse.json({ success: true, disparados, hora_curitiba: horaAtual });
+    return NextResponse.json({ 
+        success: true, 
+        disparados, 
+        hora_curitiba: horaAtual,
+        saudacao: saudacaoReal
+    });
+
   } catch (error: any) {
+    console.error("❌ ERRO NO CRON:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

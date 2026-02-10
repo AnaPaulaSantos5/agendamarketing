@@ -31,12 +31,9 @@ export async function GET() {
     const events = rowsAgenda.map(row => {
         const titulo = getVal(row, 'Conteudo_Principal');
         const dataIni = getVal(row, 'Data_Inicio');
-
-        const tarefaCorrespondente = rowsTarefas.find(r => {
-            const tTitulo = getVal(r, 'Titulo');
-            const tData = getVal(r, 'Data');
-            return tTitulo === titulo && tData === dataIni;
-        });
+        const tarefaCorrespondente = rowsTarefas.find(r => 
+            getVal(r, 'Titulo') === titulo && getVal(r, 'Data') === dataIni
+        );
 
         return {
             id: (titulo + dataIni).replace(/\s/g, '').toLowerCase(),
@@ -70,9 +67,18 @@ export async function GET() {
         Data: getVal(r, 'Data') 
     }))
     .filter(item => {
-        // LIMPEZA: Remove os envios de log automático que poluem com "-" ou números
-        if (item.Tipo === 'ENVIO') {
-            const isLixo = !item.Evento || item.Evento === '-' || item.Evento === '1' || item.Evento === '2';
+        // FILTRO DE LIMPEZA ROBUSTO
+        const tipo = String(item.Tipo).toUpperCase().trim();
+        const evento = String(item.Evento || '').trim();
+
+        if (tipo === 'ENVIO') {
+            // Descarta títulos vazios, traços, números de bot ou textos muito curtos (ruído)
+            const isLixo = !evento || 
+                           evento === '-' || 
+                           evento === '1' || 
+                           evento === '2' || 
+                           evento.toLowerCase() === 'n tem' ||
+                           evento.length < 3; 
             return !isLixo;
         }
         return true;
