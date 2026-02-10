@@ -33,15 +33,14 @@ export default function AgendaPage() {
 
   const carregarDados = async () => {
     try {
-      // --- TRAVA DE SEGURANÇA 2: NO-STORE NO FRONTEND ---
+      // Forçamos o no-store para o link do Drive aparecer sempre atualizado
       const res = await fetch('/api/agenda', { 
           cache: 'no-store',
-          next: { revalidate: 0 }
+          headers: { 'Pragma': 'no-cache' }
       });
       
       const data = await res.json();
       if (data.events) {
-          console.log("🔥 Eventos Frescos (Verifique o Link):", data.events);
           setEventos(data.events);
       }
       if (data.feed) setFeed(data.feed);
@@ -66,46 +65,18 @@ export default function AgendaPage() {
     }
   }, [status, session, router]);
 
-  const handleDispararWhatsApp = async () => {
-    const destino = tempEvento.chatId || perfilAtivo?.chatId;
-    if (!destino) return alert("Selecione um perfil com ChatID válido!");
-    
-    setEnviandoZap(true);
-    try {
-      const res = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome: perfilAtivo.nome,
-          responsavelChatId: destino,
-          conteudoPrincipal: tempEvento.titulo,
-          conteudoSecundario: tempEvento.conteudoSecundario,
-          linkDrive: tempEvento.linkDrive
-        })
-      });
-      if (res.ok) {
-        alert("🚀 WhatsApp enviado com sucesso!");
-        carregarDados();
-      } else { 
-        const errData = await res.json();
-        alert("Erro ao enviar: " + (errData.error || "Erro no servidor")); 
-      }
-    } catch (e) { alert("Erro de conexão com o servidor"); } finally { setEnviandoZap(false); }
-  };
-
   const handleSalvar = async () => {
-    // 1. Apaga o antigo se for edição
+    // 1. Evita duplicidade: Apaga o registro antigo baseado no ID normalizado
     if (tempEvento.id) {
         try {
-            console.log("Editando: Apagando anterior...");
             await fetch('/api/agenda', { 
                 method: 'DELETE', 
                 body: JSON.stringify({ id: tempEvento.id }) 
             });
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Erro ao limpar duplicado:", e); }
     }
 
-    // 2. Cria o novo
+    // 2. Cria o novo registro (Atualizado)
     const payload = { 
       ...tempEvento, 
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
@@ -115,18 +86,18 @@ export default function AgendaPage() {
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
     
     if (res.ok) { 
-        alert("Gravado com sucesso!"); 
+        alert("Salvo com sucesso!"); 
         setShowEventModal(false); 
-        // Pequeno delay para garantir que o Google Sheets processou
-        setTimeout(() => carregarDados(), 1000); 
+        // Aguarda a planilha processar antes de recarregar
+        setTimeout(() => carregarDados(), 1200); 
     } else {
-        alert("Erro ao gravar.");
+        alert("Erro ao salvar.");
     }
   };
 
   const handleExcluir = async () => {
     if (!tempEvento.id) return;
-    if (!confirm("Tem certeza que deseja excluir este evento?")) return;
+    if (!confirm("Excluir este evento?")) return;
 
     try {
         const res = await fetch('/api/agenda', { 
@@ -134,13 +105,10 @@ export default function AgendaPage() {
             body: JSON.stringify({ id: tempEvento.id }) 
         });
         if (res.ok) {
-            alert("Evento excluído!");
             setShowEventModal(false);
             setTimeout(() => carregarDados(), 1000);
-        } else {
-            alert("Erro ao excluir.");
         }
-    } catch (e) { alert("Erro de conexão."); }
+    } catch (e) { console.error(e); }
   };
 
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
@@ -171,7 +139,9 @@ export default function AgendaPage() {
 
   const handleEventoClick = (e: React.MouseEvent, evento: any) => {
     e.stopPropagation(); 
-    console.log("Abrindo evento:", evento);
+    // Garante que o tipo esteja sempre em minúsculo para os botões do modal funcionarem
+    const tipoNormalizado = evento.tipo?.toLowerCase().trim() === 'interno' ? 'interno' : 'externo';
+
     setTempEvento({ 
         id: evento.id, 
         titulo: evento.titulo, 
@@ -180,30 +150,54 @@ export default function AgendaPage() {
         horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
         horaFim: evento.dataFim?.split(' ')[1] || '09:00',
         cor: evento.cor, 
-        tipo: evento.tipo || 'externo', 
+        tipo: tipoNormalizado, 
         linkDrive: evento.linkDrive || '', 
         conteudoSecundario: evento.conteudoSecundario || '', 
         perfil: evento.perfil || perfilAtivo?.nome || '', 
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
+    
     const dataStr = evento.dataInicio?.split(' ')[0];
-    const eventosDoDia = eventos.filter(ev => isDiaNoPeriodo(dataStr, ev.dataInicio?.split(' ')[0], ev.dataFim?.split(' ')[0]));
-    setEventosDoDiaSelecionado(eventosDoDia);
+    const evs = eventos.filter(ev => isDiaNoPeriodo(dataStr, ev.dataInicio?.split(' ')[0], ev.dataFim?.split(' ')[0]));
+    setEventosDoDiaSelecionado(evs);
     setShowEventModal(true);
   };
 
   const selecionarEventoDaLista = (evento: any) => {
+      const tipoNormalizado = evento.tipo?.toLowerCase().trim() === 'interno' ? 'interno' : 'externo';
       setTempEvento({ 
         id: evento.id, titulo: evento.titulo, 
         dataInicio: evento.dataInicio?.split(' ')[0], 
         dataTermino: evento.dataFim?.split(' ')[0], 
         horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
         horaFim: evento.dataFim?.split(' ')[1] || '09:00',
-        cor: evento.cor, tipo: evento.tipo || 'externo', 
-        linkDrive: evento.linkDrive || '', conteudoSecundario: evento.conteudoSecundario || '', 
+        cor: evento.cor, 
+        tipo: tipoNormalizado, 
+        linkDrive: evento.linkDrive || '', 
+        conteudoSecundario: evento.conteudoSecundario || '', 
         perfil: evento.perfil || perfilAtivo?.nome || '',
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
+  };
+
+  const handleDispararWhatsApp = async () => {
+    const destino = tempEvento.chatId || perfilAtivo?.chatId;
+    if (!destino) return alert("ChatID ausente!");
+    setEnviandoZap(true);
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: perfilAtivo.nome,
+          responsavelChatId: destino,
+          conteudoPrincipal: tempEvento.titulo,
+          conteudoSecundario: tempEvento.conteudoSecundario,
+          linkDrive: tempEvento.linkDrive
+        })
+      });
+      if (res.ok) alert("🚀 WhatsApp enviado!");
+    } catch (e) { console.error(e); } finally { setEnviandoZap(false); }
   };
 
   if (status === "loading") return <div className="h-screen grid place-items-center font-black text-2xl">Sincronizando...</div>;
@@ -285,22 +279,7 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      <AnimatePresence>
-        {showPerfilModal && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-xl shadow-2xl relative">
-              <X className="absolute top-8 right-8 cursor-pointer" onClick={() => setShowPerfilModal(false)} />
-              <h2 className="text-4xl font-black uppercase mb-8 border-b-2 border-black pb-4">Configurar Perfil</h2>
-              <div className="space-y-6">
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input type="text" value={perfilAtivo?.nome || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, nome: e.target.value})} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-white focus:bg-blue-50 outline-none" /></div>
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-white focus-within:bg-blue-50"><MessageSquare size={20} className="opacity-30" /><input type="text" value={perfilAtivo?.chatId || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, chatId: e.target.value})} className="w-full bg-transparent font-mono font-bold outline-none" /></div></div>
-                <button onClick={() => { alert("Perfil alterado localmente!"); setShowPerfilModal(false); }} className="w-full bg-black text-white p-5 rounded-3xl font-black uppercase hover:scale-[1.02] transition-all">Confirmar</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
+      {/* MODAL EVENTO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
@@ -349,6 +328,22 @@ export default function AgendaPage() {
                   </div>
                   <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPerfilModal && (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-xl shadow-2xl relative">
+              <X className="absolute top-8 right-8 cursor-pointer" onClick={() => setShowPerfilModal(false)} />
+              <h2 className="text-4xl font-black uppercase mb-8 border-b-2 border-black pb-4">Configurar Perfil</h2>
+              <div className="space-y-6">
+                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input type="text" value={perfilAtivo?.nome || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, nome: e.target.value})} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-white focus:bg-blue-50 outline-none" /></div>
+                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><div className="flex items-center gap-3 border-2 border-black rounded-2xl p-4 bg-white focus-within:bg-blue-50"><MessageSquare size={20} className="opacity-30" /><input type="text" value={perfilAtivo?.chatId || ''} onChange={(e) => setPerfilAtivo({...perfilAtivo, chatId: e.target.value})} className="w-full bg-transparent font-mono font-bold outline-none" /></div></div>
+                <button onClick={() => { alert("Perfil alterado!"); setShowPerfilModal(false); }} className="w-full bg-black text-white p-5 rounded-3xl font-black uppercase hover:scale-[1.02] transition-all">Confirmar</button>
               </div>
             </motion.div>
           </div>
