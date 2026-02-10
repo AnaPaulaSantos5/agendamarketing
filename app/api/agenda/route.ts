@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
+// Força a Vercel a buscar dados novos sempre (mata o cache)
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 const serviceAccountAuth = new JWT({
@@ -23,6 +25,7 @@ export async function GET() {
   try {
     await doc.loadInfo();
     
+    // 1. CARREGA AGENDA E TAREFAS
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -48,6 +51,7 @@ export async function GET() {
         };
     });
 
+    // 2. CARREGA PERFIS
     const pSheet = doc.sheetsByTitle['Perfil'];
     const pRows = await pSheet.getRows();
     const perfis = pRows.map(r => ({ 
@@ -56,6 +60,7 @@ export async function GET() {
         email: getVal(r, 'Email') 
     }));
 
+    // 3. CARREGA E FILTRA O FEED (A MÁGICA ACONTECE AQUI)
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
     
@@ -67,20 +72,23 @@ export async function GET() {
         Data: getVal(r, 'Data') 
     }))
     .filter(item => {
-        // FILTRO DE LIMPEZA ROBUSTO
-        const tipo = String(item.Tipo).toUpperCase().trim();
+        const tipo = String(item.Tipo || '').toUpperCase().trim();
         const evento = String(item.Evento || '').trim();
+        const resposta = String(item.Resposta || '').trim();
 
+        // Se for um ENVIO
         if (tipo === 'ENVIO') {
-            // Descarta títulos vazios, traços, números de bot ou textos muito curtos (ruído)
-            const isLixo = !evento || 
-                           evento === '-' || 
-                           evento === '1' || 
-                           evento === '2' || 
-                           evento.toLowerCase() === 'n tem' ||
-                           evento.length < 3; 
+            // Ignora se o nome do evento for lixo (traço, números do bot ou vazio)
+            const isLixo = !evento || evento === '-' || evento === '1' || evento === '2' || evento.length < 2;
             return !isLixo;
         }
+
+        // Se for uma RESPOSTA
+        if (tipo === 'RESPOSTA') {
+            // Ignora respostas que são apenas traço (logs vazios do webhook)
+            if (resposta === '-' || !resposta) return false;
+        }
+
         return true;
     })
     .reverse().slice(0, 20);
@@ -91,6 +99,7 @@ export async function GET() {
   }
 }
 
+// POST e DELETE permanecem os mesmos...
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
