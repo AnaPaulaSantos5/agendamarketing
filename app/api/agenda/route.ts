@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
-// FORÇA A VERCEL A BUSCAR DADOS SEMPRE DO GOOGLE (MATA O CACHE)
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -25,7 +24,7 @@ export async function GET() {
   try {
     await doc.loadInfo();
     
-    // 1. CARREGA AGENDA E TAREFAS PARA O CALENDÁRIO
+    // 1. CARREGA AGENDA E TAREFAS
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -51,7 +50,6 @@ export async function GET() {
         };
     });
 
-    // 2. CARREGA PERFIS PARA O SELECTOR
     const pSheet = doc.sheetsByTitle['Perfil'];
     const pRows = await pSheet.getRows();
     const perfis = pRows.map(r => ({ 
@@ -60,7 +58,7 @@ export async function GET() {
         email: getVal(r, 'Email') 
     }));
 
-    // 3. CARREGA E FILTRA O FEED (LIMPEZA PROFUNDA)
+    // 2. CARREGA E FILTRA O FEED (Ajustado para sua planilha)
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
     
@@ -76,25 +74,24 @@ export async function GET() {
         const tipo = String(item.Tipo || '').toUpperCase().trim();
         const evento = String(item.Evento || '').toLowerCase().trim();
         const resposta = String(item.Resposta || '').toUpperCase().trim();
-        const telefone = String(item.Telefone || '').toLowerCase();
 
-        // FILTRO 1: Remove IDs de sistema (@lid) ou telefones vazios
-        if (telefone.includes('@lid') || !telefone) return false;
-
-        // FILTRO 2: Se for ENVIO, remove nomes de teste ou caracteres inúteis
-        if (tipo === 'ENVIO') {
-            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'teste whatsapp', 'null'];
-            if (lixo.includes(evento) || evento.length < 3) return false;
+        // FILTRO 1: Se for uma RESPOSTA (Tipo = RESPOSTA)
+        if (tipo === 'RESPOSTA') {
+            // SÓ deixa passar se a resposta for SIM ou NÃO. 
+            // Se for traço (-), ignora, pois é log vazio do webhook.
+            return (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO');
         }
 
-        // FILTRO 3: Se for RESPOSTA, remove se a resposta for um traço ou vazia
-        if (tipo === 'RESPOSTA') {
-            if (resposta === '-' || resposta === '' || resposta === 'NULL') return false;
+        // FILTRO 2: Se for um ENVIO (Tipo = ENVIO)
+        if (tipo === 'ENVIO') {
+            const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'teste whatsapp'];
+            // Só deixa passar se o evento for real e não for lixo
+            return !lixo.includes(evento) && evento.length > 2;
         }
 
         return true;
     })
-    .reverse().slice(0, 20);
+    .reverse().slice(0, 25); // Mostra as 25 atividades mais recentes
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -102,6 +99,7 @@ export async function GET() {
   }
 }
 
+// POST e DELETE mantidos iguais...
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
