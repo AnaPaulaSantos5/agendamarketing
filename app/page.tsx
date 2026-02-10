@@ -22,10 +22,7 @@ export default function AgendaPage() {
   const [showPerfilSelector, setShowPerfilSelector] = useState(false);
   const [capaImage, setCapaImage] = useState<string | null>(null);
   const [enviandoZap, setEnviandoZap] = useState(false);
-  
-  // Controle de múltiplos eventos no modal
   const [eventosDoDiaSelecionado, setEventosDoDiaSelecionado] = useState<any[]>([]);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tempEvento, setTempEvento] = useState({
@@ -36,17 +33,24 @@ export default function AgendaPage() {
 
   const carregarDados = async () => {
     try {
-      const res = await fetch('/api/agenda');
+      // --- TRAVA DE SEGURANÇA 2: NO-STORE NO FRONTEND ---
+      const res = await fetch('/api/agenda', { 
+          cache: 'no-store',
+          next: { revalidate: 0 }
+      });
+      
       const data = await res.json();
       if (data.events) {
-          console.log("Eventos carregados (Verifique linkDrive):", data.events);
+          console.log("🔥 Eventos Frescos (Verifique o Link):", data.events);
           setEventos(data.events);
       }
       if (data.feed) setFeed(data.feed);
       if (data.perfis) {
         setPerfis(data.perfis);
-        const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
-        setPerfilAtivo(logado || data.perfis[0]);
+        if (!perfilAtivo) {
+            const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
+            setPerfilAtivo(logado || data.perfis[0]);
+        }
       }
     } catch (e) { console.error("Erro ao carregar dados:", e); }
   };
@@ -89,22 +93,19 @@ export default function AgendaPage() {
     } catch (e) { alert("Erro de conexão com o servidor"); } finally { setEnviandoZap(false); }
   };
 
-  // --- NOVA LÓGICA INTELIGENTE DE SALVAR ---
   const handleSalvar = async () => {
-    // 1. SE FOR EDIÇÃO (já tem ID), DELETAMOS O ANTIGO PRIMEIRO
+    // 1. Apaga o antigo se for edição
     if (tempEvento.id) {
         try {
-            console.log("Modo Edição: Removendo antigo evento...", tempEvento.id);
+            console.log("Editando: Apagando anterior...");
             await fetch('/api/agenda', { 
                 method: 'DELETE', 
                 body: JSON.stringify({ id: tempEvento.id }) 
             });
-        } catch (e) {
-            console.error("Erro ao tentar limpar evento antigo:", e);
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // 2. CRIAMOS O NOVO (Seja novo ou recriando o editado)
+    // 2. Cria o novo
     const payload = { 
       ...tempEvento, 
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
@@ -116,9 +117,10 @@ export default function AgendaPage() {
     if (res.ok) { 
         alert("Gravado com sucesso!"); 
         setShowEventModal(false); 
-        carregarDados(); 
+        // Pequeno delay para garantir que o Google Sheets processou
+        setTimeout(() => carregarDados(), 1000); 
     } else {
-        alert("Erro ao gravar novo evento.");
+        alert("Erro ao gravar.");
     }
   };
 
@@ -134,7 +136,7 @@ export default function AgendaPage() {
         if (res.ok) {
             alert("Evento excluído!");
             setShowEventModal(false);
-            carregarDados();
+            setTimeout(() => carregarDados(), 1000);
         } else {
             alert("Erro ao excluir.");
         }
@@ -156,26 +158,20 @@ export default function AgendaPage() {
   const handleDiaClick = (dia: number) => {
     const dataStr = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
     setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia));
-    
     const eventosDoDia = eventos.filter(e => isDiaNoPeriodo(dataStr, e.dataInicio?.split(' ')[0], e.dataFim?.split(' ')[0]));
     setEventosDoDiaSelecionado(eventosDoDia);
-
     setTempEvento({ 
         id: '', dataInicio: dataStr, dataTermino: dataStr, titulo: '', 
         conteudoSecundario: '', perfil: perfilAtivo?.nome || '', 
         chatId: perfilAtivo?.chatId || '', linkDrive: '', 
         cor: CORES_PASTEL[0], tipo: 'externo', horaInicio: '08:00', horaFim: '09:00'
     });
-    
     setShowEventModal(true);
   };
 
-  // --- CARREGAMENTO DO EVENTO (CORRIGIDO LINK) ---
   const handleEventoClick = (e: React.MouseEvent, evento: any) => {
     e.stopPropagation(); 
-    
-    console.log("Abrindo evento:", evento); // Debug no console do navegador
-
+    console.log("Abrindo evento:", evento);
     setTempEvento({ 
         id: evento.id, 
         titulo: evento.titulo, 
@@ -185,12 +181,11 @@ export default function AgendaPage() {
         horaFim: evento.dataFim?.split(' ')[1] || '09:00',
         cor: evento.cor, 
         tipo: evento.tipo || 'externo', 
-        linkDrive: evento.linkDrive || '', // <--- AQUI GARANTE QUE O LINK VEM
+        linkDrive: evento.linkDrive || '', 
         conteudoSecundario: evento.conteudoSecundario || '', 
         perfil: evento.perfil || perfilAtivo?.nome || '', 
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
-    
     const dataStr = evento.dataInicio?.split(' ')[0];
     const eventosDoDia = eventos.filter(ev => isDiaNoPeriodo(dataStr, ev.dataInicio?.split(' ')[0], ev.dataFim?.split(' ')[0]));
     setEventosDoDiaSelecionado(eventosDoDia);
@@ -199,16 +194,13 @@ export default function AgendaPage() {
 
   const selecionarEventoDaLista = (evento: any) => {
       setTempEvento({ 
-        id: evento.id, 
-        titulo: evento.titulo, 
+        id: evento.id, titulo: evento.titulo, 
         dataInicio: evento.dataInicio?.split(' ')[0], 
         dataTermino: evento.dataFim?.split(' ')[0], 
         horaInicio: evento.dataInicio?.split(' ')[1] || '08:00',
         horaFim: evento.dataFim?.split(' ')[1] || '09:00',
-        cor: evento.cor, 
-        tipo: evento.tipo || 'externo', 
-        linkDrive: evento.linkDrive || '', // <--- AQUI TAMBÉM
-        conteudoSecundario: evento.conteudoSecundario || '', 
+        cor: evento.cor, tipo: evento.tipo || 'externo', 
+        linkDrive: evento.linkDrive || '', conteudoSecundario: evento.conteudoSecundario || '', 
         perfil: evento.perfil || perfilAtivo?.nome || '',
         chatId: evento.chatId || perfilAtivo?.chatId || '' 
     });
@@ -218,8 +210,6 @@ export default function AgendaPage() {
 
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
-      
-      {/* SIDEBAR ATIVIDADE */}
       <aside className="w-80 border-r-2 border-black p-6 overflow-y-auto no-scrollbar bg-gray-50/50 flex flex-col">
         <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2"><MessageSquare size={24} /> Atividade</h2>
         <div className="space-y-4">
@@ -241,7 +231,6 @@ export default function AgendaPage() {
         </div>
       </aside>
 
-      {/* ÁREA PRINCIPAL */}
       <main className="flex-1 overflow-y-auto p-8 no-scrollbar bg-white relative">
         <div className="relative mb-10 h-72 rounded-[40px] border-2 border-black overflow-hidden flex items-end p-8">
           <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const r = new FileReader(); r.onloadend = () => { localStorage.setItem('agenda_capa_marketing', r.result as string); setCapaImage(r.result as string); }; r.readAsDataURL(file); } }} />
@@ -296,7 +285,6 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      {/* MODAL PERFIL */}
       <AnimatePresence>
         {showPerfilModal && (
           <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
@@ -313,7 +301,6 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL EVENTO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
