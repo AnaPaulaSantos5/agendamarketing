@@ -33,7 +33,7 @@ export default function AgendaPage() {
 
   const carregarDados = async () => {
     try {
-      // Forçamos o no-store para o link do Drive aparecer sempre atualizado
+      // Forçamos o no-store para os dados virem sempre frescos da planilha
       const res = await fetch('/api/agenda', { 
           cache: 'no-store',
           headers: { 'Pragma': 'no-cache' }
@@ -66,7 +66,6 @@ export default function AgendaPage() {
   }, [status, session, router]);
 
   const handleSalvar = async () => {
-    // 1. Evita duplicidade: Apaga o registro antigo baseado no ID normalizado
     if (tempEvento.id) {
         try {
             await fetch('/api/agenda', { 
@@ -76,7 +75,6 @@ export default function AgendaPage() {
         } catch (e) { console.error("Erro ao limpar duplicado:", e); }
     }
 
-    // 2. Cria o novo registro (Atualizado)
     const payload = { 
       ...tempEvento, 
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
@@ -88,7 +86,6 @@ export default function AgendaPage() {
     if (res.ok) { 
         alert("Salvo com sucesso!"); 
         setShowEventModal(false); 
-        // Aguarda a planilha processar antes de recarregar
         setTimeout(() => carregarDados(), 1200); 
     } else {
         alert("Erro ao salvar.");
@@ -139,7 +136,6 @@ export default function AgendaPage() {
 
   const handleEventoClick = (e: React.MouseEvent, evento: any) => {
     e.stopPropagation(); 
-    // Garante que o tipo esteja sempre em minúsculo para os botões do modal funcionarem
     const tipoNormalizado = evento.tipo?.toLowerCase().trim() === 'interno' ? 'interno' : 'externo';
 
     setTempEvento({ 
@@ -204,22 +200,50 @@ export default function AgendaPage() {
 
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
+      
+      {/* SIDEBAR FEED HUMANIZADO */}
       <aside className="w-80 border-r-2 border-black p-6 overflow-y-auto no-scrollbar bg-gray-50/50 flex flex-col">
-        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2"><MessageSquare size={24} /> Atividade</h2>
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
+            <MessageSquare size={24} /> Atividade
+        </h2>
         <div className="space-y-4">
           {feed.map((item, idx) => (
             <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} key={idx} className="bg-white border-2 border-black p-4 rounded-3xl shadow-[4px_4px_0px_black]">
               <div className="flex justify-between items-start mb-2">
-                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border border-black ${item.Tipo === 'ENVIO' ? 'bg-blue-100' : 'bg-green-100'}`}>{item.Tipo}</span>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border border-black ${item.Tipo === 'ENVIO' ? 'bg-blue-100' : 'bg-green-100'}`}>
+                    {item.Tipo}
+                </span>
                 <span className="text-[8px] font-bold opacity-40">{item.Data?.split(' ')[1]}</span>
               </div>
+              
               <p className="font-black text-xs uppercase truncate">{item.Nome}</p>
+
               {item.Tipo === 'RESPOSTA' ? (
-                <div className="mt-2 flex items-center gap-2 text-sm font-bold">
-                  {item.Resposta === 'SIM' ? <CheckCircle2 size={16} className="text-green-600" /> : <XCircle size={16} className="text-red-600" />}
-                  <span>{item.Resposta === 'SIM' ? 'Confirmou' : 'Recusou'}</span>
+                <div className="mt-2 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-sm font-bold">
+                    {item.Resposta === 'SIM' ? (
+                      <>
+                        <CheckCircle2 size={16} className="text-green-600" />
+                        <span className="text-green-700 font-black">Confirmado</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={16} className="text-red-600" />
+                        <span className="text-red-700 font-black">Recusado</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-medium leading-tight opacity-70">
+                    {item.Resposta === 'SIM' 
+                      ? `${item.Nome} está de acordo.` 
+                      : `${item.Nome} precisa de ajuda.`}
+                  </p>
                 </div>
-              ) : <p className="text-[10px] opacity-60 mt-1 italic truncate">"{item.Evento}"</p>}
+              ) : (
+                <p className="text-[10px] opacity-80 mt-1 font-bold">
+                  🚀 Enviado {item.Evento}
+                </p>
+              )}
             </motion.div>
           ))}
         </div>
@@ -242,11 +266,6 @@ export default function AgendaPage() {
             </div>
             <button onClick={() => signOut({ callbackUrl: '/login' })} className="bg-white border-2 border-black p-4 rounded-2xl hover:bg-red-50 flex items-center gap-2 font-bold uppercase text-xs shadow-md"><LogOut size={18} /> Sair</button>
           </div>
-          {showPerfilSelector && (
-            <motion.div initial={{opacity:0, y: 10}} animate={{opacity:1, y: 0}} className="absolute bottom-28 left-40 bg-white border-2 border-black rounded-2xl p-4 shadow-xl w-48 z-50">
-              {perfis.map(p => <div key={p.nome} onClick={() => { setPerfilAtivo(p); setShowPerfilSelector(false); }} className="p-2 hover:bg-gray-100 rounded-lg font-bold cursor-pointer border-b last:border-0">{p.nome}</div>)}
-            </motion.div>
-          )}
         </div>
 
         <div className="flex justify-between items-center mb-8 border-b-2 border-black pb-4">

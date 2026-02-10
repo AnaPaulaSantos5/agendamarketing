@@ -3,13 +3,10 @@ export function buildWhatsAppMessage(data: {
   conteudoPrincipal: string;
   conteudoSecundario?: string;
   linkDrive?: string;
+  saudacao?: string; // <-- Adicionado para o TypeScript aceitar
 }) {
-  const hora = new Date().getHours();
-  let saudacao = "Olá";
-
-  if (hora >= 5 && hora < 12) saudacao = "Bom dia";
-  else if (hora >= 12 && hora < 18) saudacao = "Boa tarde";
-  else saudacao = "Boa noite";
+  // Se por acaso não vier saudação, ele usa "Olá"
+  const saudacao = data.saudacao || "Olá";
 
   let msg = `${saudacao}, ${data.nome}! 😊\n\nTem marcado pra você o evento:\n“${data.conteudoPrincipal}”\n`;
 
