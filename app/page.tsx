@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, XCircle, Plus, BellRing } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -16,7 +16,7 @@ export default function AgendaPage() {
   const [perfis, setPerfis] = useState<any[]>([]);
   const [feed, setFeed] = useState<any[]>([]);
   const [perfilAtivo, setPerfilAtivo] = useState<any>(null);
-  const [dataAtiva, setDataAtiva] = useState(new Date(2026, 1, 4)); 
+  const [dataAtiva, setDataAtiva] = useState(new Date()); 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showPerfilModal, setShowPerfilModal] = useState(false);
   const [showPerfilSelector, setShowPerfilSelector] = useState(false);
@@ -63,15 +63,6 @@ export default function AgendaPage() {
   }, [status, session, router]);
 
   const handleSalvar = async () => {
-    if (tempEvento.id) {
-        try {
-            await fetch('/api/agenda', { 
-                method: 'DELETE', 
-                body: JSON.stringify({ id: tempEvento.id }) 
-            });
-        } catch (e) { console.error("Erro ao limpar duplicado:", e); }
-    }
-
     const payload = { 
       ...tempEvento, 
       dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
@@ -81,9 +72,8 @@ export default function AgendaPage() {
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
     
     if (res.ok) { 
-        alert("Salvo com sucesso!"); 
         setShowEventModal(false); 
-        setTimeout(() => carregarDados(), 1200); 
+        carregarDados(); 
     } else {
         alert("Erro ao salvar.");
     }
@@ -100,7 +90,7 @@ export default function AgendaPage() {
         });
         if (res.ok) {
             setShowEventModal(false);
-            setTimeout(() => carregarDados(), 1000);
+            carregarDados();
         }
     } catch (e) { console.error(e); }
   };
@@ -196,57 +186,57 @@ export default function AgendaPage() {
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
       
-      {/* SIDEBAR FEED HUMANIZADO E FILTRADO */}
-      <aside className="w-80 border-r-2 border-black p-6 overflow-y-auto no-scrollbar bg-gray-50/50 flex flex-col">
+      {/* SIDEBAR FEED REESTILIZADO */}
+      <aside className="w-80 border-r-2 border-black p-6 bg-gray-50 flex flex-col h-full overflow-hidden">
         <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
-            <MessageSquare size={24} /> Atividade
+            <BellRing size={24} className="text-[#1260c7]" /> Atividade
         </h2>
-        <div className="space-y-4">
-          {feed
-            .filter(item => {
-              // Remove logs de resposta que entram como envios vazios/numéricos
-              if (item.Tipo === 'ENVIO' && (item.Evento === '1' || item.Evento === '2' || item.Evento === '-' || !item.Evento)) return false;
-              return true;
-            })
-            .map((item, idx) => (
-            <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} key={idx} className="bg-white border-2 border-black p-4 rounded-3xl shadow-[4px_4px_0px_black]">
-              <div className="flex justify-between items-start mb-2">
-                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border border-black ${item.Tipo === 'ENVIO' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                    {item.Tipo}
-                </span>
-                <span className="text-[8px] font-bold opacity-40">{item.Data?.split(' ')[1]}</span>
-              </div>
-              
-              <p className="font-black text-xs uppercase truncate">{item.Nome}</p>
-
-              {item.Tipo === 'RESPOSTA' ? (
-                <div className="mt-2 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    {item.Resposta === '1' || item.Resposta === 'SIM' ? (
-                      <>
-                        <CheckCircle2 size={16} className="text-blue-600" />
-                        <span className="text-blue-700 font-black italic underline">Precisa de ajuda</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={16} className="text-green-600" />
-                        <span className="text-green-700 font-black">Está de acordo</span>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-[10px] font-medium leading-tight opacity-70">
-                    {item.Resposta === '1' || item.Resposta === 'SIM'
-                      ? `${item.Nome} solicitou contato do Marketing.` 
-                      : `${item.Nome} confirmou que está tudo certo.`}
-                  </p>
+        
+        {/* CONTAINER COM SCROLL ELEGANTE */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar custom-scrollbar">
+          {feed.length === 0 ? (
+             <p className="text-[10px] font-bold opacity-30 uppercase text-center mt-20">Nenhuma atividade recente</p>
+          ) : (
+            feed.map((item, idx) => (
+              <motion.div 
+                initial={{ x: -20, opacity: 0 }} 
+                animate={{ x: 0, opacity: 1 }} 
+                key={idx} 
+                className={`bg-white border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black] transition-all hover:translate-x-1 hover:translate-y-1 hover:shadow-none`}
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border border-black uppercase ${item.Tipo === 'ENVIO' ? 'bg-[#1260c7] text-white' : 'bg-[#22c55e] text-white'}`}>
+                      {item.Tipo}
+                  </span>
+                  <span className="text-[8px] font-bold opacity-40">{item.Data?.split(',')[1] || item.Data?.split(' ')[1]}</span>
                 </div>
-              ) : (
-                <p className="text-[10px] opacity-80 mt-1 font-bold">
-                  🚀 Enviado {item.Evento}
-                </p>
-              )}
-            </motion.div>
-          ))}
+                
+                <p className="font-black text-xs uppercase truncate mb-1">{item.Nome}</p>
+
+                {item.Tipo === 'RESPOSTA' ? (
+                  <div className="flex flex-col gap-1 border-t border-black/5 pt-2 mt-2">
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      {item.Resposta === 'SIM' ? (
+                        <>
+                          <CheckCircle2 size={14} className="text-[#1260c7]" />
+                          <span className="text-[#1260c7] font-black italic underline">Precisa de ajuda</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={14} className="text-[#22c55e]" />
+                          <span className="text-[#22c55e] font-black">Está de acordo</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] opacity-70 mt-1 font-bold leading-tight">
+                    🚀 <span className="italic">{item.Evento}</span>
+                  </p>
+                )}
+              </motion.div>
+            ))
+          )}
         </div>
       </aside>
 
@@ -273,8 +263,8 @@ export default function AgendaPage() {
           <div className="flex items-center gap-4">
             <ChevronLeft size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() - 1, 1))} />
             <h1 className="text-8xl font-black uppercase tracking-tighter leading-none">{meses[dataAtiva.getMonth()]}</h1>
+            <h1 className="text-8xl font-light tracking-tighter leading-none ml-4">{dataAtiva.getFullYear()}</h1>
           </div>
-          <h1 className="text-8xl font-light tracking-tighter leading-none">{dataAtiva.getFullYear()}</h1>
           <ChevronRight size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 1))} />
         </div>
 
@@ -326,7 +316,7 @@ export default function AgendaPage() {
                 <div className="grid grid-cols-2 gap-6">
                   <select value={tempEvento.perfil} onChange={e => { const p = perfis.find(it => it.nome === e.target.value); setTempEvento({...tempEvento, perfil: e.target.value, chatId: p?.chatId || ''}); }} className="border-2 border-black rounded-2xl p-4 font-bold bg-gray-50 outline-none uppercase">{perfis.map(p => <option key={p.nome} value={p.nome}>{p.nome}</option>)}</select>
                   <div className="flex border-2 border-black rounded-2xl overflow-hidden font-black text-xs h-[60px]">
-                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'externo'})} className={`flex-1 ${tempEvento.tipo === 'externo' ? 'bg-blue-600 text-white' : 'bg-white'}`}>EXTERNO</button>
+                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'externo'})} className={`flex-1 ${tempEvento.tipo === 'externo' ? 'bg-[#1260c7] text-white' : 'bg-white'}`}>EXTERNO</button>
                     <button onClick={() => setTempEvento({...tempEvento, tipo: 'interno'})} className={`flex-1 ${tempEvento.tipo === 'interno' ? 'bg-black text-white' : 'bg-white'}`}>INTERNO</button>
                   </div>
                 </div>
@@ -336,14 +326,14 @@ export default function AgendaPage() {
                 </div>
                 <div className="space-y-6"><input value={tempEvento.titulo} onChange={e => setTempEvento({...tempEvento, titulo: e.target.value})} className="w-full text-4xl font-black bg-transparent outline-none uppercase border-b-2 border-black/10 py-2" placeholder="CONTEÚDO PRINCIPAL" /><textarea value={tempEvento.conteudoSecundario} onChange={e => setTempEvento({...tempEvento, conteudoSecundario: e.target.value})} className="w-full text-xl font-bold bg-transparent outline-none h-24 resize-none" placeholder="Conteúdo Alternativo..." /></div>
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-yellow-100 border-2 border-black p-4 rounded-2xl shadow-[5px_5px_0px_black] overflow-hidden"><p className="text-[9px] font-black uppercase opacity-40">WhatsApp ChatID</p><p className="font-mono text-xs truncate underline decoration-blue-500">{tempEvento.chatId}</p></div>
+                  <div className="bg-[#ffce0a]/20 border-2 border-black p-4 rounded-2xl shadow-[5px_5px_0px_black] overflow-hidden"><p className="text-[9px] font-black uppercase opacity-40">WhatsApp ChatID</p><p className="font-mono text-xs truncate underline decoration-[#1260c7]">{tempEvento.chatId}</p></div>
                   <div className="border-2 border-black p-4 rounded-2xl flex flex-col justify-center bg-white shadow-[5px_5px_0px_black]"><p className="text-[9px] font-black uppercase opacity-40 mb-1">Link Drive</p><input placeholder="https://..." value={tempEvento.linkDrive} onChange={e => setTempEvento({...tempEvento, linkDrive: e.target.value})} className="w-full font-bold text-xs outline-none bg-transparent" /></div>
                 </div>
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
                   <div className="flex gap-4">
-                    <button onClick={handleSalvar} className="hover:underline decoration-yellow-400 decoration-[12px]">Gravar</button>
+                    <button onClick={handleSalvar} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>
                     {tempEvento.id && <button onClick={handleExcluir} className="text-red-500 hover:scale-110"><Trash2 size={24}/></button>}
-                    <button onClick={handleDispararWhatsApp} disabled={enviandoZap} className={`flex items-center gap-2 transition-all ${enviandoZap ? 'opacity-20' : 'hover:underline decoration-green-400 decoration-[12px]'}`}><Send size={24} /> {enviandoZap ? '...' : 'Disparar'}</button>
+                    <button onClick={handleDispararWhatsApp} disabled={enviandoZap} className={`flex items-center gap-2 transition-all ${enviandoZap ? 'opacity-20' : 'hover:underline decoration-[#1260c7] decoration-[12px]'}`}><Send size={24} /> {enviandoZap ? '...' : 'Disparar'}</button>
                   </div>
                   <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
                 </div>
@@ -368,6 +358,14 @@ export default function AgendaPage() {
           </div>
         )}
       </AnimatePresence>
+      
+      {/* CSS CUSTOM PARA SCROLLBAR */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #000; border-radius: 10px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+      `}</style>
     </div>
   );
 }
