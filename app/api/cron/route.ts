@@ -3,14 +3,15 @@ import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/sender';
 import { buildWhatsAppMessage } from '@/lib/whatsapp/template';
+import { formatInTimeZone } from 'date-fns-tz';
 
-// Força o Vercel a não guardar cache dessa rota (essencial para CRON)
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    console.log("⏰ CRON INICIADO: Verificando disparos...");
-
+    const fuso = 'America/Sao_Paulo';
+    const agora = new Date();
+    
     const auth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -19,47 +20,48 @@ export async function GET() {
     const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, auth);
     await doc.loadInfo();
 
-    const sheet = doc.sheetsByTitle['Tarefas'];
-    const rows = await sheet.getRows();
+    // 1. Saudação Inteligente (Curitiba)
+    const horaAtual = parseInt(formatInTimeZone(agora, fuso, 'H'));
+    let saudacaoReal = "Olá";
+    if (horaAtual >= 5 && horaAtual < 12) saudacaoReal = "Bom dia";
+    else if (horaAtual >= 12 && horaAtual < 18) saudacaoReal = "Boa tarde";
+    else saudacaoReal = "Boa noite";
 
-    // Data Atual REAL (UTC) - O Vercel sabe que horas são no mundo
-    const agora = new Date();
-    
+    const sheetTarefas = doc.sheetsByTitle['Tarefas'];
+    const rowsTarefas = await sheetTarefas.getRows();
+    const sheetAgenda = doc.sheetsByTitle['Agenda'];
+    const rowsAgenda = await sheetAgenda.getRows();
+
     let disparados = 0;
 
-    for (const row of rows) {
-        const dataEventoStr = row.get('Data'); // Ex: "2026-02-05 14:00"
+    for (const row of rowsTarefas) {
+        const dataEventoStr = row.get('Data'); 
         const status = row.get('Status');
         const notificar = row.get('Notificar');
 
         if (status === 'Pendente' && notificar === 'Sim' && dataEventoStr) {
             try {
-                // TRUQUE DO FUSO HORÁRIO:
-                // Pegamos a string "2026-02-05 14:00", trocamos espaço por T
-                // E adicionamos "-03:00" no final para dizer "Isso é hora do Brasil"
-                // Resultado: "2026-02-05T14:00:00-03:00"
+                // Converte data da planilha para o objeto Date real
                 const dataFormatada = dataEventoStr.replace(' ', 'T') + ':00-03:00';
                 const dataEvento = new Date(dataFormatada);
                 
-                // Se a data do evento for inválida, pula
-                if (isNaN(dataEvento.getTime())) {
-                    // CORREÇÃO AQUI: Usamos (row as any) para o TypeScript aceitar o rowIndex
-                    console.log(`Data inválida na linha ${(row as any).rowIndex}: ${dataEventoStr}`);
-                    continue;
-                }
+                if (isNaN(dataEvento.getTime())) continue;
 
-                // COMPARAÇÃO UNIVERSAL:
+                // Chegou o momento do disparo?
                 if (dataEvento <= agora) {
                      const chatId = row.get('ResponsavelChatId');
                      const nome = row.get('Responsavel');
                      const titulo = row.get('Titulo');
 
                      if (chatId) {
-                        console.log(`🚀 Disparando para ${nome} (${titulo})`);
+                        // Busca o conteúdo alternativo na aba Agenda para enriquecer a mensagem
+                        const evAgenda = rowsAgenda.find(ra => ra.get('Conteudo_Principal') === titulo);
 
                         const msg = buildWhatsAppMessage({
                             nome: nome,
+                            saudacao: saudacaoReal,
                             conteudoPrincipal: titulo,
+                            conteudoSecundario: evAgenda ? evAgenda.get('Conteudo_Secundario') : '', 
                             linkDrive: row.get('LinkDrive')
                         });
 
@@ -70,16 +72,12 @@ export async function GET() {
                         disparados++;
                      }
                 }
-            } catch (err) {
-                console.error(`Erro ao processar linha: ${err}`);
-            }
+            } catch (err) { console.error(`Erro na linha ${row.get('Titulo')}:`, err); }
         }
     }
 
-    console.log(`✅ CRON FINALIZADO. Disparados: ${disparados}`);
-    return NextResponse.json({ success: true, disparados });
+    return NextResponse.json({ success: true, disparados, hora_curitiba: horaAtual });
   } catch (error: any) {
-    console.error("❌ ERRO NO CRON:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
