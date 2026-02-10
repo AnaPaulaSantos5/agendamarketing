@@ -75,26 +75,21 @@ export async function GET() {
         const evento = String(item.Evento || '').toLowerCase().trim();
         const nome = String(item.Nome || '').toLowerCase().trim();
 
-        // 1. PRIORIDADE: Respostas humanas (SIM/NÃO)
         if (resposta === 'SIM' || resposta === 'NÃO' || resposta === 'NAO') {
             item.Tipo = 'RESPOSTA';
             return true;
         }
 
-        // 2. FILTRO DE LIMPEZA: Remove poluição de logs irrelevantes
-        // Só mostra envios que tenham um nome de evento real (mínimo 3 letras e não seja teste)
         if (nome.includes('confi') || nome.includes('sistema')) {
             const lixo = ['-', '', 'teste', 'tester', 'n tem', 'nenhum', 'null', 'undefined'];
             if (lixo.includes(evento) || evento.length < 3) return false;
-            
             item.Tipo = 'ENVIO';
             return true;
         }
-
         return false;
     })
     .reverse() 
-    .slice(0, 10); // <--- LIMITE: Mostra apenas as 10 últimas atividades para manter o site limpo
+    .slice(0, 10);
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -107,6 +102,22 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     await doc.loadInfo();
     
+    // LÓGICA PARA ATUALIZAR PERFIL NA PLANILHA
+    if (data.isPerfilUpdate) {
+        const pSheet = doc.sheetsByTitle['Perfil'];
+        const pRows = await pSheet.getRows();
+        const row = pRows.find(r => getVal(r, 'Email').toLowerCase().trim() === data.email.toLowerCase().trim());
+
+        if (row) {
+            row.set('Perfil', data.nome);
+            row.set('ChatId', data.chatId);
+            await row.save();
+            return NextResponse.json({ success: true, message: "Perfil Atualizado" });
+        }
+        return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
+    }
+
+    // LÓGICA PARA AGENDA E TAREFAS
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
 
