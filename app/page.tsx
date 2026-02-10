@@ -33,16 +33,13 @@ export default function AgendaPage() {
 
   const carregarDados = async () => {
     try {
-      // Forçamos o no-store para os dados virem sempre frescos da planilha
       const res = await fetch('/api/agenda', { 
           cache: 'no-store',
           headers: { 'Pragma': 'no-cache' }
       });
       
       const data = await res.json();
-      if (data.events) {
-          setEventos(data.events);
-      }
+      if (data.events) setEventos(data.events);
       if (data.feed) setFeed(data.feed);
       if (data.perfis) {
         setPerfis(data.perfis);
@@ -196,18 +193,22 @@ export default function AgendaPage() {
     } catch (e) { console.error(e); } finally { setEnviandoZap(false); }
   };
 
-  if (status === "loading") return <div className="h-screen grid place-items-center font-black text-2xl">Sincronizando...</div>;
-
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
       
-      {/* SIDEBAR FEED HUMANIZADO */}
+      {/* SIDEBAR FEED HUMANIZADO E FILTRADO */}
       <aside className="w-80 border-r-2 border-black p-6 overflow-y-auto no-scrollbar bg-gray-50/50 flex flex-col">
         <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
             <MessageSquare size={24} /> Atividade
         </h2>
         <div className="space-y-4">
-          {feed.map((item, idx) => (
+          {feed
+            .filter(item => {
+              // Remove logs de resposta que entram como envios vazios/numéricos
+              if (item.Tipo === 'ENVIO' && (item.Evento === '1' || item.Evento === '2' || item.Evento === '-' || !item.Evento)) return false;
+              return true;
+            })
+            .map((item, idx) => (
             <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} key={idx} className="bg-white border-2 border-black p-4 rounded-3xl shadow-[4px_4px_0px_black]">
               <div className="flex justify-between items-start mb-2">
                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border border-black ${item.Tipo === 'ENVIO' ? 'bg-blue-100' : 'bg-green-100'}`}>
@@ -221,22 +222,22 @@ export default function AgendaPage() {
               {item.Tipo === 'RESPOSTA' ? (
                 <div className="mt-2 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-sm font-bold">
-                    {item.Resposta === 'SIM' ? (
+                    {item.Resposta === '1' || item.Resposta === 'SIM' ? (
                       <>
-                        <CheckCircle2 size={16} className="text-green-600" />
-                        <span className="text-green-700 font-black">Confirmado</span>
+                        <CheckCircle2 size={16} className="text-blue-600" />
+                        <span className="text-blue-700 font-black italic underline">Precisa de ajuda</span>
                       </>
                     ) : (
                       <>
-                        <XCircle size={16} className="text-red-600" />
-                        <span className="text-red-700 font-black">Recusado</span>
+                        <CheckCircle2 size={16} className="text-green-600" />
+                        <span className="text-green-700 font-black">Está de acordo</span>
                       </>
                     )}
                   </div>
                   <p className="text-[10px] font-medium leading-tight opacity-70">
-                    {item.Resposta === 'SIM' 
-                      ? `${item.Nome} está de acordo.` 
-                      : `${item.Nome} precisa de ajuda.`}
+                    {item.Resposta === '1' || item.Resposta === 'SIM'
+                      ? `${item.Nome} solicitou contato do Marketing.` 
+                      : `${item.Nome} confirmou que está tudo certo.`}
                   </p>
                 </div>
               ) : (
@@ -298,7 +299,6 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      {/* MODAL EVENTO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
