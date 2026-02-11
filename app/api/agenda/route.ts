@@ -27,10 +27,10 @@ export async function GET() {
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
     const rowsTarefas = await tarefasSheet.getRows();
-    const perfisSheet = doc.sheetsByTitle['Perfil'];
-    const rowsPerfis = await perfisSheet.getRows();
+    const pSheet = doc.sheetsByTitle['Perfil'];
+    const pRows = await pSheet.getRows();
 
-    const perfis = rowsPerfis.map(r => ({ 
+    const perfis = pRows.map(r => ({ 
         nome: getVal(r, 'Perfil'), 
         chatId: getVal(r, 'ChatId'), 
         email: getVal(r, 'Email') 
@@ -45,8 +45,8 @@ export async function GET() {
             getVal(r, 'Titulo').trim() === titulo.trim() && getVal(r, 'Data').trim() === dataIni.trim()
         );
 
-        // Busca o chatId do perfil caso não esteja na tarefa
-        const perfilData = perfis.find(p => p.nome === nomePerfil);
+        // Sincroniza o ChatID atualizado do perfil com o evento
+        const dadosDoPerfil = perfis.find(p => p.nome === nomePerfil);
 
         return {
             id: (titulo + dataIni).replace(/\s/g, '').toLowerCase(),
@@ -58,7 +58,7 @@ export async function GET() {
             perfil: nomePerfil,
             conteudoSecundario: getVal(row, 'Conteudo_Secundario'),
             linkDrive: tarefa ? getVal(tarefa, 'LinkDrive') : '',
-            chatId: tarefa ? getVal(tarefa, 'ResponsavelChatId') : (perfilData?.chatId || '')
+            chatId: dadosDoPerfil ? dadosDoPerfil.chatId : (tarefa ? getVal(tarefa, 'ResponsavelChatId') : '')
         };
     });
 
@@ -98,17 +98,14 @@ export async function POST(req: NextRequest) {
 
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
-    const existeAgenda = rowsAgenda.find(r => 
-        getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
-        getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
-    );
+    const existe = rowsAgenda.find(r => getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim());
 
-    if (existeAgenda) {
-        existeAgenda.set('Data_Fim', data.dataFim);
-        existeAgenda.set('Tipo_Evento', data.cor);
-        existeAgenda.set('Perfil', data.perfil);
-        existeAgenda.set('Conteudo_Secundario', data.conteudoSecundario || '');
-        await existeAgenda.save();
+    if (existe) {
+        existe.set('Data_Fim', data.dataFim);
+        existe.set('Tipo_Evento', data.cor);
+        existe.set('Perfil', data.perfil);
+        existe.set('Conteudo_Secundario', data.conteudoSecundario || '');
+        await existe.save();
     } else {
         await agendaSheet.addRow({
           'Data_Inicio': data.dataInicio, 'Data_Fim': data.dataFim, 'Tipo_Evento': data.cor,
