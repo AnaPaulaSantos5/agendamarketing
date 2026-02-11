@@ -54,7 +54,9 @@ export async function GET() {
         };
     });
 
-    const feed = (await doc.sheetsByTitle['WhatsApp_Feed'].getRows()).map(r => ({ 
+    const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
+    const fRows = await fSheet.getRows();
+    const feed = fRows.map(r => ({ 
         Tipo: getVal(r, 'Tipo'), Nome: getVal(r, 'Nome'), Evento: getVal(r, 'Evento'), Resposta: getVal(r, 'Resposta'), Data: getVal(r, 'Data')
     })).filter(item => {
         const res = String(item.Resposta || '').toUpperCase().trim();
@@ -75,12 +77,26 @@ export async function POST(req: NextRequest) {
     await doc.loadInfo();
     
     if (data.isPerfilUpdate) {
-        const pRows = await doc.sheetsByTitle['Perfil'].getRows();
-        const row = pRows.find(r => getVal(r, 'Email').toLowerCase().trim() === data.email.toLowerCase().trim());
-        if (row) {
-            row.set('Perfil', data.nome);
-            row.set('ChatId', data.chatId);
-            await row.save();
+        const pSheet = doc.sheetsByTitle['Perfil'];
+        const pRows = await pSheet.getRows();
+        const rowPerfil = pRows.find(r => getVal(r, 'Email').toLowerCase().trim() === data.email.toLowerCase().trim());
+        
+        if (rowPerfil) {
+            const nomeAntigo = getVal(rowPerfil, 'Perfil');
+            rowPerfil.set('Perfil', data.nome);
+            rowPerfil.set('ChatId', data.chatId);
+            await rowPerfil.save();
+
+            // Sincroniza todas as tarefas existentes com o novo ChatID/Nome
+            const tSheet = doc.sheetsByTitle['Tarefas'];
+            const rowsT = await tSheet.getRows();
+            const tarefasAlvo = rowsT.filter(r => getVal(r, 'Responsavel') === nomeAntigo || getVal(r, 'Responsavel') === data.nome);
+            
+            for (const t of tarefasAlvo) {
+                t.set('ResponsavelChatId', data.chatId);
+                t.set('Responsavel', data.nome);
+                await t.save();
+            }
             return NextResponse.json({ success: true });
         }
     }
@@ -113,6 +129,34 @@ export async function POST(req: NextRequest) {
         await tEx.save();
     } else {
         await tSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
+    }
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json();
+    await doc.loadInfo();
+    const agendaSheet = doc.sheetsByTitle['Agenda'];
+    const rowsA = await agendaSheet.getRows();
+    
+    const rowToDelete = rowsA.find(row => {
+        const idLinha = (getVal(row, 'Conteudo_Principal') + getVal(row, 'Data_Inicio')).replace(/\s/g, '').toLowerCase();
+        return idLinha === data.id;
+    });
+
+    if (rowToDelete) {
+        const t = getVal(rowToDelete, 'Conteudo_Principal');
+        const d = getVal(rowToDelete, 'Data_Inicio');
+        await rowToDelete.delete();
+
+        const tSheet = doc.sheetsByTitle['Tarefas'];
+        const rowsT = await tSheet.getRows();
+        const rowT = rowsT.find(r => getVal(r, 'Titulo') === t && getVal(r, 'Data') === d);
+        if (rowT) await rowT.delete();
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
