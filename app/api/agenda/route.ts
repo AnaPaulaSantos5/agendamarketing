@@ -23,38 +23,60 @@ function getVal(row: any, nome: string) {
 export async function GET() {
   try {
     await doc.loadInfo();
-    const rowsAgenda = await doc.sheetsByTitle['Agenda'].getRows();
-    const rowsTarefas = await doc.sheetsByTitle['Tarefas'].getRows();
-    const rowsPerfis = await doc.sheetsByTitle['Perfil'].getRows();
-    const rowsFeed = await doc.sheetsByTitle['WhatsApp_Feed'].getRows();
+    
+    // 1. EVENTOS DA AGENDA
+    const agendaSheet = doc.sheetsByTitle['Agenda'];
+    const rowsAgenda = await agendaSheet.getRows();
+    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+    const rowsTarefas = await tarefasSheet.getRows();
     
     const events = rowsAgenda.map(row => {
         const titulo = getVal(row, 'Conteudo_Principal');
         const dataIni = getVal(row, 'Data_Inicio');
-        const tarefa = rowsTarefas.find(r => getVal(r, 'Titulo').trim() === titulo.trim() && getVal(r, 'Data').trim() === dataIni.trim());
+        const tarefaCorrespondente = rowsTarefas.find(r => 
+            getVal(r, 'Titulo').trim() === titulo.trim() && getVal(r, 'Data').trim() === dataIni.trim()
+        );
+
         return {
             id: (titulo + dataIni).replace(/\s/g, '').toLowerCase(),
-            titulo, dataInicio: dataIni, dataFim: getVal(row, 'Data_Fim'),
-            tipo: getVal(row, 'Tipo'), cor: getVal(row, 'Tipo_Evento'),
-            perfil: getVal(row, 'Perfil'), conteudoSecundario: getVal(row, 'Conteudo_Secundario'),
-            linkDrive: tarefa ? getVal(tarefa, 'LinkDrive') : ''
+            titulo,
+            dataInicio: dataIni,
+            dataFim: getVal(row, 'Data_Fim'),
+            tipo: getVal(row, 'Tipo'),
+            cor: getVal(row, 'Tipo_Evento'),
+            perfil: getVal(row, 'Perfil'),
+            conteudoSecundario: getVal(row, 'Conteudo_Secundario'),
+            linkDrive: tarefaCorrespondente ? getVal(tarefaCorrespondente, 'LinkDrive') : '',
+            chatId: tarefaCorrespondente ? getVal(tarefaCorrespondente, 'ResponsavelChatId') : ''
         };
     });
 
-    const perfis = rowsPerfis.map(r => ({ 
-        nome: getVal(r, 'Perfil'), chatId: getVal(r, 'ChatId'), email: getVal(r, 'Email') 
+    // 2. PERFIS
+    const pSheet = doc.sheetsByTitle['Perfil'];
+    const pRows = await pSheet.getRows();
+    const perfis = pRows.map(r => ({ 
+        nome: getVal(r, 'Perfil'), 
+        chatId: getVal(r, 'ChatId'), 
+        email: getVal(r, 'Email') 
     }));
 
-    const feed = rowsFeed.map(r => ({ 
+    // 3. ATIVIDADES (FEED)
+    const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
+    const fRows = await fSheet.getRows();
+    const feed = fRows.map(r => ({ 
         Tipo: getVal(r, 'Tipo'), Nome: getVal(r, 'Nome'), Evento: getVal(r, 'Evento'), Resposta: getVal(r, 'Resposta'), Data: getVal(r, 'Data')
     })).filter(item => {
         const res = String(item.Resposta || '').toUpperCase().trim();
-        if (res === 'SIM' || res === 'NÃO' || res === 'NAO') return true;
-        return String(item.Nome || '').toLowerCase().includes('confi') && String(item.Evento || '').length > 3;
-    }).reverse().slice(0, 10);
+        const nome = String(item.Nome || '').toLowerCase();
+        if (res === 'SIM' || res === 'NÃO' || res === 'NAO') { item.Tipo = 'RESPOSTA'; return true; }
+        if (nome.includes('confi') && String(item.Evento).length > 3) { item.Tipo = 'ENVIO'; return true; }
+        return false;
+    }).reverse().slice(0, 15);
 
     return NextResponse.json({ events, perfis, feed });
-  } catch (error: any) { return NextResponse.json({ error: error.message }, { status: 500 }); }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -62,6 +84,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     await doc.loadInfo();
     
+    // CASO SEJA UPDATE DE PERFIL
     if (data.isPerfilUpdate) {
         const pSheet = doc.sheetsByTitle['Perfil'];
         const pRows = await pSheet.getRows();
@@ -74,12 +97,62 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
     }
 
+    // CASO SEJA SALVAR EVENTO (AGENDA + TAREFAS)
     const agendaSheet = doc.sheetsByTitle['Agenda'];
-    await agendaSheet.addRow({
-      'Data_Inicio': data.dataInicio, 'Data_Fim': data.dataFim, 'Tipo_Evento': data.cor,
-      'Tipo': data.tipo, 'Conteudo_Principal': data.titulo, 'Conteudo_Secundario': data.conteudoSecundario || '', 'Perfil': data.perfil
-    });
+    const rowsAgenda = await agendaSheet.getRows();
+    const existeAgenda = rowsAgenda.find(r => 
+        getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
+        getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
+    );
+
+    if (existeAgenda) {
+        existeAgenda.set('Conteudo_Secundario', data.conteudoSecundario || '');
+        existeAgenda.set('Tipo_Evento', data.cor);
+        existeAgenda.set('Perfil', data.perfil);
+        existeAgenda.set('Data_Fim', data.dataFim);
+        await existeAgenda.save();
+    } else {
+        await agendaSheet.addRow({
+          'Data_Inicio': data.dataInicio, 'Data_Fim': data.dataFim, 'Tipo_Evento': data.cor,
+          'Tipo': data.tipo, 'Conteudo_Principal': data.titulo, 'Conteudo_Secundario': data.conteudoSecundario || '', 'Perfil': data.perfil
+        });
+    }
+
+    const tarefasSheet = doc.sheetsByTitle['Tarefas'];
+    const rowsT = await tarefasSheet.getRows();
+    const tEx = rowsT.find(r => getVal(r, 'Titulo').trim() === data.titulo.trim() && getVal(r, 'Data').trim() === data.dataInicio.trim());
+
+    if (tEx) {
+        tEx.set('LinkDrive', data.linkDrive || '');
+        tEx.set('Responsavel', data.perfil);
+        tEx.set('ResponsavelChatId', data.chatId);
+        await tEx.save();
+    } else {
+        await tarefasSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
+    }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) { return NextResponse.json({ error: error.message }, { status: 500 }); }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+    try {
+      const data = await req.json();
+      await doc.loadInfo();
+      const rows = await doc.sheetsByTitle['Agenda'].getRows();
+      const rowToDelete = rows.find(r => (getVal(r, 'Conteudo_Principal') + getVal(r, 'Data_Inicio')).replace(/\s/g, '').toLowerCase() === data.id);
+      if (rowToDelete) {
+          const t = getVal(rowToDelete, 'Conteudo_Principal');
+          const d = getVal(rowToDelete, 'Data_Inicio');
+          await rowToDelete.delete();
+          const rowsT = await doc.sheetsByTitle['Tarefas'].getRows();
+          const rT = rowsT.find(r => getVal(r, 'Titulo').trim() === t.trim() && getVal(r, 'Data').trim() === d.trim());
+          if (rT) await rT.delete();
+      }
+      return NextResponse.json({ success: true });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }
