@@ -27,11 +27,26 @@ export async function GET() {
     const rowsAgenda = await agendaSheet.getRows();
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
     const rowsTarefas = await tarefasSheet.getRows();
+    const perfisSheet = doc.sheetsByTitle['Perfil'];
+    const rowsPerfis = await perfisSheet.getRows();
+
+    const perfis = rowsPerfis.map(r => ({ 
+        nome: getVal(r, 'Perfil'), 
+        chatId: getVal(r, 'ChatId'), 
+        email: getVal(r, 'Email') 
+    }));
     
     const events = rowsAgenda.map(row => {
         const titulo = getVal(row, 'Conteudo_Principal');
         const dataIni = getVal(row, 'Data_Inicio');
-        const tarefa = rowsTarefas.find(r => getVal(r, 'Titulo').trim() === titulo.trim() && getVal(r, 'Data').trim() === dataIni.trim());
+        const nomePerfil = getVal(row, 'Perfil');
+        
+        const tarefa = rowsTarefas.find(r => 
+            getVal(r, 'Titulo').trim() === titulo.trim() && getVal(r, 'Data').trim() === dataIni.trim()
+        );
+
+        // Busca o chatId do perfil caso não esteja na tarefa
+        const perfilData = perfis.find(p => p.nome === nomePerfil);
 
         return {
             id: (titulo + dataIni).replace(/\s/g, '').toLowerCase(),
@@ -40,34 +55,23 @@ export async function GET() {
             dataFim: getVal(row, 'Data_Fim'),
             tipo: getVal(row, 'Tipo'),
             cor: getVal(row, 'Tipo_Evento'),
-            perfil: getVal(row, 'Perfil'),
+            perfil: nomePerfil,
             conteudoSecundario: getVal(row, 'Conteudo_Secundario'),
             linkDrive: tarefa ? getVal(tarefa, 'LinkDrive') : '',
-            chatId: tarefa ? getVal(tarefa, 'ResponsavelChatId') : ''
+            chatId: tarefa ? getVal(tarefa, 'ResponsavelChatId') : (perfilData?.chatId || '')
         };
     });
 
-    const pSheet = doc.sheetsByTitle['Perfil'];
-    const pRows = await pSheet.getRows();
-    const perfis = pRows.map(r => ({ 
-        nome: getVal(r, 'Perfil'), 
-        chatId: getVal(r, 'ChatId'), 
-        email: getVal(r, 'Email') 
-    }));
-
     const fSheet = doc.sheetsByTitle['WhatsApp_Feed'];
     const fRows = await fSheet.getRows();
-    
     const feed = fRows.map(r => ({ 
         Tipo: getVal(r, 'Tipo'), Nome: getVal(r, 'Nome'), Evento: getVal(r, 'Evento'), Resposta: getVal(r, 'Resposta'), Data: getVal(r, 'Data')
-    }))
-    .filter(item => {
+    })).filter(item => {
         const res = String(item.Resposta || '').toUpperCase().trim();
         if (res === 'SIM' || res === 'NÃO' || res === 'NAO') { item.Tipo = 'RESPOSTA'; return true; }
-        if (String(item.Nome).toLowerCase().includes('confi') && String(item.Evento).length > 3) { item.Tipo = 'ENVIO'; return true; }
+        if (String(item.Nome).toLowerCase().includes('confi')) { item.Tipo = 'ENVIO'; return true; }
         return false;
-    })
-    .reverse().slice(0, 10);
+    }).reverse().slice(0, 10);
 
     return NextResponse.json({ events, perfis, feed });
   } catch (error: any) {
@@ -80,11 +84,9 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     await doc.loadInfo();
     
-    // ATUALIZAÇÃO DE PERFIL NA PLANILHA (ADMIN)
     if (data.isPerfilUpdate) {
         const pSheet = doc.sheetsByTitle['Perfil'];
         const pRows = await pSheet.getRows();
-        // Busca a linha pelo email fornecido no body
         const row = pRows.find(r => getVal(r, 'Email').toLowerCase().trim() === data.email.toLowerCase().trim());
         if (row) {
             row.set('Perfil', data.nome);
@@ -92,22 +94,26 @@ export async function POST(req: NextRequest) {
             await row.save();
             return NextResponse.json({ success: true });
         }
-        return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
     }
 
-    // SALVAR EVENTO (AGENDA + TAREFAS)
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsAgenda = await agendaSheet.getRows();
-    const existe = rowsAgenda.find(r => getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim());
+    const existeAgenda = rowsAgenda.find(r => 
+        getVal(r, 'Conteudo_Principal').trim() === data.titulo.trim() && 
+        getVal(r, 'Data_Inicio').trim() === data.dataInicio.trim()
+    );
 
-    if (existe) {
-        existe.set('Conteudo_Secundario', data.conteudoSecundario);
-        existe.set('Tipo_Evento', data.cor);
-        existe.set('Perfil', data.perfil);
-        existe.set('Data_Fim', data.dataFim);
-        await existe.save();
+    if (existeAgenda) {
+        existeAgenda.set('Data_Fim', data.dataFim);
+        existeAgenda.set('Tipo_Evento', data.cor);
+        existeAgenda.set('Perfil', data.perfil);
+        existeAgenda.set('Conteudo_Secundario', data.conteudoSecundario || '');
+        await existeAgenda.save();
     } else {
-        await agendaSheet.addRow({ 'Data_Inicio': data.dataInicio, 'Data_Fim': data.dataFim, 'Tipo_Evento': data.cor, 'Tipo': data.tipo, 'Conteudo_Principal': data.titulo, 'Conteudo_Secundario': data.conteudoSecundario, 'Perfil': data.perfil });
+        await agendaSheet.addRow({
+          'Data_Inicio': data.dataInicio, 'Data_Fim': data.dataFim, 'Tipo_Evento': data.cor,
+          'Tipo': data.tipo, 'Conteudo_Principal': data.titulo, 'Conteudo_Secundario': data.conteudoSecundario || '', 'Perfil': data.perfil
+        });
     }
 
     const tarefasSheet = doc.sheetsByTitle['Tarefas'];
@@ -115,14 +121,13 @@ export async function POST(req: NextRequest) {
     const tEx = rowsT.find(r => getVal(r, 'Titulo').trim() === data.titulo.trim() && getVal(r, 'Data').trim() === data.dataInicio.trim());
 
     if (tEx) {
-        tEx.set('LinkDrive', data.linkDrive);
+        tEx.set('LinkDrive', data.linkDrive || '');
         tEx.set('Responsavel', data.perfil);
         tEx.set('ResponsavelChatId', data.chatId);
         await tEx.save();
     } else {
         await tarefasSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
     }
-    
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
