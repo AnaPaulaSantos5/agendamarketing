@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, Plus, BellRing, Camera, Menu } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, MessageSquare, LogOut, Send, CheckCircle2, Plus, BellRing, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -11,7 +11,6 @@ const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f
 export default function AgendaPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-
   const [eventos, setEventos] = useState<any[]>([]);
   const [perfis, setPerfis] = useState<any[]>([]);
   const [feed, setFeed] = useState<any[]>([]);
@@ -20,25 +19,27 @@ export default function AgendaPage() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showPerfilModal, setShowPerfilModal] = useState(false);
   const [showPerfilSelector, setShowPerfilSelector] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
   const [capaImage, setCapaImage] = useState<string | null>(null);
   const [enviandoZap, setEnviandoZap] = useState(false);
+  const [eventosDoDiaSelecionado, setEventosDoDiaSelecionado] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [tempEvento, setTempEvento] = useState({ id: '', dataInicio: '', dataTermino: '', titulo: '', conteudoSecundario: '', linkDrive: '', cor: CORES_PASTEL[0], perfil: '', chatId: '', tipo: 'externo', horaInicio: '08:00', horaFim: '09:00' });
+  const [tempEvento, setTempEvento] = useState({
+    id: '', dataInicio: '', dataTermino: '', titulo: '', conteudoSecundario: '', 
+    linkDrive: '', cor: CORES_PASTEL[0], perfil: '', chatId: '', tipo: 'externo',
+    horaInicio: '08:00', horaFim: '09:00'
+  });
 
   const carregarDados = async () => {
     try {
       const res = await fetch('/api/agenda', { cache: 'no-store' });
       const data = await res.json();
       if (data.events) setEventos(data.events);
+      if (data.perfis) setPerfis(data.perfis);
       if (data.feed) setFeed(data.feed);
-      if (data.perfis) {
-        setPerfis(data.perfis);
-        if (!perfilAtivo) {
-            const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
-            setPerfilAtivo(logado || data.perfis[0]);
-        }
+      if (data.perfis && !perfilAtivo) {
+          const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
+          setPerfilAtivo(logado || data.perfis[0]);
       }
     } catch (e) { console.error(e); }
   };
@@ -52,40 +53,25 @@ export default function AgendaPage() {
         const interval = setInterval(carregarDados, 15000); 
         return () => clearInterval(interval);
     }
-  }, [status, session, router]);
-
-  const handleSalvarPerfil = async () => {
-    // ADMIN: Envia os dados do perfilAtivo atual para salvar na planilha via POST
-    const res = await fetch('/api/agenda', { 
-        method: 'POST', 
-        body: JSON.stringify({ 
-            isPerfilUpdate: true, 
-            email: perfilAtivo.email, 
-            nome: perfilAtivo.nome, 
-            chatId: perfilAtivo.chatId 
-        }) 
-    });
-    if (res.ok) { 
-        alert("Perfil Atualizado na Planilha!"); 
-        setShowPerfilModal(false); 
-        carregarDados(); 
-    }
-  };
+  }, [status, session]);
 
   const handleSalvar = async () => {
-    const payload = { ...tempEvento, dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}`, chatId: tempEvento.chatId || perfilAtivo.chatId };
+    const payload = { 
+      ...tempEvento, 
+      dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
+      dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}`,
+      chatId: tempEvento.chatId || perfis.find(p => p.nome === tempEvento.perfil)?.chatId || ''
+    };
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
     if (res.ok) { setShowEventModal(false); carregarDados(); }
   };
 
-  const handleDispararWhatsApp = async () => {
-    const destino = tempEvento.chatId || perfilAtivo?.chatId;
-    if (!destino) return alert("ChatID ausente!");
-    setEnviandoZap(true);
-    try {
-      const res = await fetch('/api/whatsapp/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: perfilAtivo.nome, responsavelChatId: destino, conteudoPrincipal: tempEvento.titulo, conteudoSecundario: tempEvento.conteudoSecundario, linkDrive: tempEvento.linkDrive }) });
-      if (res.ok) alert("🚀 WhatsApp enviado!");
-    } catch (e) { console.error(e); } finally { setEnviandoZap(false); }
+  const handleSalvarPerfil = async () => {
+    const res = await fetch('/api/agenda', {
+      method: 'POST',
+      body: JSON.stringify({ isPerfilUpdate: true, email: perfilAtivo.email, nome: perfilAtivo.nome, chatId: perfilAtivo.chatId })
+    });
+    if (res.ok) { alert("Perfil Atualizado!"); setShowPerfilModal(false); carregarDados(); }
   };
 
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
@@ -93,93 +79,72 @@ export default function AgendaPage() {
   const diasNoMes = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate(), [dataAtiva]);
   const primeiroDiaSemana = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), 1).getDay(), [dataAtiva]);
 
-  const isDiaNoPeriodo = (diaStr: string, ini: string, fim: string) => {
-    const d = new Date(diaStr + 'T00:00:00');
-    const i = new Date(ini?.split(' ')[0] + 'T00:00:00');
-    const f = new Date(fim?.split(' ')[0] + 'T00:00:00');
-    return d >= i && d <= f;
+  const handleDiaClick = (dia: number) => {
+    const dataStr = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    setTempEvento({ 
+        id: '', dataInicio: dataStr, dataTermino: dataStr, titulo: '', 
+        conteudoSecundario: '', perfil: perfilAtivo?.nome || '', 
+        chatId: perfilAtivo?.chatId || '', linkDrive: '', 
+        cor: CORES_PASTEL[0], tipo: 'externo', horaInicio: '08:00', horaFim: '09:00'
+    });
+    setShowEventModal(true);
   };
-
-  // Filtra os eventos para o calendário baseado no perfil que o Admin selecionou
-  const eventosFiltrados = useMemo(() => {
-    return eventos.filter(e => e.perfil === perfilAtivo?.nome);
-  }, [eventos, perfilAtivo]);
 
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden">
-      
-      {/* SIDEBAR RETRÁTIL */}
-      <AnimatePresence>
-        {showSidebar && (
-          <motion.aside initial={{ width: 0, opacity: 0 }} animate={{ width: 320, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="border-r-2 border-black p-6 bg-gray-50 flex flex-col h-full overflow-hidden relative">
-            <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2"><BellRing size={24} className="text-[#1260c7]" /> Atividade</h2>
-            <div className="flex-1 overflow-y-auto space-y-4 no-scrollbar custom-scrollbar">
-              {feed.map((item, idx) => (
-                <div key={idx} className="bg-white border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black]">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border border-black text-white ${item.Tipo === 'ENVIO' ? 'bg-[#1260c7]' : 'bg-[#22c55e]'}`}>{item.Tipo}</span>
-                    <span className="text-[8px] font-bold opacity-30">{item.Data?.split(',')[1]}</span>
-                  </div>
-                  <p className="font-black text-xs uppercase truncate">{item.Nome}</p>
-                  {item.Tipo === 'RESPOSTA' ? (
-                      <p className={`text-[10px] font-black mt-1 ${item.Resposta === 'SIM' ? 'text-[#1260c7] italic' : 'text-[#22c55e]'}`}>
-                          {item.Resposta === 'SIM' ? 'Ana Paula está de acordo' : 'Está de acordo'}
-                      </p>
-                  ) : <p className="text-[10px] opacity-70 mt-1 font-bold italic truncate">🚀 {item.Evento}</p>}
-                </div>
-              ))}
+      <aside className="w-80 border-r-2 border-black p-6 bg-gray-50 flex flex-col h-full overflow-hidden">
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2"><BellRing size={24} className="text-[#1260c7]" /> Atividade</h2>
+        <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar custom-scrollbar">
+          {feed.map((item, idx) => (
+            <div key={idx} className="bg-white border-2 border-black p-4 rounded-2xl shadow-[4px_4px_0px_black]">
+              <p className="font-black text-xs uppercase truncate">{item.Nome}</p>
+              <p className="text-[10px] opacity-70 mt-1 font-bold">🚀 {item.Evento}</p>
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+          ))}
+        </div>
+      </aside>
 
       <main className="flex-1 overflow-y-auto p-8 no-scrollbar bg-white relative">
-        <button onClick={() => setShowSidebar(!showSidebar)} className="absolute top-4 left-4 z-[100] bg-white border-2 border-black p-2 rounded-xl shadow-md"><Menu size={20}/></button>
-
-        {/* CAPA COM SELEÇÃO */}
-        <div className="relative mb-10 h-72 rounded-[40px] border-2 border-black overflow-hidden flex items-end p-8">
-          <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const r = new FileReader(); r.onloadend = () => { localStorage.setItem('agenda_capa_marketing', r.result as string); setCapaImage(r.result as string); }; r.readAsDataURL(file); } }} />
-          <div onClick={() => fileInputRef.current?.click()} className="absolute inset-0 cursor-pointer z-0 bg-gray-50 flex items-center justify-center text-gray-400 font-bold overflow-hidden">
-            {capaImage ? <img src={capaImage} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center"><Camera size={40}/><p>ADICIONAR CAPA</p></div>}
-          </div>
-          
-          <div className="relative z-10 flex items-center justify-between w-full">
+        {/* HEADER AREA: Z-Index alto para ficar acima da capa */}
+        <div className="relative z-20 flex items-center justify-between mb-6">
             <div className="flex items-center gap-6">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-2 border-black bg-white flex items-center justify-center text-4xl font-black shadow-lg uppercase overflow-hidden">{perfilAtivo?.nome?.charAt(0)}</div>
-                <button onClick={() => setShowPerfilModal(true)} className="absolute -top-1 -left-1 bg-white border-2 border-black rounded-full p-2 hover:bg-black hover:text-white transition-all shadow-md"><Settings size={18} /></button>
-              </div>
-              {/* SELETOR DE PERFIL (ADMIN) */}
-              <div className="relative">
-                <div className="bg-white border-2 border-black px-6 py-2 rounded-2xl flex items-center gap-4 cursor-pointer shadow-md" onClick={() => setShowPerfilSelector(!showPerfilSelector)}>
-                  <div><h3 className="text-xl font-black uppercase leading-none">{perfilAtivo?.nome || "Perfil"}</h3><p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{perfilAtivo?.email}</p></div>
-                  <ChevronDown className={`opacity-40 transition-transform ${showPerfilSelector ? 'rotate-180' : ''}`} />
+                <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-2 border-black bg-white flex items-center justify-center text-4xl font-black shadow-[4px_4px_0px_black] uppercase">{perfilAtivo?.nome?.charAt(0) || 'A'}</div>
+                    <button onClick={() => setShowPerfilModal(true)} className="absolute -top-1 -left-1 bg-white border-2 border-black rounded-full p-2 hover:bg-black hover:text-white shadow-md"><Settings size={18} /></button>
                 </div>
-                <AnimatePresence>
-                  {showPerfilSelector && (
-                    <motion.div initial={{opacity:0, y:-10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="absolute top-full left-0 mt-2 w-full bg-white border-2 border-black rounded-2xl shadow-xl z-[150] overflow-hidden">
-                      {perfis.map((p, i) => (
-                        <div key={i} onClick={() => { setPerfilAtivo(p); setShowPerfilSelector(false); }} className="p-4 hover:bg-gray-50 cursor-pointer border-b border-black/5 last:border-0 font-black uppercase text-xs">
-                          {p.nome}
+                <div className="relative">
+                    <div onClick={() => setShowPerfilSelector(!showPerfilSelector)} className="bg-white border-2 border-black px-6 py-2 rounded-2xl flex items-center gap-4 cursor-pointer shadow-[4px_4px_0px_black]">
+                        <div><h3 className="text-xl font-black uppercase leading-none">{perfilAtivo?.nome || "Perfil"}</h3><p className="text-[9px] font-bold opacity-40 uppercase">{perfilAtivo?.email}</p></div>
+                        <ChevronDown className={`transition-transform ${showPerfilSelector ? 'rotate-180' : ''}`} />
+                    </div>
+                    {showPerfilSelector && (
+                        <div className="absolute top-full left-0 mt-2 w-full bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_black] overflow-hidden z-[100]">
+                            {perfis.map(p => (
+                                <div key={p.email} onClick={() => { setPerfilAtivo(p); setShowPerfilSelector(false); }} className="p-4 hover:bg-gray-100 cursor-pointer font-black uppercase text-xs border-b border-black last:border-0">{p.nome}</div>
+                            ))}
                         </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    )}
+                </div>
             </div>
-            <button onClick={() => signOut()} className="bg-white border-2 border-black p-4 rounded-2xl font-bold uppercase text-xs shadow-md"><LogOut size={18} /> Sair</button>
+            <button onClick={() => signOut()} className="bg-white border-2 border-black p-4 rounded-2xl font-black uppercase text-xs shadow-[4px_4px_0px_black] hover:bg-red-500 hover:text-white">Sair</button>
+        </div>
+
+        {/* CAPA: Agora em Z-0 para não bloquear cliques */}
+        <div className="relative mb-10 h-64 rounded-[40px] border-2 border-black overflow-hidden bg-gray-100 z-0 shadow-[8px_8px_0px_black]">
+          <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const r = new FileReader(); r.onloadend = () => { setCapaImage(r.result as string); localStorage.setItem('agenda_capa_marketing', r.result as string); }; r.readAsDataURL(file); } }} />
+          <div onClick={() => fileInputRef.current?.click()} className="absolute inset-0 cursor-pointer flex items-center justify-center">
+            {capaImage ? <img src={capaImage} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center opacity-20"><Camera size={48} /><p className="font-black">ADICIONAR CAPA</p></div>}
           </div>
         </div>
 
-        {/* CALENDÁRIO GRID */}
+        {/* CALENDARIO GRID */}
         <div className="flex justify-between items-center mb-8 border-b-2 border-black pb-4">
-          <div className="flex items-center gap-4">
-            <ChevronLeft size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() - 1, 1))} />
-            <h1 className="text-8xl font-black uppercase tracking-tighter leading-none">{meses[dataAtiva.getMonth()]}</h1>
-            <h1 className="text-8xl font-light tracking-tighter leading-none ml-4">{dataAtiva.getFullYear()}</h1>
-          </div>
-          <ChevronRight size={60} className="cursor-pointer hover:scale-110" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 1))} />
+            <div className="flex items-center gap-4">
+                <ChevronLeft size={60} className="cursor-pointer" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() - 1, 1))} />
+                <h1 className="text-8xl font-black uppercase tracking-tighter leading-none">{meses[dataAtiva.getMonth()]}</h1>
+                <h1 className="text-8xl font-light tracking-tighter leading-none ml-4">{dataAtiva.getFullYear()}</h1>
+                <ChevronRight size={60} className="cursor-pointer" onClick={() => setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 1))} />
+            </div>
         </div>
 
         <div className="grid grid-cols-7 gap-4">
@@ -188,14 +153,12 @@ export default function AgendaPage() {
           {Array.from({ length: diasNoMes }, (_, i) => {
             const dia = i + 1;
             const key = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-            const evs = eventosFiltrados.filter(e => isDiaNoPeriodo(key, e.dataInicio, e.dataFim));
+            const evs = eventos.filter(e => e.perfil === perfilAtivo?.nome && e.dataInicio?.split(' ')[0] === key);
             return (
-              <div key={dia} onClick={() => { setTempEvento({...tempEvento, id:'', dataInicio:key, dataTermino:key, perfil:perfilAtivo.nome, chatId:perfilAtivo.chatId}); setShowEventModal(true); }} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer transition-all hover:scale-105 flex flex-col justify-between shadow-sm ${dataAtiva.getDate() === dia && dataAtiva.getMonth() === new Date().getMonth() ? 'bg-orange-50' : 'bg-white'}`}>
-                <span className="text-2xl font-black tracking-tighter">{dia}</span>
-                <div className="flex gap-1 flex-wrap content-start">
-                    {evs.map((ev, idx) => (
-                        <div key={idx} onClick={(e) => { e.stopPropagation(); setTempEvento({...ev, dataInicio:ev.dataInicio.split(' ')[0], dataTermino:ev.dataFim.split(' ')[0], horaInicio:ev.dataInicio.split(' ')[1], horaFim:ev.dataFim.split(' ')[1]}); setShowEventModal(true); }} className="w-3 h-3 rounded-full border border-black shadow-sm" style={{ backgroundColor: ev.cor }} />
-                    ))}
+              <div key={dia} onClick={() => handleDiaClick(dia)} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer shadow-sm ${dataAtiva.getDate() === dia ? 'bg-orange-50' : 'bg-white'}`}>
+                <span className="text-2xl font-black">{dia}</span>
+                <div className="flex gap-1 mt-2 flex-wrap">
+                    {evs.map((ev, idx) => <div key={idx} className="w-3 h-3 rounded-full border border-black" style={{ backgroundColor: ev.cor }} />)}
                 </div>
               </div>
             );
@@ -203,40 +166,25 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      {/* MODAL EVENTO COMPLETO */}
+      {/* MODAL EVENTO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
-            <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white border-2 border-black rounded-[60px] p-12 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+            <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-3xl shadow-[12px_12px_0px_black]">
               <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-4">
-                <h2 className="text-4xl font-black uppercase leading-none">{tempEvento.id ? 'Editar Registro' : 'Novo Registro'}</h2>
-                <div className="flex gap-2">{CORES_PASTEL.map(c => <div key={c} onClick={() => setTempEvento({...tempEvento, cor: c})} className={`w-7 h-7 rounded-full border-2 border-black cursor-pointer ${tempEvento.cor === c ? 'scale-125' : 'opacity-30'}`} style={{ backgroundColor: c }} />)}</div>
+                <h2 className="text-4xl font-black uppercase">Evento</h2>
                 <X className="cursor-pointer" onClick={() => setShowEventModal(false)} />
               </div>
-              
               <div className="space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <select value={tempEvento.perfil} onChange={e => { const p = perfis.find(it => it.nome === e.target.value); setTempEvento({...tempEvento, perfil: e.target.value, chatId: p?.chatId || ''}); }} className="border-2 border-black rounded-2xl p-4 font-bold bg-gray-50 outline-none uppercase">{perfis.map(p => <option key={p.nome} value={p.nome}>{p.nome}</option>)}</select>
-                  <div className="flex border-2 border-black rounded-2xl overflow-hidden font-black text-xs h-[60px]">
-                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'externo'})} className={`flex-1 ${tempEvento.tipo === 'externo' ? 'bg-[#1260c7] text-white' : 'bg-white'}`}>EXTERNO</button>
-                    <button onClick={() => setTempEvento({...tempEvento, tipo: 'interno'})} className={`flex-1 ${tempEvento.tipo === 'interno' ? 'bg-black text-white' : 'bg-white'}`}>INTERNO</button>
-                  </div>
+                <select value={tempEvento.perfil} onChange={e => { const p = perfis.find(it => it.nome === e.target.value); setTempEvento({...tempEvento, perfil: e.target.value, chatId: p?.chatId || ''}); }} className="w-full border-2 border-black rounded-xl p-4 font-black uppercase bg-gray-50">{perfis.map(p => <option key={p.email} value={p.nome}>{p.nome}</option>)}</select>
+                <input value={tempEvento.titulo} onChange={e => setTempEvento({...tempEvento, titulo: e.target.value})} className="w-full text-4xl font-black border-b-2 border-black outline-none uppercase py-2" placeholder="TÍTULO" />
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="date" value={tempEvento.dataInicio} onChange={e => setTempEvento({...tempEvento, dataInicio: e.target.value})} className="border-2 border-black rounded-xl p-4 font-black" />
+                  <input type="time" value={tempEvento.horaInicio} onChange={e => setTempEvento({...tempEvento, horaInicio: e.target.value})} className="border-2 border-black rounded-xl p-4 font-black" />
                 </div>
-                <div className="bg-gray-50 p-8 rounded-[40px] border-2 border-black/5 grid grid-cols-2 gap-8">
-                  <div className="space-y-4"><p className="text-[10px] font-black uppercase opacity-30 flex items-center gap-1"><CalendarIcon size={12}/> Início</p><input type="date" value={tempEvento.dataInicio} onChange={e => setTempEvento({...tempEvento, dataInicio: e.target.value})} className="text-xl font-black bg-transparent w-full border-b border-black outline-none" /><input type="time" value={tempEvento.horaInicio} onChange={e => setTempEvento({...tempEvento, horaInicio: e.target.value})} className="text-3xl font-black bg-transparent w-full outline-none" /></div>
-                  <div className="space-y-4"><p className="text-[10px] font-black uppercase opacity-30 flex items-center gap-1"><CalendarIcon size={12}/> Término</p><input type="date" value={tempEvento.dataTermino} onChange={e => setTempEvento({...tempEvento, dataTermino: e.target.value})} className="text-xl font-black bg-transparent w-full border-b border-black outline-none" /><input type="time" value={tempEvento.horaFim} onChange={e => setTempEvento({...tempEvento, horaFim: e.target.value})} className="text-3xl font-black bg-transparent w-full outline-none" /></div>
-                </div>
-                <div className="space-y-6"><input value={tempEvento.titulo} onChange={e => setTempEvento({...tempEvento, titulo: e.target.value})} className="w-full text-4xl font-black bg-transparent outline-none uppercase border-b-2 border-black/10 py-2" placeholder="CONTEÚDO PRINCIPAL" /><textarea value={tempEvento.conteudoSecundario} onChange={e => setTempEvento({...tempEvento, conteudoSecundario: e.target.value})} className="w-full text-xl font-bold bg-transparent outline-none h-24 resize-none" placeholder="Conteúdo Alternativo..." /></div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-[#ffce0a]/20 border-2 border-black p-4 rounded-2xl shadow-[5px_5px_0px_black] overflow-hidden"><p className="text-[9px] font-black uppercase opacity-40">WhatsApp ChatID</p><p className="font-mono text-xs truncate underline decoration-[#1260c7]">{tempEvento.chatId}</p></div>
-                  <div className="border-2 border-black p-4 rounded-2xl flex flex-col justify-center bg-white shadow-[5px_5px_0px_black]"><p className="text-[9px] font-black uppercase opacity-40 mb-1">Link Drive</p><input placeholder="https://..." value={tempEvento.linkDrive} onChange={e => setTempEvento({...tempEvento, linkDrive: e.target.value})} className="w-full font-bold text-xs outline-none bg-transparent" /></div>
-                </div>
-                <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black text-2xl uppercase tracking-tighter">
-                  <div className="flex gap-4">
-                    <button onClick={handleSalvar} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>
-                    <button onClick={handleDispararWhatsApp} disabled={enviandoZap} className={`flex items-center gap-2 transition-all ${enviandoZap ? 'opacity-20' : 'hover:underline text-[#1260c7]'}`}><Send size={24} /> {enviandoZap ? '...' : 'Disparar'}</button>
-                  </div>
-                  <button onClick={() => setShowEventModal(false)} className="opacity-20 uppercase">Voltar</button>
+                <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black uppercase text-2xl">
+                    <button onClick={handleSalvar} className="hover:underline">Gravar</button>
+                    <button onClick={() => setShowEventModal(false)} className="opacity-20">Voltar</button>
                 </div>
               </div>
             </motion.div>
@@ -244,28 +192,21 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
+      {/* MODAL PERFIL */}
       <AnimatePresence>
         {showPerfilModal && (
-          <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white border-2 border-black rounded-[50px] p-12 w-full max-w-xl shadow-2xl relative">
-              <X className="absolute top-8 right-8 cursor-pointer" onClick={() => setShowPerfilModal(false)} />
-              <h2 className="text-4xl font-black uppercase mb-8 border-b-2 border-black pb-4">Gestão Admin</h2>
-              <div className="space-y-6">
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">Nome</p><input type="text" value={perfilAtivo?.nome || ''} onChange={e => setPerfilAtivo({...perfilAtivo, nome: e.target.value})} className="w-full border-2 border-black rounded-2xl p-4 font-bold bg-white focus:bg-blue-50 outline-none" /></div>
-                <div><p className="text-[10px] font-black uppercase opacity-30 mb-2">WhatsApp ChatID</p><input type="text" value={perfilAtivo?.chatId || ''} onChange={e => setPerfilAtivo({...perfilAtivo, chatId: e.target.value})} className="w-full border-2 border-black rounded-2xl p-4 font-bold" /></div>
-                <button onClick={handleSalvarPerfil} className="w-full bg-black text-white p-5 rounded-3xl font-black uppercase shadow-[6px_6px_0px_#ffce0a] active:translate-y-1">Gravar na Planilha</button>
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white border-2 border-black rounded-[40px] p-10 w-full max-w-md shadow-[12px_12px_0px_black]">
+              <h2 className="text-3xl font-black uppercase mb-8 border-b-2 border-black">Perfil</h2>
+              <div className="space-y-6 font-black uppercase">
+                <div><p className="text-[10px] mb-1">Nome</p><input value={perfilAtivo?.nome || ''} onChange={e => setPerfilAtivo({...perfilAtivo, nome: e.target.value})} className="w-full border-2 border-black p-4 rounded-xl outline-none" /></div>
+                <div><p className="text-[10px] mb-1">ChatID WhatsApp</p><input value={perfilAtivo?.chatId || ''} onChange={e => setPerfilAtivo({...perfilAtivo, chatId: e.target.value})} className="w-full border-2 border-black p-4 rounded-xl outline-none" /></div>
+                <button onClick={handleSalvarPerfil} className="w-full bg-black text-white p-5 rounded-2xl shadow-[4px_4px_0px_#ffce0a] active:translate-y-1">Salvar na Planilha</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-      
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #000; border-radius: 10px; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
     </div>
   );
 }
