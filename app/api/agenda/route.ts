@@ -77,8 +77,7 @@ export async function POST(req: NextRequest) {
     await doc.loadInfo();
     
     if (data.isPerfilUpdate) {
-        const pSheet = doc.sheetsByTitle['Perfil'];
-        const pRows = await pSheet.getRows();
+        const pRows = await doc.sheetsByTitle['Perfil'].getRows();
         const rowPerfil = pRows.find(r => getVal(r, 'Email').toLowerCase().trim() === data.email.toLowerCase().trim());
         
         if (rowPerfil) {
@@ -87,7 +86,6 @@ export async function POST(req: NextRequest) {
             rowPerfil.set('ChatId', data.chatId);
             await rowPerfil.save();
 
-            // Sincroniza todas as tarefas existentes com o novo ChatID/Nome
             const tSheet = doc.sheetsByTitle['Tarefas'];
             const rowsT = await tSheet.getRows();
             const tarefasAlvo = rowsT.filter(r => getVal(r, 'Responsavel') === nomeAntigo || getVal(r, 'Responsavel') === data.nome);
@@ -126,9 +124,26 @@ export async function POST(req: NextRequest) {
         tEx.set('LinkDrive', data.linkDrive || '');
         tEx.set('Responsavel', data.perfil);
         tEx.set('ResponsavelChatId', data.chatId);
+        // Se o sinal de postagem vier do site, atualiza as colunas de trigger
+        if (data.postarNoInstagram) {
+            tEx.set('Postar_Instagram', 'SIM');
+            tEx.set('Status_Instagram', 'PENDENTE');
+        }
         await tEx.save();
     } else {
-        await tSheet.addRow([`ID${Date.now()}`, data.titulo, data.perfil, data.dataInicio, 'Pendente', data.linkDrive || '', 'Sim', data.chatId]);
+        // Nova Tarefa com colunas extras (I e J)
+        await tSheet.addRow([
+            `ID${Date.now()}`, 
+            data.titulo, 
+            data.perfil, 
+            data.dataInicio, 
+            'Pendente', 
+            data.linkDrive || '', 
+            'Sim', 
+            data.chatId,
+            data.postarNoInstagram ? 'SIM' : 'NÃO', // Coluna I
+            ''                                      // Coluna J
+        ]);
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -142,19 +157,15 @@ export async function DELETE(req: NextRequest) {
     await doc.loadInfo();
     const agendaSheet = doc.sheetsByTitle['Agenda'];
     const rowsA = await agendaSheet.getRows();
-    
     const rowToDelete = rowsA.find(row => {
         const idLinha = (getVal(row, 'Conteudo_Principal') + getVal(row, 'Data_Inicio')).replace(/\s/g, '').toLowerCase();
         return idLinha === data.id;
     });
-
     if (rowToDelete) {
         const t = getVal(rowToDelete, 'Conteudo_Principal');
         const d = getVal(rowToDelete, 'Data_Inicio');
         await rowToDelete.delete();
-
-        const tSheet = doc.sheetsByTitle['Tarefas'];
-        const rowsT = await tSheet.getRows();
+        const rowsT = await doc.sheetsByTitle['Tarefas'].getRows();
         const rowT = rowsT.find(r => getVal(r, 'Titulo') === t && getVal(r, 'Data') === d);
         if (rowT) await rowT.delete();
     }
