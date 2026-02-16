@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, LogOut, Send, CheckCircle2, Plus, BellRing, Camera, Menu } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, Trash2, LogOut, Send, CheckCircle2, Plus, BellRing, Camera, Menu, Instagram } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CORES_PASTEL = ['#f5886c', '#1260c7', '#ffce0a', '#b8e1dd', '#d1c4e9', '#f8bbd0', '#e1f5fe', '#c5e1a5', '#ffe082'];
@@ -34,6 +34,7 @@ export default function AgendaPage() {
       if (data.perfis) setPerfis(data.perfis);
       if (data.feed) setFeed(data.feed);
       
+      // Só define o perfil automaticamente na primeira carga para não bugar sua seleção de Admin
       if (isFirstLoad && data.perfis && !perfilAtivo) {
           const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
           setPerfilAtivo(logado || data.perfis[0]);
@@ -57,10 +58,20 @@ export default function AgendaPage() {
     if (res.ok) { alert("Perfil e Tarefas Sincronizadas!"); setShowPerfilModal(false); carregarDados(); }
   };
 
-  const handleSalvarEvento = async () => {
-    const payload = { ...tempEvento, dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}`, chatId: tempEvento.chatId || perfis.find(p => p.nome === tempEvento.perfil)?.chatId || '' };
+  const handleSalvarEvento = async (postarIG = false) => {
+    const payload = { 
+        ...tempEvento, 
+        dataInicio: `${tempEvento.dataInicio} ${tempEvento.horaInicio}`, 
+        dataFim: `${tempEvento.dataTermino} ${tempEvento.horaFim}`, 
+        chatId: tempEvento.chatId || perfis.find(p => p.nome === tempEvento.perfil)?.chatId || '',
+        postarNoInstagram: postarIG
+    };
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify(payload) });
-    if (res.ok) { setShowEventModal(false); carregarDados(); }
+    if (res.ok) { 
+        if(postarIG) alert("🚀 Comando de postagem enviado!");
+        setShowEventModal(false); 
+        carregarDados(); 
+    }
   };
 
   const handleExcluirEvento = async () => {
@@ -174,11 +185,16 @@ export default function AgendaPage() {
                 <textarea value={tempEvento.conteudoSecundario} onChange={e => setTempEvento({...tempEvento, conteudoSecundario: e.target.value})} className="w-full h-24 border-2 border-black rounded-xl p-4 font-bold outline-none resize-none" placeholder="Descrição..." />
                 <div className="grid grid-cols-2 gap-6"><div className="border-2 border-black p-4 rounded-2xl bg-[#ffce0a]/10"><p className="text-[9px] font-black uppercase opacity-40">ChatId</p><p className="font-mono text-xs">{tempEvento.chatId}</p></div><div className="border-2 border-black p-4 rounded-2xl bg-white"><p className="text-[9px] font-black uppercase opacity-40">Drive</p><input value={tempEvento.linkDrive} onChange={e => setTempEvento({...tempEvento, linkDrive: e.target.value})} className="w-full font-bold text-xs outline-none bg-transparent" /></div></div>
                 <div className="flex justify-between items-center pt-8 border-t-2 border-black font-black uppercase text-2xl">
-                    <div className="flex gap-8">
-                        <button onClick={handleSalvarEvento} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>
+                    <div className="flex gap-4 items-center">
+                        <button onClick={() => handleSalvarEvento(false)} className="hover:underline decoration-[#ffce0a] decoration-[12px]">Gravar</button>
                         {tempEvento.id && <button onClick={handleExcluirEvento} className="text-red-500 hover:scale-110 transition-transform"><Trash2 size={24}/></button>}
                     </div>
-                    <button onClick={async () => { const destino = tempEvento.chatId || perfilAtivo?.chatId; setEnviandoZap(true); await fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({...tempEvento, responsavelChatId: destino, nome: perfilAtivo.nome}) }); setEnviandoZap(false); alert("🚀 Enviado!"); }} className="text-[#1260c7] hover:underline">Disparar</button>
+                    <div className="flex gap-6 items-center">
+                        <button onClick={() => handleSalvarEvento(true)} className="flex items-center gap-2 text-pink-500 hover:scale-110 transition-transform">
+                          <Instagram size={24}/> Postar no IG
+                        </button>
+                        <button onClick={async () => { const destino = tempEvento.chatId || perfilAtivo?.chatId; setEnviandoZap(true); await fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({...tempEvento, responsavelChatId: destino, nome: perfilAtivo.nome}) }); setEnviandoZap(false); alert("🚀 Enviado!"); }} className="text-[#1260c7] hover:underline">Disparar</button>
+                    </div>
                 </div>
               </div>
             </motion.div>
