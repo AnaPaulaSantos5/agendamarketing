@@ -34,7 +34,6 @@ export default function AgendaPage() {
       if (data.perfis) setPerfis(data.perfis);
       if (data.feed) setFeed(data.feed);
       
-      // Só define o perfil automaticamente na primeira carga para não bugar sua seleção de Admin
       if (isFirstLoad && data.perfis && !perfilAtivo) {
           const logado = data.perfis.find((p: any) => p.email?.toLowerCase() === session?.user?.email?.toLowerCase());
           setPerfilAtivo(logado || data.perfis[0]);
@@ -52,6 +51,14 @@ export default function AgendaPage() {
         return () => clearInterval(interval);
     }
   }, [status, session]);
+
+  const proximoMes = () => {
+    setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 1));
+  };
+
+  const mesAnterior = () => {
+    setDataAtiva(new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() - 1, 1));
+  };
 
   const handleSalvarPerfil = async () => {
     const res = await fetch('/api/agenda', { method: 'POST', body: JSON.stringify({ isPerfilUpdate: true, email: perfilAtivo.email, nome: perfilAtivo.nome, chatId: perfilAtivo.chatId }) });
@@ -83,6 +90,7 @@ export default function AgendaPage() {
 
   const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
   const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+  
   const diasNoMes = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth() + 1, 0).getDate(), [dataAtiva]);
   const primeiroDiaSemana = useMemo(() => new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), 1).getDay(), [dataAtiva]);
 
@@ -144,6 +152,21 @@ export default function AgendaPage() {
           </div>
         </div>
 
+        {/* CONTROLES DE NAVEGAÇÃO DO CALENDÁRIO */}
+        <div className="flex items-center justify-between mb-8 px-4">
+          <h1 className="text-5xl font-black uppercase tracking-tighter">
+            {meses[dataAtiva.getMonth()]} <span className="opacity-20">{dataAtiva.getFullYear()}</span>
+          </h1>
+          <div className="flex gap-2">
+            <button onClick={mesAnterior} className="bg-white border-2 border-black p-3 rounded-2xl hover:bg-black hover:text-white transition-all shadow-[4px_4px_0_black] active:translate-y-1 active:shadow-none">
+              <ChevronLeft size={24} />
+            </button>
+            <button onClick={proximoMes} className="bg-white border-2 border-black p-3 rounded-2xl hover:bg-black hover:text-white transition-all shadow-[4px_4px_0_black] active:translate-y-1 active:shadow-none">
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-7 gap-4">
           {diasSemana.map(d => <div key={d} className="text-center font-black opacity-20 text-xs uppercase">{d}</div>)}
           {Array.from({ length: primeiroDiaSemana }).map((_, i) => <div key={i} />)}
@@ -152,7 +175,7 @@ export default function AgendaPage() {
             const key = `${dataAtiva.getFullYear()}-${String(dataAtiva.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
             const evs = eventos.filter(e => e.perfil === perfilAtivo?.nome && isDiaNoPeriodo(key, e.dataInicio, e.dataFim));
             return (
-              <div key={dia} onClick={() => { setTempEvento({...tempEvento, id:'', dataInicio:key, dataTermino:key, perfil:perfilAtivo.nome, chatId:perfilAtivo.chatId, titulo:'', conteudoSecundario:'', linkDrive:''}); setShowEventModal(true); }} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer shadow-sm transition-all hover:scale-105 ${dataAtiva.getDate() === dia ? 'bg-orange-50' : 'bg-white'}`}>
+              <div key={dia} onClick={() => { setTempEvento({...tempEvento, id:'', dataInicio:key, dataTermino:key, perfil:perfilAtivo.nome, chatId:perfilAtivo.chatId, titulo:'', conteudoSecundario:'', linkDrive:''}); setShowEventModal(true); }} className={`h-32 border-2 border-black rounded-[30px] p-4 cursor-pointer shadow-sm transition-all hover:scale-105 ${new Date().toDateString() === new Date(dataAtiva.getFullYear(), dataAtiva.getMonth(), dia).toDateString() ? 'bg-orange-50' : 'bg-white'}`}>
                 <span className="text-2xl font-black">{dia}</span>
                 <div className="flex gap-1 mt-2 flex-wrap">
                     {evs.map((ev, idx) => <div key={idx} onClick={(e) => { e.stopPropagation(); setTempEvento({...ev, dataInicio:ev.dataInicio.split(' ')[0], dataTermino:ev.dataFim.split(' ')[0], horaInicio:ev.dataInicio.split(' ')[1] || '08:00', horaFim:ev.dataFim.split(' ')[1] || '09:00'}); setShowEventModal(true); }} className="w-3 h-3 rounded-full border border-black cursor-pointer hover:scale-125 transition-transform" style={{ backgroundColor: ev.cor }} />)}
@@ -163,6 +186,7 @@ export default function AgendaPage() {
         </div>
       </main>
 
+      {/* MODAL EVENTO */}
       <AnimatePresence>
         {showEventModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
@@ -202,6 +226,7 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
+      {/* MODAL PERFIL */}
       <AnimatePresence>
         {showPerfilModal && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
