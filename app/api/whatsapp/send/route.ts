@@ -16,10 +16,13 @@ export async function POST(req: NextRequest) {
     else if (horaAtual >= 12 && horaAtual < 18) saudacaoReal = "Boa tarde";
     else saudacaoReal = "Boa noite";
 
+    // CORREÇÃO: Usamos data.titulo (que vem do front) para preencher o conteudoPrincipal (que o template espera)
+    const tituloEvento = data.titulo || data.conteudoPrincipal || 'Evento sem título';
+
     const mensagem = buildWhatsAppMessage({
       nome: data.nome,
-      saudacao: saudacaoReal, // <-- Passando a saudação de Curitiba
-      conteudoPrincipal: data.conteudoPrincipal || 'Evento sem título',
+      saudacao: saudacaoReal,
+      conteudoPrincipal: tituloEvento, 
       conteudoSecundario: data.conteudoSecundario || '',
       linkDrive: data.linkDrive || '',
     })
@@ -28,11 +31,12 @@ export async function POST(req: NextRequest) {
       data.responsavelChatId, 
       mensagem, 
       data.nome, 
-      data.conteudoPrincipal || 'Evento'
+      tituloEvento // Também corrigido aqui para o log do sender
     )
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
+    console.error("Erro ao enviar WhatsApp:", err);
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
